@@ -44,6 +44,10 @@ When `[✓] Advanced Bill` is toggled:
 * **Additional Expenses & Landed Costs:**
   * Rows for Freight Inward, Handling & Labour, Packaging, Transit Insurance.
   * `[✓] Capitalize into Inventory Cost` toggle: Capitalized charges are absorbed into moving average inventory valuation (AVCO); uncapitalized charges route to operational P&L expense accounts.
+* **Configurable Cost Composition Policy:** Controlled individually in Settings:
+  * *Factor Discounts in Cost:* [ON / OFF]
+  * *Factor Expenses in Cost:* [ON / OFF]
+  * *Factor Taxes in Cost:* [ON / OFF] (ON for Composition/non-GST, OFF for Regular GST)
 * **Tax Override & Penny Round-off:**
   * System calculates tax (GST / TCS / VAT).
   * User can override the tax amount directly to match the printed supplier invoice.

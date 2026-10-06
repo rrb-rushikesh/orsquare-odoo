@@ -161,6 +161,25 @@ For a complete Advanced Purchase Bill matching the Anand Wines case study:
 
 ---
 
+### E. Configurable Cost Composition Policy (Settings Control)
+
+Rather than enforcing rigid, hardcoded logic for how the "Effective Cost per Piece" is derived, ORSquare provides shop owners with granular configuration toggles under `Settings` $\rightarrow$ `Bill & Invoice / Costing`:
+
+| Control Toggle | Setting Key | Default Setting | When ON | When OFF |
+|---|---|---|---|---|
+| **Factor Discounts in Cost** | `cost_include_discounts` | **ON** | Item and bill-level trade discounts lower the effective piece cost and inventory asset valuation. | Cost stays at gross purchase rate; discounts post to Discount Received income without lowering stock asset valuation. |
+| **Factor Expenses in Cost** | `cost_include_expenses` | **ON** | Freight, handling, and logistics charges are capitalized into effective piece cost (Landed Cost). | Expenses post directly to P&L expense ledgers and do not inflate inventory valuation. |
+| **Factor Taxes in Cost** | `cost_include_taxes` | **OFF** (Regular GST) / **ON** (Composition / Non-GST) | Taxes (GST / VAT / TCS) are added directly into product cost (essential for Composition Scheme retailers who cannot claim ITC). | Taxes route to Tax Input Credit asset accounts and do not inflate product cost (standard for Regular GST businesses). |
+
+#### The Dynamic Cost Formula:
+$$\text{Effective Stock Cost} = \text{Gross Items} - (\text{Discounts if ON}) + (\text{Expenses if ON}) + (\text{Taxes if ON})$$
+$$\text{Effective Piece Rate} = \frac{\text{Effective Stock Cost}}{\text{Total Physical Units Received}}$$
+
+* **Per-Bill Transparency:** In the Advanced Purchase Bill drawer, each deduction or addition row displays a clear pill tag (e.g. `[Adds to Cost]` vs `[Posted as Expense]`) honoring the shop's active configuration, with owner-authorized inline override toggles.
+
+
+---
+
 ## 4. UI/UX Workflow Specifications
 
 ### A. Advanced Purchase Bill Drawer (Progressive Disclosure)

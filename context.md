@@ -88,7 +88,7 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
   - **Two-Tier Billing:** Simple Bill (default 10-second workflow for everyday counter operations) vs. Advanced Bill (`[✓] Advanced Bill` toggle for supplier invoice reproduction and B2B wholesale invoices).
   - **Commercial Adjustments:** Item-level discounts (%/₹), prorated bill-level trade discounts, capitalized landed costs (freight, handling, insurance) vs. period expenses.
   - **Bi-Directional Rate Engine:** Supports forward entry (`Qty × Rate = Total`) and reverse entry (`Qty + Total = Rate`), with explicit tax-exclusive base labeling and tax-inclusive reverse calculator.
-  - **Costing Standard:** Moving Weighted Average Cost (AVCO via Odoo `property_cost_method = 'average'`) across all products, cleanly separating internal asset valuation from legal supplier payables.
+  - **Costing Standard & Configurable Policy:** Moving Weighted Average Cost (AVCO via Odoo `property_cost_method = 'average'`) across all products, cleanly separating internal asset valuation from legal supplier payables. Granular settings switches give shop owners total control over whether discounts, freight/expenses, and taxes are factored into product cost rates.
   - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
   - **Dual Bill-Template System:** Dedicated template engines in Settings for **Large Format A4 Tax Invoices** (with statutory excise bottle breakdown matrix, bank details, dynamic UPI QR) and **Compact Thermal Slips** (58mm, 80mm).
 
