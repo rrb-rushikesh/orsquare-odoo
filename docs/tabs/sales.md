@@ -9,51 +9,43 @@
 ## 1. Checkout Workflow
 
 1. **Scan or Search:** Salesperson scans barcode (USB/Bluetooth) or searches product name / short code.
-2. **Stock Validation vs. Infinite Kitchen Stock:**
-   * **Retail Products (`detailed_type = 'product'`):** Instant visual feedback showing availability in **Counter** stock (`WH/Stock/Counter`). Quantity cannot exceed physical stock without manager override.
-   * **Kitchen Dishes & Consumables (`detailed_type = 'consu'`):** Bypasses physical stock check; displays an infinite availability badge (`∞`). Quantities can be incremented freely without inventory restrictions.
+2. **Stock Validation & Auto-Godown Replenishment:**
+   * **Counter Stock Validation:** Retail items consume `WH/Stock/Counter`.
+   * **Auto-Godown Transfer:** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal transfer from Godown to Counter is chained automatically during settlement.
+   * **Kitchen & Consumables (`detailed_type = 'consu'`):** Displays an infinite availability badge (`∞`). Incrementable freely without inventory restrictions.
 3. **Quantity, Rate & Portion Selection:**
    * Adjust quantity; optional discount or price override (if authorized).
-   * **Portion Selection (Full / Half):** For dishes with portion pricing, cashier selects the desired portion chip (`[Full: ₹200]` or `[Half: ₹120]`) directly from the search dropdown or bill line without cluttering catalog searches.
+   * **Portion Selection (Full / Half):** For dishes with portion variants, cashier selects `[Full]` or `[Half]` directly from search or line item.
 4. **Open Bottle Peg Flow (Optional):**
-   * If customer wants a portion (e.g. 60ml peg), salesperson opens the **Open Bottle Drawer**.
-   * Selects portion pack size (30ml, 60ml, 90ml, etc.).
-   * Selects existing open bottle from the **Open Bottles Tray** (or opens a new bottle).
-   * Adds portion to bill.
-5. **Select Payment Method:**
-   * **Cash:** Exact change or tendered amount calculator.
-   * **UPI / Online:** Generates dynamic QR or manual transaction reference.
-   * **Khata (Credit):** Customer picker with live outstanding balance; adds to customer's receivable.
-   * **Multiple Tender:** Combine Cash + UPI.
-6. **Confirm & Settle:** Commits the transaction atomically.
-7. **Silent Thermal Printing:** ESC/POS silent print to 80mm or 58mm thermal receipt printer via QZ Tray or browser print fallback.
+   * Salesperson opens the **Open Bottle Drawer**, selects peg size (30ml, 60ml, 90ml, etc.), chooses an open bottle from the **Open Bottles Tray**, and adds portion to bill.
+5. **Coupons & Discount Schemes:**
+   * 1-tap coupon input applying configured promo schemes (e.g. `PROMO10` for 10% off, `FLAT50` for ₹50 off) subject to minimum invoice spend rules.
+6. **Payment & Settlement:**
+   * **Tender Options:** Cash (with change calculator), UPI (dynamic QR code), Khata (Customer ledger credit), or Split Tender.
+   * **Enforced Payment Method:** If enabled in Settings (e.g. `Cash only` or `UPI only`), alternative buttons are hidden and keyboard shortcuts route directly to the enforced method.
+7. **Silent Thermal Printing:** ESC/POS silent print to 80mm or 58mm thermal receipt printer via QZ Tray bridge or clean browser print fallback.
 
 ---
 
-## 2. Universal Features & Modules
+## 2. Specialized Operational Modes
 
-### A. Open Bottles Tray & Open Bottle Drawer
-* Persistent carousel at the bottom of the Sales screen displaying active opened bottles with live remaining ml and visual liquid fill level (Green >50%, Amber 25-50%, Red <25%). See [`docs/opened-bottles-spec.md`](../opened-bottles-spec.md).
+### A. Continuous Scanning Mode (`prefs.continuousScanning`)
+* **Target:** High-traffic supermarket queues and festival rush hours.
+* **Behavior:** Locks the cart list and hides visual category tiles. Every barcode scan immediately accumulates into the active open draft bill without requiring enter keys or confirmation modals.
 
-### B. Kitchen Quick Billing (Universal Extension)
-* When Kitchen is enabled in Business Studio, a dedicated Kitchen category filter appears in POS.
-* Cashiers can quickly tap popular food dishes and snacks without leaving the checkout flow.
-* Kitchen sales roll into daily sales totals and tax accounts, but never affect stock valuations or warehouse quants.
+### B. Bill Finder Drawer ("Recognition Over Recall")
+* Dedicated drawer to locate past bills for returns, reprints, or customer disputes.
+* Lists the most recent bills immediately upon opening; real-time search filters by Bill # (e.g. `INV-1042`), Customer name, date/time, or bill amount.
 
-### C. Offline Mode & Queue
-* When internet disconnects, the React app continues billing using locally cached catalog data in IndexedDB.
-* Generates bills with client-side UUIDs and prints receipts locally.
-* When connection returns, batches and pushes pending orders to Odoo.
+### C. Open Bottles Tray & Peg Drawer
+* Persistent carousel at the bottom of the Sales screen displaying active opened bottles with live remaining ml and visual liquid fill badges (Green >50%, Amber 25-50%, Red <25%). See [`docs/opened-bottles-spec.md`](../opened-bottles-spec.md).
 
-### D. Restaurant Tables Mode (Optional)
-* When enabled in Settings, provides an interactive table map allowing staff to hold and manage open bills per table.
+### D. Offline POS & Resilient Outbox
+* Local IndexedDB (Dexie.js) cache allows continuous billing when offline. Orders queue safely with client-side UUIDs (`client_order_ref`) and flush idempotently to Odoo upon reconnect.
 
 ### E. Advanced Sales Bill (B2B Tax Invoice)
-* **Separation of Concerns:** Counter POS billing remains fast, minimal, and keyboard-driven.
-* **B2B Invoice Flow (`+ New Tax Invoice`):** Accessed via a dedicated button for wholesale sales to hotels, clubs, or institutions.
-* **Fields:** Registered Customer with GSTIN, State Code (CGST+SGST vs. IGST), HSN/SAC item table, Trade Discounts, Payment Credit Terms, Transport/Vehicle No., and e-Way bill #.
-* **Output:** Official statutory A4 Tax Invoice PDF and real-time debit on Customer Khata / Accounts Receivable. See [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md).
-
+* `+ New Tax Invoice` drawer for wholesale institutional sales (hotels, clubs).
+* Captures Customer GSTIN, State Code, HSN breakdown, transport details, and generates statutory A4 Tax Invoices. See [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md).
 
 ---
 
@@ -65,8 +57,8 @@
 ---
 
 ## 4. Business Rules
-* **Counter Stock Only for Retails:** Sales strictly consume stock from `WH/Stock/Counter`. Goods cannot be sold directly from the Godown without an internal transfer.
-* **Infinite Stock for Kitchen:** Kitchen items and untracked consumables never generate Odoo `stock.picking` delivery records, posting only the `account.move` invoice and payment lines.
-* **Sealed Day Guard:** The checkout service rejects sales dated in a closed business day.
-* **Atomic Settle:** Inventory deduction, invoice posting, and payment reconciliation succeed together or fail together.
-
+* **Counter Stock Only for Retails:** Sales strictly consume stock from `WH/Stock/Counter`.
+* **Infinite Stock for Kitchen:** Kitchen consumables never generate stock delivery pickings, posting only revenue and tax journal lines.
+* **Sealed Day Guard:** Checkout service rejects sales dated in a closed business day.
+* **Atomic Settlement:** Inventory deduction, invoice posting, and payment reconciliation succeed together or fail together.
+* **Data Masking:** Cashiers without `can_see_money` permission cannot view cumulative daily sales revenue or drawer cash balances.

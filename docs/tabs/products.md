@@ -1,7 +1,7 @@
 # Tab Specification: Products
 
 **Route:** `/products`  
-**Purpose:** Master catalog defining what the shop sells, purchase costs, retail prices, barcodes, and measurement units.  
+**Purpose:** Master catalog defining sellable products, purchase costs, retail prices, barcodes, units of measure, and onboarding tools.  
 **Underlying Engine:** Standard Odoo `product.template`, `product.product`, and `uom.uom`.
 
 ---
@@ -22,19 +22,22 @@ Mixing up brands, flavors, and sizes is a common source of retail bugs. ORSquare
 ## 2. Key Features & Workflows
 
 ### A. Product Form & Catalog Fields
-* **Product Classification:**
-  * **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter with quants, low-stock alerts, and internal transfers.
-  * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings. No recipes, BOMs, or kitchen costing at this stage.
-  * **Shop Consumables (Packaged snacks, peanuts, cashews):** Can be configured as tracked storables (`detailed_type = 'product'`) or untracked counter items (`detailed_type = 'consu'`) with standard units (`Piece`, `Pack`, `Plate`).
-* **Name, Short Code, Barcode:** For high-speed barcode scanner or keyboard search.
-* **Category (`product.category`):** E.g., *Whisky*, *Beer*, *Wine*, *Beverages*, *Kitchen / Food*.
+* **Classification:**
+  * **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter.
+  * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions.
+  * **Shop Consumables (Packaged snacks, peanuts):** Configurable as tracked storables or untracked counter consumables.
 * **Pricing & Portions:**
-  * Maximum Retail Price (MRP), Selling Rate (`list_price`), and Cost Rate (`standard_price`).
-  * **Portion Pricing (Half & Full Portions):** Replaces legacy duplicate products (`Name (Half)`). Managed as native Odoo Product Variants (`product.template` + `Portion` attribute). In the UI, presented as a clean toggle:
-    * `[✓] Offer Half & Full portions`
-    * Full Portion Rate (₹) and Half Portion Rate (₹).
-    * Single parent product template guarantees synchronized names, categories, and unified sales reporting.
-* **Open Bottle Peg Settings:** Configures allowed peg pack sizes (e.g. 30ml, 60ml, 90ml) and selling rates per peg for that bottle.
+  * MRP, Selling Rate (`list_price`), and Cost Rate (`standard_price`).
+  * **Portion Pricing (Half & Full Portions):** Replaces legacy duplicate products (`Name (Half)`). Managed as native Odoo Product Variants (`product.template` + `Portion` attribute) under a clean toggle: `[✓] Offer Half & Full portions`.
+* **Open Bottle Peg Settings:** Configures allowed peg pack sizes (30ml, 60ml, 90ml) and selling rates per peg for that bottle.
+
+### B. Canonical Product Master Library
+* Pre-seeded canonical database of Indian beverage barcodes, standard package sizes, and MRPs maintained at the platform level.
+* Allows new retailers to onboard their shop catalog in minutes by picking recognized brands rather than manually entering hundreds of items.
+
+### C. Smart Spreadsheet Importer (CSV / Excel)
+* High-tolerance importer supporting catalog sheets exported from TallyPrime, Busy, Marg ERP, and custom Excel templates.
+* **Fuzzy Header Matching:** Uses Levenshtein distance and alias dictionaries to auto-map columns (e.g. `ItemDescription` $\rightarrow$ `name`, `Distillery` $\rightarrow$ `brand`, `PcsPerCase` $\rightarrow$ `piecesPerBox`).
 
 ---
 
@@ -62,34 +65,21 @@ To guarantee exact liquid volume calculations for excise/statutory reporting and
 └──────────────────────────────┘ └───────────────────────────────────────────┘
 ```
 
-### A. Tier 1: Standard Base Units (Platform Managed)
-* Built-in platform units shipped by ORSquare: `ml`, `L`, `Piece`, `Pack`, `Plate`, `Bowl`, `Kg`, `gm`.
-* Immutable: Users cannot delete them and cannot create new base units.
-* **Shop Visibility Control & Non-Destructive Hiding:** Shop owners can toggle visibility (eye icon) to hide base units not relevant to their retail type (e.g., wine shops hide `Plate` and `Bowl`).
-* **Non-Destructive Guardrail:** Hiding a Base Unit removes it strictly from new selection dropdowns and creation UIs. It **never breaks or invalidates existing Shop Units or products** that rely on it; they continue operating and calculating volume normally. Re-enabling the base unit restores it to the creation dropdowns.
-
-
-### B. Tier 2: Shop Units / Product Units (Shop Managed)
-* Created by the shop owner from an active, visible Base Unit.
-* Fields: Unit Name (e.g. `180 ml`, `Pack of 10`), Base Unit (`ml`, `Piece`), and a strict Numeric Ratio (`180`, `10`).
-* **Mathematical Integrity:** Liquid volume aggregation in Liters is 100% mathematically exact:
+* **Tier 1 (Base Units):** `ml`, `L`, `Piece`, `Pack`, `Plate`, `Bowl`, `Kg`, `gm`. Immutable. Visibility controlled by shop owners via an eye toggle.
+  * **Non-Destructive Guardrail:** Hiding a Base Unit removes it strictly from new creation UIs. Existing derived Shop Units and products continue to work and compute volume normally.
+* **Tier 2 (Shop Units):** Derived by shops with strict numeric conversion ratios (e.g. `180 ml` with ratio `180` to `ml`), guaranteeing exact liquid volume calculation in Liters for excise reports:
   $$\text{Total Liters} = \sum \frac{\text{Qty Sold} \times \text{Shop Unit Ratio in ml}}{1000}$$
 
 ---
 
-## 4. Catalog Masters (Formerly "Catalog Options")
-
-The drawer accessed via the gear icon is renamed from *"Catalog Options"* to **"Catalog Masters"** to reflect authoritative enterprise master data:
+## 4. Catalog Masters Drawer
+Accessed via the gear icon in Products:
 * **Tab 1: Categories:** Manage retail and kitchen categories.
-* **Tab 2: Units:** Structured into two visual sections:
-  1. **Standard Base Units:** Shipped defaults with dimension badges and visibility toggles.
-  2. **Shop Units:** Shop-created derived units with base unit picker, numeric ratio, and edit/delete actions.
+* **Tab 2: Units:** Structured into Base Units (with eye toggles) and Shop Units (derived with ratios).
 * **Tab 3: Brands:** Brand families for grouping in registers and sheets.
 
 ---
 
-## 5. Opening Stock & Business Rules
-* **No Direct Balance Edits:** Stock quantities exist only as physical moves in the inventory ledger.
-* **Opening Stock Policy:** Accepted once upon creation for initial onboarding via an append-only inventory move.
-* **Kitchen Classification:** Dishes marked `is_kitchen` are consumables (`detailed_type = 'consu'`) and bypass counter stock deductions.
-
+## 5. Business Rules
+* **No Direct Balance Overwrites:** Stock quantities exist only as physical moves in the inventory ledger.
+* **Initial Onboarding Stock:** Accepted once upon creation via an append-only opening inventory move.

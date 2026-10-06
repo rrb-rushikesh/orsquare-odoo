@@ -1,7 +1,7 @@
 # Tab Specification: Purchases
 
 **Route:** `/purchases`  
-**Purpose:** Manages procurement from suppliers: recording bills, receiving stock into Godown, and updating supplier payables.  
+**Purpose:** Manages procurement from suppliers: recording bills, receiving stock into Godown, purchase returns, and supplier payables.  
 **Underlying Engine:** Odoo `purchase.order`, incoming `stock.picking` (`Supplier` $\rightarrow$ `WH/Stock/Godown`), and vendor bills (`account.move` with `move_type='in_invoice'`).
 
 ---
@@ -37,39 +37,38 @@ Purchases supports two operational modes via a progressive disclosure toggle:
 
 ### B. Advanced Purchase Bill (Wholesale Invoice Reproduction)
 When `[✓] Advanced Bill` is toggled:
-* **Invoice Metadata:** Supplier Invoice No. (for GSTR-2B ITC matching), Payment Due Date, Transport Permit No. (TP No) & Date (statutory liquor transport compliance).
-* **Discounts:**
-  * Item-level discounts (% or ₹ per unit).
-  * Bill-level Trade Discounts (prorated across line items by gross value for exact GST tax slab compliance).
-* **Additional Expenses & Landed Costs:**
-  * Rows for Freight Inward, Handling & Labour, Packaging, Transit Insurance.
-  * `[✓] Capitalize into Inventory Cost` toggle: Capitalized charges are absorbed into moving average inventory valuation (AVCO); uncapitalized charges route to operational P&L expense accounts.
-* **Configurable Cost Composition Policy:** Controlled individually in Settings:
-  * *Factor Discounts in Cost:* [ON / OFF]
-  * *Factor Expenses in Cost:* [ON / OFF]
-  * *Factor Taxes in Cost:* [ON / OFF] (ON for Composition/non-GST, OFF for Regular GST)
-* **Tax Override & Penny Round-off:**
-  * System calculates tax (GST / TCS / VAT).
-  * User can override the tax amount directly to match the printed supplier invoice.
-  * Discrepancies up to $\pm ₹5.00$ are booked to the standard **Round-off Account**.
+* **Invoice Metadata:** Supplier Invoice No. (for GSTR-2B matching), Payment Due Date, Transport Permit No. (TP No) & Date (statutory liquor transport compliance).
+* **Discounts:** Item-level discounts (% or ₹) and prorated bill-level Trade Discounts.
+* **Additional Expenses & Landed Costs:** Freight, Handling, Insurance with `[✓] Capitalize into Inventory Cost` switch.
+* **Configurable Cost Composition Policy:** Independent Settings toggles for factoring discounts, freight, and taxes into product piece rates.
+* **Tax Override & Penny Round-off:** Direct override of calculated tax to match printed supplier invoice ($\pm ₹5.00$ auto-booked to Round-off ledger).
 
 ---
 
-## 2. Stock Costing & Price Fluctuation (AVCO Moving Average)
-* **Moving Weighted Average Cost (AVCO):** Standardized across all products (`property_cost_method = 'average'`). When new stock arrives at a fluctuating rate:
+## 2. Stock Costing (AVCO Moving Average)
+* **Moving Weighted Average Cost (AVCO):** Standardized across all products (`property_cost_method = 'average'`).
   $$\text{New Unit Cost} = \frac{\text{Current Asset Value} + \text{New Receipt Landed Value}}{\text{Current Qty} + \text{New Qty}}$$
 * **Supplier Payable Separation:** Vendor payables reflect the exact contractual invoice total and are never averaged.
 
 ---
 
-## 3. Purchase Returns & Corrections
-* **Purchase Returns:** System posts reverse stock movement (`WH/Stock/Godown` $\rightarrow$ `Supplier`) and generates an Odoo Vendor Credit Note (`in_refund`), reversing taxes/TCS and reducing supplier payables.
-* **Audited Edits:** Correcting historical bills generates auditable adjustment entries rather than silent database overwrites.
+## 3. Purchase Returns & Direct Replacement Exchange
+
+Purchases handles damaged goods or distributor discrepancies with two flows:
+
+### A. Standard Purchase Return (Debit Note)
+* Posts reverse stock movement (`WH/Stock/Godown` $\rightarrow$ `Supplier`) and generates an Odoo Vendor Credit Note (`in_refund`), reducing supplier payables.
+
+### B. Direct Replacement Exchange (`[✓] Exchange items instead`)
+* **Problem:** Distributors frequently replace broken bottles immediately upon delivery rather than issuing financial credit notes.
+* **Behavior:** Checking `Exchange items instead (stock down + intake up)` allows adding replacement intake items directly on the return voucher.
+  * System records damaged goods leaving Godown **and** replacement goods entering Godown simultaneously.
+  * If replacement value matches returned value, supplier payable balance is untouched; if there is a price difference, net difference books to the supplier ledger.
 
 ---
 
-## 4. Business Rules
-* **Godown Arrival:** All incoming goods land in the Godown. Stock must be transferred to the Counter before it is sale-ready.
-* **Sealed Day Guard:** The system rejects recording purchases dated in a closed/sealed business day.
+## 4. Bill Finder & Business Rules
+* **Bill Finder:** Drawer allowing quick lookup of past purchase bills by Bill #, Supplier, date, or amount for audits or returns.
+* **Godown Arrival:** All incoming goods land strictly in `WH/Stock/Godown`.
+* **Sealed Day Guard:** System rejects recording purchases dated in a sealed business day.
 * **See Full Specification:** [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md).
-

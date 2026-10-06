@@ -92,6 +92,10 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
   - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
   - **Dual Bill-Template System:** Dedicated template engines in Settings for **Large Format A4 Tax Invoices** (with statutory excise bottle breakdown matrix, bank details, dynamic UPI QR) and **Compact Thermal Slips** (58mm, 80mm).
 
+### I. 16 Locked Operational Capabilities & Domain Workflows
+* **Status:** Locked Decision (surfaced via 360-degree audit of live production app).
+* **Scope:** Auto-Godown stock transfer during checkout, Closing Stock Audit reconciliation engine (Facts vs. Findings with 1-click remediation), Blind Physical Inventory Count, Cash Materiality Threshold, Continuous Scanning mode, Payment Tender Enforcement, Bill Finder, Purchase Return with Direct Replacement Exchange, Rate Cards & volume margins, WineStock matrix & Pinned sorting, Statutory Excise Sheet register, Coupon discount schemes, Hardware thermal printing engine (QZ Tray bridge + ESC/POS pulses), Restaurant seating grid editor, Granular cashier data masking (`can_see_money`, `can_see_valuation`), and Master Product Library with smart fuzzy spreadsheet importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
+
 ---
 
 ## 3. High-Level System Architecture
@@ -130,29 +134,30 @@ graph TD
 ## 4. Documentation Index
 
 ### Tab Specifications (`docs/tabs/`)
-* [`docs/tabs/dashboard.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/dashboard.md) — Executive operational summary and owner rollup.
-* [`docs/tabs/accounts.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/accounts.md) — Directory, customer Khata credit, supplier payables, employee advances, and party dossier.
-* [`docs/tabs/ledger.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/ledger.md) — Business-wide Trial Balance, P&L, Balance Sheet, and tax reports.
-* [`docs/tabs/purchases.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/purchases.md) — Procurement, Godown goods receipt, vendor bills, and purchase returns.
-* [`docs/tabs/products.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/products.md) — Master catalog, brand/variant/size hierarchy, opening stock, Open Bottle peg sizes.
-* [`docs/tabs/sales.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/sales.md) — Counter POS, barcode scanning, Open Bottle drawer, payment methods, offline outbox.
-* [`docs/tabs/stock.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/stock.md) — Godown & Counter topology, stock transfer drawer, OP Stock shelf, WineStock matrix.
-* [`docs/tabs/sheet.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/sheet.md) — Daily Counter Register matrix, bottle size columns, conservation identity.
-* [`docs/tabs/cashflow.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/cashflow.md) — Chronological cash diary, petty expenses, daily liquidity.
-* [`docs/tabs/daybook.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/daybook.md) — Daily cash drawer session, opening float, expected cash, closing count, closing stock audit.
-* [`docs/tabs/calendar.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/calendar.md) — Historical business days, cutoff hour lock-in, frozen snapshots, audited Re-Audit.
-* [`docs/tabs/settings.md`](file:///C:/Repo/orsquare-odoo/docs/tabs/settings.md) — Appearance, bill/invoice format, Business Studio, Staff Access, data control.
+* [`docs/tabs/dashboard.md`](docs/tabs/dashboard.md) — Executive operational summary and owner rollup.
+* [`docs/tabs/accounts.md`](docs/tabs/accounts.md) — Directory, customer Khata credit, supplier payables, employee advances, and party dossier.
+* [`docs/tabs/ledger.md`](docs/tabs/ledger.md) — Business-wide Trial Balance, P&L, Balance Sheet, and tax reports.
+* [`docs/tabs/purchases.md`](docs/tabs/purchases.md) — Procurement, Godown goods receipt, vendor bills, direct replacement exchange, and purchase returns.
+* [`docs/tabs/products.md`](docs/tabs/products.md) — Master catalog, brand/variant/size hierarchy, opening stock, Open Bottle peg sizes, product library, and smart importer.
+* [`docs/tabs/sales.md`](docs/tabs/sales.md) — Counter POS, continuous scanning, barcode scanning, Open Bottle drawer, payment methods, offline outbox, and Bill Finder.
+* [`docs/tabs/stock.md`](docs/tabs/stock.md) — Godown & Counter topology, Auto-Godown transfer, stock transfer drawer, OP Stock shelf, and WineStock matrix with pinned sorting.
+* [`docs/tabs/sheet.md`](docs/tabs/sheet.md) — Daily Counter Register matrix, bottle size columns, Rate Cards, conservation identity, and statutory excise export.
+* [`docs/tabs/cashflow.md`](docs/tabs/cashflow.md) — Chronological cash diary, petty expenses, daily liquidity.
+* [`docs/tabs/daybook.md`](docs/tabs/daybook.md) — Daily cash drawer session, opening float, expected cash, closing count, blind physical counting, and Closing Stock Audit engine.
+* [`docs/tabs/calendar.md`](docs/tabs/calendar.md) — Historical business days, cutoff hour lock-in, frozen snapshots, audited Re-Audit.
+* [`docs/tabs/settings.md`](docs/tabs/settings.md) — Appearance, bill/invoice format, hardware thermal printing, restaurant grid, Business Studio, Staff Access, and data control.
 
 ### Deep Architecture Research (`docs/`)
-* [`docs/opened-bottles-spec.md`](file:///C:/Repo/orsquare-odoo/docs/opened-bottles-spec.md) — Open Bottle portion/peg inventory, COGS valuation, wastage scrap, and UI reference mapping.
-* [`docs/tenancy-and-offline-architecture.md`](file:///C:/Repo/orsquare-odoo/docs/tenancy-and-offline-architecture.md) — Database-per-Shop, Dexie.js offline outbox, single bootstrap bundle, and physical stock conflict handling.
-* [`docs/odoo-version-analysis.md`](file:///C:/Repo/orsquare-odoo/docs/odoo-version-analysis.md) — Odoo 16 vs 17 vs 18 vs 19 evaluation.
-* [`docs/odoo-module-architecture.md`](file:///C:/Repo/orsquare-odoo/docs/odoo-module-architecture.md) — Core vs Official vs Industry Packages vs OCA vs Thin `orsquare` Module.
-* [`docs/retail-workflow-spec.md`](file:///C:/Repo/orsquare-odoo/docs/retail-workflow-spec.md) — Detailed operational mapping of retail workflows to Odoo.
-* [`docs/data-control-and-wipe.md`](file:///C:/Repo/orsquare-odoo/docs/data-control-and-wipe.md) — Safe operational data wipe architecture, PostgreSQL integrity, and pre-wipe backup design.
-* [`docs/existing-repos-audit.md`](file:///C:/Repo/orsquare-odoo/docs/existing-repos-audit.md) — Deep audit of legacy repositories (`production-hot-fix` and `orsquare-tryton`).
-* [`docs/astra-landing-optimization.md`](file:///C:/Repo/orsquare-odoo/docs/astra-landing-optimization.md) — Astro landing page SEO, accessibility, performance, and seamless login integration.
-* [`docs/kitchen-and-units-spec.md`](file:///C:/Repo/orsquare-odoo/docs/kitchen-and-units-spec.md) — Kitchen universal extension (infinite stock consumables), Two-Tier Units (Base Units with visibility toggles, Shop Units with numeric conversion ratios), portion variants, and Catalog Masters drawer redesign.
-* [`docs/advanced-billing-spec.md`](file:///C:/Repo/orsquare-odoo/docs/advanced-billing-spec.md) — Advanced Purchase & Sales Billing specification, Two-Tier progressive disclosure, capitalized landed costs vs period expenses, AVCO moving average costing, bi-directional rate entry, tax override & penny rounding, and Dual Bill Templates (A4 & Thermal).
+* [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md) — Single master specification for all 16 operational capabilities, settings switches, and hardware drivers.
+* [`docs/opened-bottles-spec.md`](docs/opened-bottles-spec.md) — Open Bottle portion/peg inventory, COGS valuation, wastage scrap, and UI reference mapping.
+* [`docs/tenancy-and-offline-architecture.md`](docs/tenancy-and-offline-architecture.md) — Database-per-Shop, Dexie.js offline outbox, single bootstrap bundle, and physical stock conflict handling.
+* [`docs/odoo-version-analysis.md`](docs/odoo-version-analysis.md) — Odoo 16 vs 17 vs 18 vs 19 evaluation.
+* [`docs/odoo-module-architecture.md`](docs/odoo-module-architecture.md) — Core vs Official vs Industry Packages vs OCA vs Thin `orsquare` Module.
+* [`docs/retail-workflow-spec.md`](docs/retail-workflow-spec.md) — Detailed operational mapping of retail workflows to Odoo.
+* [`docs/data-control-and-wipe.md`](docs/data-control-and-wipe.md) — Safe operational data wipe architecture, PostgreSQL integrity, and pre-wipe backup design.
+* [`docs/existing-repos-audit.md`](docs/existing-repos-audit.md) — Deep audit of legacy repositories (`production-hot-fix` and `orsquare-tryton`).
+* [`docs/astra-landing-optimization.md`](docs/astra-landing-optimization.md) — Astro landing page SEO, accessibility, performance, and seamless login integration.
+* [`docs/kitchen-and-units-spec.md`](docs/kitchen-and-units-spec.md) — Kitchen universal extension (infinite stock consumables), Two-Tier Units (Base Units with visibility toggles, Shop Units with numeric conversion ratios), portion variants, and Catalog Masters drawer redesign.
+* [`docs/advanced-billing-spec.md`](docs/advanced-billing-spec.md) — Advanced Purchase & Sales Billing specification, Two-Tier progressive disclosure, capitalized landed costs vs period expenses, AVCO moving average costing, bi-directional rate entry, tax override & penny rounding, and Dual Bill Templates (A4 & Thermal).
 
 
