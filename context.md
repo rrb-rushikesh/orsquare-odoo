@@ -92,9 +92,11 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
   - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
   - **Dual Bill-Template System:** Dedicated template engines in Settings for **Large Format A4 Tax Invoices** (with statutory excise bottle breakdown matrix, bank details, dynamic UPI QR) and **Compact Thermal Slips** (58mm, 80mm).
 
-### I. 16 Locked Operational Capabilities & Domain Workflows
-* **Status:** Locked Decision (surfaced via 360-degree audit of live production app).
-* **Scope:** Auto-Godown stock transfer during checkout, Closing Stock Audit reconciliation engine (Facts vs. Findings with 1-click remediation), Blind Physical Inventory Count, Cash Materiality Threshold, Continuous Scanning mode, Payment Tender Enforcement, Bill Finder, Purchase Return with Direct Replacement Exchange, Rate Cards & volume margins, WineStock matrix & Pinned sorting, Statutory Excise Sheet register, Coupon discount schemes, Hardware thermal printing engine (QZ Tray bridge + ESC/POS pulses), Restaurant seating grid editor, Granular cashier data masking (`can_see_money`, `can_see_valuation`), and Master Product Library with smart fuzzy spreadsheet importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
+### I. Operational Capabilities Roadmap (Refined Baseline)
+* **Status:** Locked Decision (formalized based on live codebase audit and domain review).
+* **Active (Keep Now & Redesign):** Auto-Godown stock transfer during checkout, Continuous Scanning mode with UI lock/unlock protection, Independent Default Payment Mode, Granular Cashier Permissions & Sensitive Data Masking, Purchase & Sales Returns + Direct Replacement Exchanges, Redesigned Restaurant Floor & Table Setup, Three-Tier Hardware Thermal Printing Engine (QZ Tray + Local Queue + Browser Fallback), Unified 3-in-1 Discount System, Bill Finder ("Recognition Over Recall"), and Simplified UoM Size Margins.
+* **Postponed (Future Scope):** Closing Stock Audit & Reconciliation Engine, and Indian Wine Shop Sheet Register & WineStock Matrix.
+* **Skipped:** Product Master Library & Fuzzy Spreadsheet Importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
 
 ---
 
@@ -138,14 +140,14 @@ graph TD
 * [`docs/tabs/accounts.md`](docs/tabs/accounts.md) — Directory, customer Khata credit, supplier payables, employee advances, and party dossier.
 * [`docs/tabs/ledger.md`](docs/tabs/ledger.md) — Business-wide Trial Balance, P&L, Balance Sheet, and tax reports.
 * [`docs/tabs/purchases.md`](docs/tabs/purchases.md) — Procurement, Godown goods receipt, vendor bills, direct replacement exchange, and purchase returns.
-* [`docs/tabs/products.md`](docs/tabs/products.md) — Master catalog, brand/variant/size hierarchy, opening stock, Open Bottle peg sizes, product library, and smart importer.
-* [`docs/tabs/sales.md`](docs/tabs/sales.md) — Counter POS, continuous scanning, barcode scanning, Open Bottle drawer, payment methods, offline outbox, and Bill Finder.
-* [`docs/tabs/stock.md`](docs/tabs/stock.md) — Godown & Counter topology, Auto-Godown transfer, stock transfer drawer, OP Stock shelf, and WineStock matrix with pinned sorting.
-* [`docs/tabs/sheet.md`](docs/tabs/sheet.md) — Daily Counter Register matrix, bottle size columns, Rate Cards, conservation identity, and statutory excise export.
+* [`docs/tabs/products.md`](docs/tabs/products.md) — Master catalog, brand/variant/size hierarchy, opening stock, Open Bottle peg sizes, and simplified size margin helpers.
+* [`docs/tabs/sales.md`](docs/tabs/sales.md) — Counter POS, continuous scanning with lock/unlock guard, independent payment mode, 3-in-1 discounts, counter returns/exchanges, and Bill Finder.
+* [`docs/tabs/stock.md`](docs/tabs/stock.md) — Godown & Counter topology, Auto-Godown transfer, stock transfer drawer, and OP Stock shelf. (WineStock matrix marked as Future Scope).
+* [`docs/tabs/sheet.md`](docs/tabs/sheet.md) — Daily Counter Register matrix and statutory excise formulas (marked as Future Scope).
 * [`docs/tabs/cashflow.md`](docs/tabs/cashflow.md) — Chronological cash diary, petty expenses, daily liquidity.
-* [`docs/tabs/daybook.md`](docs/tabs/daybook.md) — Daily cash drawer session, opening float, expected cash, closing count, blind physical counting, and Closing Stock Audit engine.
+* [`docs/tabs/daybook.md`](docs/tabs/daybook.md) — Daily cash drawer session, opening float, expected cash, drawer count, and cash materiality threshold. (Closing stock audit marked as Future Scope).
 * [`docs/tabs/calendar.md`](docs/tabs/calendar.md) — Historical business days, cutoff hour lock-in, frozen snapshots, audited Re-Audit.
-* [`docs/tabs/settings.md`](docs/tabs/settings.md) — Appearance, bill/invoice format, hardware thermal printing, restaurant grid, Business Studio, Staff Access, and data control.
+* [`docs/tabs/settings.md`](docs/tabs/settings.md) — Appearance, bill/invoice format, three-tier thermal printing, redesigned restaurant tables setup, Business Studio, Staff Access data masking, and data control.
 
 ### Deep Architecture Research (`docs/`)
 * [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md) — Single master specification for all 16 operational capabilities, settings switches, and hardware drivers.

@@ -60,15 +60,17 @@ Purchases handles damaged goods or distributor discrepancies with two flows:
 * Posts reverse stock movement (`WH/Stock/Godown` $\rightarrow$ `Supplier`) and generates an Odoo Vendor Credit Note (`in_refund`), reducing supplier payables.
 
 ### B. Direct Replacement Exchange (`[✓] Exchange items instead`)
-* **Problem:** Distributors frequently replace broken bottles immediately upon delivery rather than issuing financial credit notes.
-* **Behavior:** Checking `Exchange items instead (stock down + intake up)` allows adding replacement intake items directly on the return voucher.
-  * System records damaged goods leaving Godown **and** replacement goods entering Godown simultaneously.
-  * If replacement value matches returned value, supplier payable balance is untouched; if there is a price difference, net difference books to the supplier ledger.
+* **Problem:** Distributors frequently replace damaged bottles immediately upon truck delivery rather than issuing financial credit notes.
+* **Behavior:** Checking `Exchange items instead (stock down + intake up)` records damaged items returned **and** replacement items received on the same voucher.
+  * System executes paired stock movements: damaged items exit Godown to vendor; replacement items enter Godown.
+  * **Ledger Netting:**
+    - If replacement value matches returned value: Wash transaction; supplier balance is untouched.
+    - If a price difference exists: The Credit Note and Bill net automatically in Odoo, booking only the net variance to the supplier ledger.
 
 ---
 
 ## 4. Bill Finder & Business Rules
-* **Bill Finder:** Drawer allowing quick lookup of past purchase bills by Bill #, Supplier, date, or amount for audits or returns.
+* **Bill Finder Drawer:** Two-tier lookup drawer allowing quick search of past purchase bills by Bill #, Supplier, date, or amount for audits or returns.
 * **Godown Arrival:** All incoming goods land strictly in `WH/Stock/Godown`.
 * **Sealed Day Guard:** System rejects recording purchases dated in a sealed business day.
 * **See Full Specification:** [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md).

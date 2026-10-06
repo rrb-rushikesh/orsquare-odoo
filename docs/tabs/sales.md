@@ -11,19 +11,22 @@
 1. **Scan or Search:** Salesperson scans barcode (USB/Bluetooth) or searches product name / short code.
 2. **Stock Validation & Auto-Godown Replenishment:**
    * **Counter Stock Validation:** Retail items consume `WH/Stock/Counter`.
-   * **Auto-Godown Transfer:** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal transfer from Godown to Counter is chained automatically during settlement.
-   * **Kitchen & Consumables (`detailed_type = 'consu'`):** Displays an infinite availability badge (`∞`). Incrementable freely without inventory restrictions.
+   * **Auto-Godown Transfer:** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal transfer from Godown to Counter is chained automatically during settlement with full audit history.
+   * **Kitchen & Consumables (`detailed_type = 'consu'`):** Displays infinite availability badge (`∞`). Incrementable freely without inventory restrictions.
 3. **Quantity, Rate & Portion Selection:**
-   * Adjust quantity; optional discount or price override (if authorized).
+   * Adjust quantity; optional authorized price override.
    * **Portion Selection (Full / Half):** For dishes with portion variants, cashier selects `[Full]` or `[Half]` directly from search or line item.
 4. **Open Bottle Peg Flow (Optional):**
-   * Salesperson opens the **Open Bottle Drawer**, selects peg size (30ml, 60ml, 90ml, etc.), chooses an open bottle from the **Open Bottles Tray**, and adds portion to bill.
-5. **Coupons & Discount Schemes:**
-   * 1-tap coupon input applying configured promo schemes (e.g. `PROMO10` for 10% off, `FLAT50` for ₹50 off) subject to minimum invoice spend rules.
+   * Salesperson opens **Open Bottle Drawer**, selects peg size (30ml, 60ml, 90ml), chooses an open bottle from the **Open Bottles Tray**, and adds portion to bill.
+5. **Unified 3-in-1 Discount Popover:**
+   * **Smart 1-Tap Rounding:** Auto-calculates remainder to nearest round number (e.g. ₹124 $\rightarrow$ `[Round to ₹100: −₹24]`).
+   * **Saved Promo Presets:** 1-tap chips for shop schemes (`[Regular 5%]`, `[Happy Hour 10%]`, `[FLAT ₹50]`).
+   * **Manual Entry:** Single input with `%` vs. `₹` switch.
+   * Discounts are prorated line-by-line across bill items to preserve exact GST slab taxation.
 6. **Payment & Settlement:**
    * **Tender Options:** Cash (with change calculator), UPI (dynamic QR code), Khata (Customer ledger credit), or Split Tender.
-   * **Enforced Payment Method:** If enabled in Settings (e.g. `Cash only` or `UPI only`), alternative buttons are hidden and keyboard shortcuts route directly to the enforced method.
-7. **Silent Thermal Printing:** ESC/POS silent print to 80mm or 58mm thermal receipt printer via QZ Tray bridge or clean browser print fallback.
+   * **Default Payment Mode:** If configured in Settings (e.g. `Cash only` or `UPI only`), pressing Settle or `F8`/`Enter` completes the sale immediately using the default tender without opening payment selection modals.
+7. **Silent Thermal Printing:** Direct ESC/POS silent print via QZ Tray bridge or browser print fallback.
 
 ---
 
@@ -31,17 +34,24 @@
 
 ### A. Continuous Scanning Mode (`prefs.continuousScanning`)
 * **Target:** High-traffic supermarket queues and festival rush hours.
-* **Behavior:** Locks the cart list and hides visual category tiles. Every barcode scan immediately accumulates into the active open draft bill without requiring enter keys or confirmation modals.
+* **Behavior:** Locks the cart list, hides visual category tiles, and keeps scanner focus permanent. Scans stream directly into the active draft bill.
+* **Safety Lock/Unlock:** A visual banner `[🔒 Cart Locked for Rapid Scanning]` prevents accidental deletions or price tampering during fast scanning. An explicit click on `[Unlock to Edit]` is required to modify items.
+* **Crash Resilience:** The draft bill persists synchronously in **IndexedDB**. If power cuts or browser crashes, reopening `/sales` instantly rehydrates the draft.
 
 ### B. Bill Finder Drawer ("Recognition Over Recall")
-* Dedicated drawer to locate past bills for returns, reprints, or customer disputes.
-* Lists the most recent bills immediately upon opening; real-time search filters by Bill # (e.g. `INV-1042`), Customer name, date/time, or bill amount.
+* Dedicated drawer to locate past bills for returns, reprints, or customer lookups.
+* **Two-Tier Engine:**
+  - **Tier 1 (Instant Local Search):** Recent bills (active daybook + last 7 days) are cached in Dexie.js and render immediately with zero latency. Debounced search filters by Bill #, customer name, date, or amount.
+  - **Tier 2 (Deep Server Archive):** Searching older records queries Odoo `account.move` asynchronously.
+* Provides 1-tap actions: *Reprint Receipt*, *Issue Return / Exchange*, *View Details*.
 
-### C. Open Bottles Tray & Peg Drawer
+### C. Counter Sales Returns & Direct Exchanges
+* Allows handling customer returns or product exchanges directly at the POS counter:
+  - Supports tickets with negative return lines and positive exchange lines (e.g. Return Beer A ₹150, Take Beer B ₹180 $\rightarrow$ Net payable ₹30).
+  - Posts a single atomic Odoo transaction adjusting inventory in both directions, reconciling sales revenue and taxes, and collecting/refunding the net cash difference.
+
+### D. Open Bottles Tray & Peg Drawer
 * Persistent carousel at the bottom of the Sales screen displaying active opened bottles with live remaining ml and visual liquid fill badges (Green >50%, Amber 25-50%, Red <25%). See [`docs/opened-bottles-spec.md`](../opened-bottles-spec.md).
-
-### D. Offline POS & Resilient Outbox
-* Local IndexedDB (Dexie.js) cache allows continuous billing when offline. Orders queue safely with client-side UUIDs (`client_order_ref`) and flush idempotently to Odoo upon reconnect.
 
 ### E. Advanced Sales Bill (B2B Tax Invoice)
 * `+ New Tax Invoice` drawer for wholesale institutional sales (hotels, clubs).
@@ -60,5 +70,4 @@
 * **Counter Stock Only for Retails:** Sales strictly consume stock from `WH/Stock/Counter`.
 * **Infinite Stock for Kitchen:** Kitchen consumables never generate stock delivery pickings, posting only revenue and tax journal lines.
 * **Sealed Day Guard:** Checkout service rejects sales dated in a closed business day.
-* **Atomic Settlement:** Inventory deduction, invoice posting, and payment reconciliation succeed together or fail together.
 * **Data Masking:** Cashiers without `can_see_money` permission cannot view cumulative daily sales revenue or drawer cash balances.
