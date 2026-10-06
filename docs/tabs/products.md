@@ -22,18 +22,24 @@ ORSquare enforces standard product nomenclature to prevent retail inventory erro
 ## 2. Key Features & Workflows
 
 ### A. Product Form & Catalog Fields
-* **Classification:**
+* **Classification & Multi-Tax Regimes:**
   * **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter.
   * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings.
   * **Shop Consumables (Packaged snacks, peanuts):** Configurable as tracked storables or untracked counter consumables.
+  * **Tax Regime Flag (`tax_regime`):**
+    - `liquor_vat`: Alcoholic liquor for human consumption (State VAT + Income Tax TCS under Sec 206C(1)). Constitutionally excluded from GST.
+    - `gst`: General retail items, snacks, beverages, water, glassware, and kitchen dishes (standard Indian GST `l10n_in`).
+    - `exempt`: Non-taxable goods.
 * **Pricing & Portions:**
   * Maximum Retail Price (MRP), Selling Rate (`list_price`), and Cost Rate (`standard_price`).
   * **Portion Pricing (Half & Full Portions):** Replaces legacy duplicate products (`Name (Half)`). Managed as native Odoo Product Variants (`product.template` + `Portion` attribute) under a clean toggle: `[✓] Offer Half & Full portions`.
-* **Bottle Size Margins & Rate Helpers (Pricing Configuration):**
+* **Bottle Size Margins as Optional Price-Setting Assistance:**
   * Margins are **never placed on `uom.uom`** (units represent pure physical dimensions, not commercial pricing, and different categories like Country Liquor vs Premium IMFL have different margins for the same 750ml bottle).
   * Margin rules are attached to **Category & Pricing configuration** (`orsquare.margin_rule`: Category + Size UoM $\rightarrow$ Margin Amount).
-  * Cashiers sell at native `product.template.list_price` (zero runtime overhead).
-  * In the product form, entering a purchase cost of ₹180 on a 750ml Whisky bottle looks up the Whisky 750ml margin rule (₹25) and displays a 1-tap helper: `[Auto-Set Selling Price: ₹180 + ₹25 = ₹205]`.
+  * In the product form, entering a purchase cost of ₹180 on a 750ml Whisky bottle looks up the Whisky 750ml margin rule (₹25) and displays an **optional price-setting helper**:  
+    `Suggested Selling Price: ₹205 (₹180 cost + ₹25 margin) [Apply Suggestion]`
+  * **Non-Intrusive:** The user can accept the suggestion or enter any custom selling price. The rule **never silently overwrites or changes the product's actual selling price**.
+  * Cashiers always sell at native `product.template.list_price` (zero runtime overhead).
 * **Open Bottle Peg Settings:** Configures allowed peg pack sizes (30ml, 60ml, 90ml) and selling rates per peg for that bottle.
 
 ---

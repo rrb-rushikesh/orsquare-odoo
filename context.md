@@ -86,7 +86,8 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 * **Status:** Locked Decision.
 * **Architecture:**
   - **Two-Tier Billing:** Simple Bill (default 10-second workflow for everyday counter operations) vs. Advanced Bill (`[✓] Advanced Bill` toggle for supplier invoice reproduction and B2B wholesale invoices).
-  - **Commercial Adjustments:** Item-level discounts (%/₹), prorated bill-level trade discounts, capitalized landed costs (freight, handling, insurance) vs. period expenses.
+  - **Multi-Tax Regimes:** Constitutional separation between Alcoholic Liquor for human consumption (outside GST per Art. 366(12A) & Sec. 9(1) CGST Act, subject to State VAT e.g. MVAT + Sec. 206C(1) TCS) and General Retail Merchandise (subject to CGST/SGST/IGST). Tax reports and ledgers are strictly segregated (VAT returns vs. GSTR-1/3B).
+  - **Commercial Adjustments & Native Landed Costs:** Item-level discounts (%/₹), prorated bill-level trade discounts, and capitalized landed costs (freight, handling, transit insurance) routed directly through native Odoo `stock.landed.cost` into AVCO valuation layers (`stock.valuation.layer`).
   - **Bi-Directional Rate Engine:** Supports forward entry (`Qty × Rate = Total`) and reverse entry (`Qty + Total = Rate`), with explicit tax-exclusive base labeling and tax-inclusive reverse calculator.
   - **Costing Standard & Configurable Policy:** Moving Weighted Average Cost (AVCO via Odoo `property_cost_method = 'average'`) across all products, cleanly separating internal asset valuation from legal supplier payables. Granular settings switches give shop owners total control over whether discounts, freight/expenses, and taxes are factored into product cost rates.
   - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
@@ -94,7 +95,17 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 
 ### I. Operational Capabilities Roadmap (Refined Baseline)
 * **Status:** Locked Decision (formalized based on live codebase audit and domain review).
-* **Active (Keep Now & Redesign):** Auto-Godown stock transfer during checkout (concurrency protected), Continuous Scanning mode with UI lock/unlock protection & durable IndexedDB draft, Independent Default Payment Mode, Granular Cashier Permissions & Sensitive Data Masking, Purchase & Sales Returns + Direct Replacement Exchanges (paired multi-tax documents), Redesigned Restaurant Floor & Table Setup, Three-Tier Hardware Thermal Printing Engine (QZ Tray + Local Queue + Browser Fallback), Commercial Discounts vs. Post-Tax Settlement Concessions, Bill Finder ("Recognition Over Recall"), and Category Size Margin Pricing Rules (decoupled from physical UoM).
+* **Active (Keep Now & Redesign):**
+  - **Auto-Godown Transfer on Checkout:** Single atomic Odoo database transaction (`with env.cr.savepoint():`) executing reservation, internal transfer, delivery, and invoice with row-level lock queueing on `stock.quant`, guaranteeing zero overselling and zero negative inventory.
+  - **Continuous Scanning Mode:** Barcode stream with UI lock/unlock protection and durable IndexedDB draft buffer.
+  - **Independent Default Payment Mode:** Dedicated registers (Cash-only counter vs. Card/UPI counter) via client-side local settings.
+  - **Granular Cashier Permissions & Masking:** Hiding sensitive purchase rates, margins, and cost totals from staff without `can_see_valuation`.
+  - **Transaction-Type-Aware Returns & Exchanges:** Paired transaction engine creating POS refund receipts and counter stock moves for retail sales, and formal statutory Credit Notes / Debit Notes for invoiced sales and vendor bills.
+  - **Restaurant Floor & Table Setup:** Spatial visual table grid with visual state indicators and tab transfers.
+  - **Three-Tier Hardware Thermal Printing Engine:** QZ Tray websocket $\rightarrow$ Local agent queue $\rightarrow$ Browser silent fallback. Benchmark targets (<100ms dispatch) measured under realistic load.
+  - **Commercial Discounts vs. Concessions:** Explicit user classification between Trade Discounts (pre-tax base reduction), Statutory Round-off (Sec 170 CGST Act to nearest rupee), and Collection/Settlement Concessions (post-tax cash difference).
+  - **Bill Finder:** High-speed client-side indexed search ("recognition over recall") targeting <10ms local lookups.
+  - **Category Size Margin Pricing Rules:** Optional price-setting assistance rules attached to categories/pricing configs (`orsquare.margin_rule`), decoupled from physical `uom.uom`.
 * **Postponed (Future Scope):** Closing Stock Audit & Reconciliation Engine, and Indian Wine Shop Sheet Register & WineStock Matrix.
 * **Skipped:** Product Master Library & Fuzzy Spreadsheet Importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
 
@@ -141,7 +152,7 @@ graph TD
 * [`docs/tabs/ledger.md`](docs/tabs/ledger.md) — Business-wide Trial Balance, P&L, Balance Sheet, and tax reports.
 * [`docs/tabs/purchases.md`](docs/tabs/purchases.md) — Procurement, Godown goods receipt, vendor bills, direct replacement exchange, and purchase returns.
 * [`docs/tabs/products.md`](docs/tabs/products.md) — Master catalog, brand/variant/size hierarchy, opening stock, Open Bottle peg sizes, and simplified size margin helpers.
-* [`docs/tabs/sales.md`](docs/tabs/sales.md) — Counter POS, continuous scanning with lock/unlock guard, independent payment mode, 3-in-1 discounts, counter returns/exchanges, and Bill Finder.
+* [`docs/tabs/sales.md`](docs/tabs/sales.md) — Counter POS, continuous scanning with lock/unlock guard, independent payment mode, commercial discounts vs concessions, counter returns/exchanges, and Bill Finder.
 * [`docs/tabs/stock.md`](docs/tabs/stock.md) — Godown & Counter topology, Auto-Godown transfer, stock transfer drawer, and OP Stock shelf. (WineStock matrix marked as Future Scope).
 * [`docs/tabs/sheet.md`](docs/tabs/sheet.md) — Daily Counter Register matrix and statutory excise formulas (marked as Future Scope).
 * [`docs/tabs/cashflow.md`](docs/tabs/cashflow.md) — Chronological cash diary, petty expenses, daily liquidity.

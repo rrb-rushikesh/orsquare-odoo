@@ -38,8 +38,11 @@ Purchases supports two operational modes via a progressive disclosure toggle:
 ### B. Advanced Purchase Bill (Wholesale Invoice Reproduction)
 When `[✓] Advanced Bill` is toggled:
 * **Invoice Metadata:** Supplier Invoice No. (for GSTR-2B matching), Payment Due Date, Transport Permit No. (TP No) & Date (statutory liquor transport compliance).
+* **Multi-Tax Regimes:** Line items are calculated according to product tax classification:
+  - *Alcoholic Liquor:* State VAT (e.g. MVAT) and Section 206C(1) TCS. Excluded from GST.
+  - *General Merchandise:* Standard Indian GST (`l10n_in`).
 * **Discounts:** Item-level discounts (% or ₹) and prorated bill-level Trade Discounts.
-* **Additional Expenses & Landed Costs:** Freight, Handling, Insurance with `[✓] Capitalize into Inventory Cost` switch.
+* **Additional Expenses & Native Landed Costs:** Freight, Handling, Insurance with `[✓] Capitalize into Inventory Cost` switch. When enabled, invokes standard Odoo **Landed Costs** (`stock.landed.cost`) to capitalize expenses into AVCO inventory valuation layers (`stock.valuation.layer`) without custom valuation math.
 * **Configurable Cost Composition Policy:** Independent Settings toggles for factoring discounts, freight, and taxes into product piece rates.
 * **Tax Override & Penny Round-off:** Direct override of calculated tax to match printed supplier invoice ($\pm ₹5.00$ auto-booked to Round-off ledger).
 

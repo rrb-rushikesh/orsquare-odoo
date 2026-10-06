@@ -9,24 +9,26 @@
 ## 1. Checkout Workflow
 
 1. **Scan or Search:** Salesperson scans barcode (USB/Bluetooth) or searches product name / short code.
-2. **Stock Validation & Auto-Godown Replenishment:**
+2. **Multi-Tax Regimes & Stock Validation:**
+   * **Multi-Tax Regime Evaluation:** Line items are automatically taxed according to product tax classification:
+     - *Alcoholic Liquor:* State VAT (e.g. MVAT) and TCS under Sec 206C(1). Constitutionally excluded from GST.
+     - *Retail Consumables & Kitchen:* Standard Indian GST (`l10n_in`: 0%, 5%, 12%, 18%, 28%).
    * **Counter Stock Validation:** Retail items consume `WH/Stock/Counter`.
-   * **Auto-Godown Transfer (Concurrency Protected):** If `auto_godown_transfer` is ON and counter quantity is insufficient, an atomic internal transfer from Godown to Counter is executed using PostgreSQL row-level locks (`SELECT ... FOR UPDATE` on `stock.quant`) and Odoo stock reservation (`_action_assign()`), preventing race conditions between concurrent cashiers.
-   * **Kitchen & Consumables (`detailed_type = 'consu'`):** Displays infinite availability badge (`∞`). Incrementable freely without inventory restrictions.
+   * **Auto-Godown Transfer (Transaction Atomic & Concurrency Protected):** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal stock transfer is executed inside the **same atomic Odoo database transaction** as the sale using PostgreSQL row-level locks (`SELECT ... FOR UPDATE` on `stock.quant`) and native stock reservation (`_action_assign()`). Competing cashier transactions queue safely, strictly guaranteeing **no overselling and no negative inventory**.
+   * **Kitchen Dishes (`detailed_type = 'consu'`):** Displays infinite availability badge (`∞`).
 3. **Quantity, Rate & Portion Selection:**
    * Adjust quantity; optional authorized price override.
    * **Portion Selection (Full / Half):** For dishes with portion variants, cashier selects `[Full]` or `[Half]` directly from search or line item.
 4. **Open Bottle Peg Flow (Optional):**
    * Salesperson opens **Open Bottle Drawer**, selects peg size (30ml, 60ml, 90ml), chooses an open bottle from the **Open Bottles Tray**, and adds portion to bill.
-5. **Commercial Discounts vs. Settlement Rounding:**
-   * **Commercial / Trade Discounts (Pre-Tax):** Promo coupons (`PROMO10`, `FLAT50`), percentage off, or manual trade discounts applied to line items before tax, reducing taxable turnover and GST proportionally.
-   * **Settlement Rounding & Cashier Concessions (Post-Tax):**
-     - Statutory penny round-off to nearest ₹1.00 (under Section 170 CGST Act) booked to standard Round-off ledger.
-     - Cashier settlement concession (e.g. ₹124 rounded to ₹100 cash): explicitly classified as either a Pre-tax Trade Discount (recalculating tax) or a Post-tax Cash Concession (booked to Cash Settlement Loss expense without altering statutory tax liabilities).
+5. **Commercial Discounts vs. Round-off vs. Settlement Concessions:**
+   * **Trade / Commercial Discounts (Pre-Tax):** Promo coupons (`PROMO10`, `FLAT50`), percentage off, or manual trade discounts applied to line items before tax, reducing taxable turnover and output taxes.
+   * **Statutory Round-off:** Standard minor rounding to nearest ₹1.00 (under Section 170 CGST Act) booked to the standard Round-off account.
+   * **Collection / Settlement Concession:** When cash payment is rounded down (e.g. ₹124 rounded to ₹100 cash), the user explicitly chooses whether it is a pre-tax trade discount or a post-tax settlement difference booked to Cash Settlement Loss expense without rewriting the tax record.
 6. **Payment & Settlement:**
    * **Tender Options:** Cash (with change calculator), UPI (dynamic QR code), Khata (Customer ledger credit), or Split Tender.
    * **Default Payment Mode:** If configured in Settings (e.g. `Cash only` or `UPI only`), pressing Settle or `F8`/`Enter` completes the sale immediately using the default tender without opening payment selection modals.
-7. **Silent Thermal Printing:** Direct ESC/POS silent print via QZ Tray bridge (dispatch target: <100ms benchmark) or browser print fallback.
+7. **Silent Thermal Printing:** Direct ESC/POS silent print via QZ Tray bridge (dispatch latency target: <100ms benchmark) or browser print fallback.
 
 ---
 
@@ -45,13 +47,11 @@
   - **Tier 2 (Deep Server Archive):** Searching older records queries Odoo `account.move` asynchronously.
 * Provides 1-tap actions: *Reprint Receipt*, *Issue Return / Exchange*, *View Details*.
 
-### C. Counter Sales Returns & Direct Exchanges (Multi-Tax Rigor)
+### C. Counter Sales Returns & Direct Exchanges (Transaction-Type-Aware)
 * Allows handling customer returns or product exchanges directly at the POS counter:
-  - Generates two linked statutory documents:
-    1. **Customer Credit Note:** Reversing the returned item with its original price, HSN, and exact original GST tax rate.
-    2. **New Tax Invoice:** Billing the replacement item with its own proper rate, HSN, and GST slab.
-    3. **Ledger Netting:** Odoo reconciles the Credit Note against the Invoice, collecting or refunding only the net cash variance.
-  - Handles unequal values (customer pays extra or receives refund) and different tax slabs without corrupting GSTR-1 filings.
+  - **POS Counter Sales:** Generates a POS return order / session refund receipt and Counter stock return movement. Avoids creating unnecessary B2B e-invoice credit notes for simple retail counter slips.
+  - **B2B Invoiced Sales:** Generates a formal statutory Credit Note (`out_refund` referencing original invoice `reversed_entry_id`) and a new Tax Invoice (`out_invoice`).
+  - **Direct Exchanges:** Net cash difference is collected or refunded seamlessly, while underlying stock movements return original items to `WH/Stock/Counter` and deliver replacement goods to `Customers`. Handles unequal values and different tax regimes cleanly.
 
 ### D. Open Bottles Tray & Peg Drawer
 * Persistent carousel at the bottom of the Sales screen displaying active opened bottles with live remaining ml and visual liquid fill badges (Green >50%, Amber 25-50%, Red <25%). See [`docs/opened-bottles-spec.md`](../opened-bottles-spec.md).

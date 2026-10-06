@@ -79,34 +79,36 @@ $$\text{Line Taxable Base} = \text{Line Gross Amount} - \text{Line Item Discount
 
 ---
 
-### B. Additional Expenses: Landed Costs (Capitalization) vs. Period Expenses
+### B. Additional Expenses: Native Odoo Landed Costs (`stock.landed.cost`) vs. Period Expenses
 
 Retailers encounter ancillary charges on purchase invoices: Freight Inward, Unloading Labour, Breakage/Insurance, Packaging/Crates, and Handling.
 
-#### Accounting Rule (Ind AS 2 / AS 2):
+#### 1. Accounting Rule (Ind AS 2 / AS 2):
 * **Capitalized to Inventory (Landed Cost):** All direct costs incurred to bring the goods to their present location and condition (Godown).
 * **Period Expense:** Financing charges, cash discount interest, post-arrival storage, or demurrage.
+
+#### 2. Native Odoo Engine Implementation (No Custom Math):
+* When the user enables `[✓] Capitalize into Inventory Cost` on freight, handling, or insurance:
+  - Behind the scenes, the system triggers Odoo's native **Landed Costs** framework (`stock.landed.cost`).
+  - It creates a landed cost record linked directly to the incoming purchase receipt picking (`stock.picking`).
+  - Odoo natively computes the valuation adjustment layer (`stock.valuation.layer`), automatically allocating the capitalized amount across line items (by value or volume) and updating the Moving Weighted Average Cost (AVCO) with 100% standard accounting compliance.
+  - Custom valuation mathematics are strictly avoided; ORSquare provides only the simple checkbox in the UI, delegating accounting execution entirely to standard Odoo.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │                             ADDITIONAL EXPENSE ROW                               │
 │  Charge Name: [ Freight Inward ]       Amount: [ ₹ 500.00 ]                      │
-│  [✓] Capitalize into Inventory Cost (Landed Cost)                                │
+│  [✓] Capitalize into Inventory Cost (Invokes native Odoo stock.landed.cost)     │
 └────────────────────────┬─────────────────────────────────┬───────────────────────┘
                          │                                 │
               IF CAPITALIZED [ON]                 IF EXPENSED [OFF]
                          │                                 │
                          ▼                                 ▼
-         Debit: Stock Interim / Inventory           Debit: Freight Expense (P&L)
-         Credit: Supplier Payable                   Credit: Supplier Payable
-         Unit Cost of products increases            Unit Cost of products unchanged
+      Odoo stock.landed.cost allocated            Debit: Freight Expense (P&L)
+      Debit: WH/Stock/Godown Asset (AVCO)         Credit: Supplier Payable
+      Credit: Stock Interim / Landed Clearing     Unit Cost of products unchanged
+      Unit Cost of products increases
 ```
-
-#### Proration of Capitalized Landed Costs
-Landed costs can be allocated across products using two standard methods:
-1. **By Value (Default):** Apportions freight proportionally to each product's value:
-   $$\text{Allocated Freight}_i = \text{Total Freight} \times \frac{\text{Value}_i}{\sum \text{Value}}$$
-2. **By Quantity / Volume (Optional):** Apportions freight based on physical bottle weight or liter volume (ideal when heavy low-cost beer incurs higher transport than high-cost whisky).
 
 ---
 
@@ -136,13 +138,32 @@ The user raised a critical scenario:
 
 ---
 
-### D. Complete Double-Entry Accounting Matrix
+### D. Multi-Tax Regime Architecture: Alcoholic Liquor State VAT / TCS vs. GST
 
-For a complete Advanced Purchase Bill matching the Anand Wines case study:
-- Line Items: ₹69,260.00
+Because ORSquare serves wine and beverage retail, the system **never treats taxes as one monolithic GST family**.
+
+#### 1. Statutory Constitutional Division:
+* **Alcoholic Liquor for Human Consumption:** Under Article 366(12A) of the Constitution of India and Section 9(1) of the CGST Act, alcoholic beverages are constitutionally excluded from GST. They are governed by:
+  - **State Excise Duties & State VAT:** (e.g. Maharashtra Value Added Tax / MVAT on liquor).
+  - **Income Tax TCS (Sec 206C(1)):** Tax Collected at Source on wholesale liquor procurement (typically 1% or 2%).
+* **Non-Liquor Retail Merchandise:** Packaged snacks, peanuts, cashews, bottled soda, packaged water, glassware, and kitchen food dishes are standard GST-taxable commodities under the CGST/SGST Acts (0%, 5%, 12%, 18%, 28%).
+
+#### 2. Technical Odoo Mapping:
+* Each product carries an authoritative `tax_regime` flag (`liquor_vat`, `gst`, or `exempt`).
+* Standard Odoo Tax models (`account.tax`) are partitioned:
+  - Liquor lines compute State VAT and Income Tax TCS, posting to dedicated State Tax / TCS asset/liability accounts.
+  - Retail lines compute CGST + SGST (or IGST), posting to standard GST Input/Output ledgers (`l10n_in`).
+* **Statutory Return Segregation:** GST tax returns (GSTR-1, GSTR-3B) classify liquor turnover as Non-GST / Nil-rated supply, while State VAT returns receive liquor figures, preventing statutory cross-contamination.
+
+---
+
+### E. Complete Double-Entry Accounting Matrix (Anand Wines Case Study)
+
+For a complete Advanced Purchase Bill matching the Anand Wines wholesale liquor invoice:
+- Line Items (Beer/Liquor): ₹69,260.00
 - Trade Discounts: -₹2,150.00
-- Handling Charge (Capitalized): +₹15.00
-- TCS (2%): +₹1,342.00
+- Handling Charge (Capitalized via Odoo Landed Cost): +₹15.00
+- TCS (2% under Sec 206C(1)): +₹1,342.00
 - Net Bill Total: ₹68,467.00
 
 ```
