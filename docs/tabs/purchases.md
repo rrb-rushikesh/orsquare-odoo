@@ -52,20 +52,22 @@ When `[✓] Advanced Bill` is toggled:
 
 ---
 
-## 3. Purchase Returns & Direct Replacement Exchange
+## 3. Purchase Returns & Direct Replacement Exchange (Multi-Tax & Value Rigor)
 
 Purchases handles damaged goods or distributor discrepancies with two flows:
 
 ### A. Standard Purchase Return (Debit Note)
-* Posts reverse stock movement (`WH/Stock/Godown` $\rightarrow$ `Supplier`) and generates an Odoo Vendor Credit Note (`in_refund`), reducing supplier payables.
+* Posts reverse stock movement (`WH/Stock/Godown` $\rightarrow$ `Supplier`) and generates an Odoo Vendor Credit Note (`in_refund`), reversing taxes/ITC and reducing supplier payables.
 
 ### B. Direct Replacement Exchange (`[✓] Exchange items instead`)
-* **Problem:** Distributors frequently replace damaged bottles immediately upon truck delivery rather than issuing financial credit notes.
-* **Behavior:** Checking `Exchange items instead (stock down + intake up)` records damaged items returned **and** replacement items received on the same voucher.
-  * System executes paired stock movements: damaged items exit Godown to vendor; replacement items enter Godown.
-  * **Ledger Netting:**
-    - If replacement value matches returned value: Wash transaction; supplier balance is untouched.
-    - If a price difference exists: The Credit Note and Bill net automatically in Odoo, booking only the net variance to the supplier ledger.
+* **The Complexity:** Damaged items returned to a distributor and replaced immediately upon delivery frequently have different prices, different HSNs, or different tax slabs (e.g. returning 18% GST items for 5% GST or TCS items). A single naive netted line corrupts GSTR-2B statutory records.
+* **Paired Statutory Documents Architecture:**
+  1. **Vendor Credit Note (`in_refund`):** Reverses returned damaged goods with their original purchase rates, HSN codes, and tax rates (`reversed_entry_id`). Generates return picking (`WH/Stock/Godown` $\rightarrow$ `Vendors`).
+  2. **New Vendor Bill (`in_invoice`):** Bills incoming replacement goods with their own rates and tax slabs. Generates incoming receipt picking (`Vendors` $\rightarrow$ `WH/Stock/Godown`).
+  3. **Automatic Ledger Netting:** Odoo reconciles the Credit Note and Bill on the supplier ledger:
+     - Equal values: Net payable adjustment is ₹0, but both documents post to statutory tax journals.
+     - Unequal values: Books the exact net difference to the supplier payable balance.
+* **Frontend UX:** The user interacts with a single unified Return/Exchange drawer, while Odoo produces compliant dual documents in the backend.
 
 ---
 

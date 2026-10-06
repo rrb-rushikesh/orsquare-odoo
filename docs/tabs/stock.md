@@ -32,10 +32,11 @@ To maintain tight physical control and prevent theft in bottle/retail counters, 
 
 ### A. Auto-Godown Stock Transfer on Checkout (`auto_godown_transfer`)
 * **Scope:** Controlled strictly by Shop Owner in Settings $\rightarrow$ Sales Register Controls.
-* **Behavior:**
+* **Behavior & Concurrency Protection:**
   * When `auto_godown_transfer` is **ON**: If Counter stock is insufficient but Godown has adequate stock, the checkout service automatically executes an internal stock transfer (`WH/Stock/Godown` $\rightarrow$ `WH/Stock/Counter`) upon bill settlement.
+  * **Concurrency & Race Condition Guard:** The transfer and sale execute inside a single atomic database transaction (`with env.cr.savepoint():`). It uses PostgreSQL row-level locks (`SELECT ... FOR UPDATE` on `stock.quant`) via Odoo's native stock reservation (`_action_assign()`). If two cashiers simultaneously attempt to sell the last Godown stock, the first acquires the reservation lock while the second fails cleanly with `Insufficient Stock in Godown`, safely rolling back without phantom sales or negative balances.
   * Preserves full Odoo audit trail: creates a real Odoo `stock.picking` with `origin = f"Auto-Godown Transfer for Sale {sale_ref}"` and logs the cashier's user session.
-  * If Godown also lacks stock, checkout halts with an explicit stockout warning.
+  * If Godown lacks stock, checkout halts with an explicit stockout warning.
 
 ### B. Stock Transfer Drawer (Manual Movements)
 * Slide-out drawer to transfer stock between Godown and Counter.

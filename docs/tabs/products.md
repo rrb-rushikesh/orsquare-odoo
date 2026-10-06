@@ -29,10 +29,11 @@ ORSquare enforces standard product nomenclature to prevent retail inventory erro
 * **Pricing & Portions:**
   * Maximum Retail Price (MRP), Selling Rate (`list_price`), and Cost Rate (`standard_price`).
   * **Portion Pricing (Half & Full Portions):** Replaces legacy duplicate products (`Name (Half)`). Managed as native Odoo Product Variants (`product.template` + `Portion` attribute) under a clean toggle: `[✓] Offer Half & Full portions`.
-* **Bottle Size Margins & Rate Helpers (Simplified):**
-  * Bottle volume margins (e.g. 90ml = ₹5, 180ml = ₹10, 375ml = ₹15, 750ml = ₹25) are stored as lightweight attributes on the Unit of Measure (`uom.uom`).
+* **Bottle Size Margins & Rate Helpers (Pricing Configuration):**
+  * Margins are **never placed on `uom.uom`** (units represent pure physical dimensions, not commercial pricing, and different categories like Country Liquor vs Premium IMFL have different margins for the same 750ml bottle).
+  * Margin rules are attached to **Category & Pricing configuration** (`orsquare.margin_rule`: Category + Size UoM $\rightarrow$ Margin Amount).
   * Cashiers sell at native `product.template.list_price` (zero runtime overhead).
-  * In the product form, entering a purchase cost of ₹180 on a 750ml bottle displays a 1-tap helper: `[Auto-Set Selling Price: ₹180 + ₹25 = ₹205]`.
+  * In the product form, entering a purchase cost of ₹180 on a 750ml Whisky bottle looks up the Whisky 750ml margin rule (₹25) and displays a 1-tap helper: `[Auto-Set Selling Price: ₹180 + ₹25 = ₹205]`.
 * **Open Bottle Peg Settings:** Configures allowed peg pack sizes (30ml, 60ml, 90ml) and selling rates per peg for that bottle.
 
 ---

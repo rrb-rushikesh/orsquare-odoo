@@ -94,7 +94,7 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 
 ### I. Operational Capabilities Roadmap (Refined Baseline)
 * **Status:** Locked Decision (formalized based on live codebase audit and domain review).
-* **Active (Keep Now & Redesign):** Auto-Godown stock transfer during checkout, Continuous Scanning mode with UI lock/unlock protection, Independent Default Payment Mode, Granular Cashier Permissions & Sensitive Data Masking, Purchase & Sales Returns + Direct Replacement Exchanges, Redesigned Restaurant Floor & Table Setup, Three-Tier Hardware Thermal Printing Engine (QZ Tray + Local Queue + Browser Fallback), Unified 3-in-1 Discount System, Bill Finder ("Recognition Over Recall"), and Simplified UoM Size Margins.
+* **Active (Keep Now & Redesign):** Auto-Godown stock transfer during checkout (concurrency protected), Continuous Scanning mode with UI lock/unlock protection & durable IndexedDB draft, Independent Default Payment Mode, Granular Cashier Permissions & Sensitive Data Masking, Purchase & Sales Returns + Direct Replacement Exchanges (paired multi-tax documents), Redesigned Restaurant Floor & Table Setup, Three-Tier Hardware Thermal Printing Engine (QZ Tray + Local Queue + Browser Fallback), Commercial Discounts vs. Post-Tax Settlement Concessions, Bill Finder ("Recognition Over Recall"), and Category Size Margin Pricing Rules (decoupled from physical UoM).
 * **Postponed (Future Scope):** Closing Stock Audit & Reconciliation Engine, and Indian Wine Shop Sheet Register & WineStock Matrix.
 * **Skipped:** Product Master Library & Fuzzy Spreadsheet Importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
 
