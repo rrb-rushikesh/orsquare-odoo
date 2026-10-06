@@ -48,6 +48,13 @@
 ### D. Restaurant Tables Mode (Optional)
 * When enabled in Settings, provides an interactive table map allowing staff to hold and manage open bills per table.
 
+### E. Advanced Sales Bill (B2B Tax Invoice)
+* **Separation of Concerns:** Counter POS billing remains fast, minimal, and keyboard-driven.
+* **B2B Invoice Flow (`+ New Tax Invoice`):** Accessed via a dedicated button for wholesale sales to hotels, clubs, or institutions.
+* **Fields:** Registered Customer with GSTIN, State Code (CGST+SGST vs. IGST), HSN/SAC item table, Trade Discounts, Payment Credit Terms, Transport/Vehicle No., and e-Way bill #.
+* **Output:** Official statutory A4 Tax Invoice PDF and real-time debit on Customer Khata / Accounts Receivable. See [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md).
+
+
 ---
 
 ## 3. Responsive Layout

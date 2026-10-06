@@ -83,10 +83,14 @@ sequenceDiagram
     Odoo-->>UI: Return Confirmed Bill #, Updated Godown Quantities
 ```
 
-### Business Rules
+### Business Rules & Accounting Treatment
+* **Two-Tier Billing:** 
+  * **Simple Purchase Bill:** Fast stock-in with Supplier, Date, Product search, Boxes/Pieces, and bi-directional Rate $\leftrightarrow$ Total calculation.
+  * **Advanced Purchase Bill (`[✓] Advanced Bill`):** Exposes Supplier Invoice No., Transport Permit (TP No) & Date, item-level discounts, bill-level trade discounts, capitalized landed costs (freight, handling, insurance), and direct tax override with penny round-off matching ($\pm ₹5.00$ to Round-off account).
 * **Cost vs. MRP:** The purchase rate entered is strictly the purchase cost (unit cost price). It must never be confused with MRP or selling price.
+* **Moving Weighted Average Cost (AVCO):** Standardized costing method (`property_cost_method = 'average'`). Blends incoming stock and capitalized landed costs into moving unit cost without distorting individual supplier payables.
 * **Godown Arrival:** All purchased stock lands in `WH/Stock/Godown`. It is not sale-ready until transferred to the Counter.
-* **Unit of Measure Conversions:** Supports buying in cases/boxes and storing in pieces/bottles using standard Odoo `uom.uom` conversions (e.g. 1 Case = 12 Bottles).
+* **Unit of Measure Conversions:** Continuous conversion between supplier packaging (cases/boxes) and single inventory pieces. See [`docs/advanced-billing-spec.md`](advanced-billing-spec.md).
 
 ---
 

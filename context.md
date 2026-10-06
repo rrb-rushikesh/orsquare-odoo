@@ -82,6 +82,16 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 * **Portion Variants (Half & Full Portions):** Eliminates fragile legacy duplicate products (`Name (Half)`). Managed natively as Odoo Product Variants (`product.template` + `Portion` attribute) under a simple Full/Half toggle in the UI, preserving single parent naming, categories, and unified sales analytics.
 * **Catalog Masters Drawer:** Renamed from *"Catalog Options"* to **"Catalog Masters"** with dedicated visual sections for Base Units and Shop Units.
 
+### H. Advanced Billing Architecture & Dual Bill Templates
+* **Status:** Locked Decision.
+* **Architecture:**
+  - **Two-Tier Billing:** Simple Bill (default 10-second workflow for everyday counter operations) vs. Advanced Bill (`[✓] Advanced Bill` toggle for supplier invoice reproduction and B2B wholesale invoices).
+  - **Commercial Adjustments:** Item-level discounts (%/₹), prorated bill-level trade discounts, capitalized landed costs (freight, handling, insurance) vs. period expenses.
+  - **Bi-Directional Rate Engine:** Supports forward entry (`Qty × Rate = Total`) and reverse entry (`Qty + Total = Rate`), with explicit tax-exclusive base labeling and tax-inclusive reverse calculator.
+  - **Costing Standard:** Moving Weighted Average Cost (AVCO via Odoo `property_cost_method = 'average'`) across all products, cleanly separating internal asset valuation from legal supplier payables.
+  - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
+  - **Dual Bill-Template System:** Dedicated template engines in Settings for **Large Format A4 Tax Invoices** (with statutory excise bottle breakdown matrix, bank details, dynamic UPI QR) and **Compact Thermal Slips** (58mm, 80mm).
+
 ---
 
 ## 3. High-Level System Architecture
@@ -143,4 +153,6 @@ graph TD
 * [`docs/existing-repos-audit.md`](file:///C:/Repo/orsquare-odoo/docs/existing-repos-audit.md) — Deep audit of legacy repositories (`production-hot-fix` and `orsquare-tryton`).
 * [`docs/astra-landing-optimization.md`](file:///C:/Repo/orsquare-odoo/docs/astra-landing-optimization.md) — Astro landing page SEO, accessibility, performance, and seamless login integration.
 * [`docs/kitchen-and-units-spec.md`](file:///C:/Repo/orsquare-odoo/docs/kitchen-and-units-spec.md) — Kitchen universal extension (infinite stock consumables), Two-Tier Units (Base Units with visibility toggles, Shop Units with numeric conversion ratios), portion variants, and Catalog Masters drawer redesign.
+* [`docs/advanced-billing-spec.md`](file:///C:/Repo/orsquare-odoo/docs/advanced-billing-spec.md) — Advanced Purchase & Sales Billing specification, Two-Tier progressive disclosure, capitalized landed costs vs period expenses, AVCO moving average costing, bi-directional rate entry, tax override & penny rounding, and Dual Bill Templates (A4 & Thermal).
+
 

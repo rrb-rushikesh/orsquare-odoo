@@ -11,7 +11,8 @@
 | Area | Controls & Capabilities |
 |---|---|
 | **Appearance** | Theme selection (Light / Dark mode), interface density (Standard / Compact). |
-| **Bill & Invoice** | Thermal POS receipt (80mm / 58mm) vs. Full A4 Tax Invoice; shop header, GSTIN, custom receipt footer message, silent thermal printing (QZ Tray / Web print). |
+| **Bill & Invoice** | **Dual Bill-Template System:** Dedicated template engines for **Compact Thermal (58mm / 80mm)** and **Large Format (A4 Tax Invoice)** with live side-by-side previews. Controls store branding, GSTIN, FSSAI, Liquor License No, Statutory Excise bottle matrix footer (IMFL/Wine/Beer), Bank details, dynamic UPI QR code, and thermal printer hardware triggers (QZ Tray / ESC/POS / cash drawer kick). See [`docs/advanced-billing-spec.md`](../advanced-billing-spec.md). |
+
 | **Business Studio** | **Master Shop Experience Customizer:** Toggle tabs (Sales, Stock, Purchases, Accounts), choose variants (*WineStock Matrix* vs. *Standard Stock*), and enable features (*Open Bottle* peg mode, restaurant *Tables* mode, *Kitchen* mode). |
 | **Staff Access** | **Simple Role Assignment:** Assign shop staff (Cashiers, Stockkeepers) to standard Odoo security groups (`res.groups`) with sensitive data masking (`can_see_money`, `can_see_valuation`). |
 | **Tables** | Setup dining areas/floors and restaurant tables for hospitality billing (leverages `pos_restaurant`). |
