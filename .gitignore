@@ -1,0 +1,53 @@
+# Operating System
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Python / Odoo
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+*.log
+
+# Node / React
+node_modules/
+dist/
+.output/
+.turbo/
+
+# Scratch & Temporary
+scratch/
+tmp/
+*.tmp
