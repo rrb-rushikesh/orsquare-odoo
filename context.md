@@ -85,9 +85,10 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 ### H. Advanced Billing Architecture & Dual Bill Templates
 * **Status:** Locked Decision.
 * **Architecture:**
+  - **Core Architectural Principle:** **ORSquare simplifies the user's actions; Odoo remains responsible for the accounting, inventory valuation, tax calculation, and ledger truth.**
   - **Two-Tier Billing:** Simple Bill (default 10-second workflow for everyday counter operations) vs. Advanced Bill (`[✓] Advanced Bill` toggle for supplier invoice reproduction and B2B wholesale invoices).
-  - **Multi-Tax Regimes:** Constitutional separation between Alcoholic Liquor for human consumption (outside GST per Art. 366(12A) & Sec. 9(1) CGST Act, subject to State VAT e.g. MVAT + Sec. 206C(1) TCS) and General Retail Merchandise (subject to CGST/SGST/IGST). Tax reports and ledgers are strictly segregated (VAT returns vs. GSTR-1/3B).
-  - **Commercial Adjustments & Native Landed Costs:** Item-level discounts (%/₹), prorated bill-level trade discounts, and capitalized landed costs (freight, handling, transit insurance) routed directly through native Odoo `stock.landed.cost` into AVCO valuation layers (`stock.valuation.layer`).
+  - **Multi-Tax Regimes & Configurable Tax Mappings:** Constitutional separation between Alcoholic Liquor for human consumption (outside GST per Art. 366(12A) & Sec. 9(1) CGST Act, subject to State VAT/excise levies + Sec. 206C(1) TCS) and General Retail Merchandise (subject to CGST/SGST/IGST). Uses configurable statutory tax regimes and Odoo fiscal mappings (`account.fiscal.position`), with Maharashtra as initial reference setup but fully configurable for any state without hard-coded state names or rates.
+  - **Commercial Adjustments & Native Landed Costs:** Item-level discounts (%/₹), prorated bill-level trade discounts, and capitalized landed costs. The ORSquare checkbox (`[✓] Capitalize into Inventory Cost`) is strictly a UX control; actual valuation is performed 100% by Odoo's native landed-cost mechanism (`stock.landed.cost`) into AVCO valuation layers (`stock.valuation.layer`). No parallel ORSquare costing engine is built.
   - **Bi-Directional Rate Engine:** Supports forward entry (`Qty × Rate = Total`) and reverse entry (`Qty + Total = Rate`), with explicit tax-exclusive base labeling and tax-inclusive reverse calculator.
   - **Costing Standard & Configurable Policy:** Moving Weighted Average Cost (AVCO via Odoo `property_cost_method = 'average'`) across all products, cleanly separating internal asset valuation from legal supplier payables. Granular settings switches give shop owners total control over whether discounts, freight/expenses, and taxes are factored into product cost rates.
   - **Tax Override & Penny Round-off:** Supports direct override of calculated tax to match printed supplier invoices, automatically booking penny differences ($\pm ₹5.00$) to the standard Round-off ledger.
@@ -96,7 +97,7 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 ### I. Operational Capabilities Roadmap (Refined Baseline)
 * **Status:** Locked Decision (formalized based on live codebase audit and domain review).
 * **Active (Keep Now & Redesign):**
-  - **Auto-Godown Transfer on Checkout:** Single atomic Odoo database transaction (`with env.cr.savepoint():`) executing reservation, internal transfer, delivery, and invoice with row-level lock queueing on `stock.quant`, guaranteeing zero overselling and zero negative inventory.
+  - **Auto-Godown Transfer on Checkout:** Single atomic Odoo database transaction (`with env.cr.savepoint():`) executing reservation, internal transfer, delivery, and invoice with row-level lock queueing on `stock.quant`. Zero overselling and zero negative stock is a core invariant proven through concurrent integration and load tests, with Odoo's native reservation machinery acting as the sole authority.
   - **Continuous Scanning Mode:** Barcode stream with UI lock/unlock protection and durable IndexedDB draft buffer.
   - **Independent Default Payment Mode:** Dedicated registers (Cash-only counter vs. Card/UPI counter) via client-side local settings.
   - **Granular Cashier Permissions & Masking:** Hiding sensitive purchase rates, margins, and cost totals from staff without `can_see_valuation`.

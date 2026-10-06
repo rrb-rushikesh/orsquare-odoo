@@ -10,11 +10,11 @@
 
 1. **Scan or Search:** Salesperson scans barcode (USB/Bluetooth) or searches product name / short code.
 2. **Multi-Tax Regimes & Stock Validation:**
-   * **Multi-Tax Regime Evaluation:** Line items are automatically taxed according to product tax classification:
-     - *Alcoholic Liquor:* State VAT (e.g. MVAT) and TCS under Sec 206C(1). Constitutionally excluded from GST.
+   * **Multi-Tax Regime & Tax Mapping Evaluation:** Line items are automatically taxed according to configurable tax regime and mapping configurations:
+     - *Alcoholic Liquor:* State levies/VAT and Section 206C(1) Income Tax TCS (constitutionally excluded from GST under Art. 366(12A) & Sec. 9(1) CGST Act). Shipped with Maharashtra reference config, fully configurable for any Indian state without hardcoding.
      - *Retail Consumables & Kitchen:* Standard Indian GST (`l10n_in`: 0%, 5%, 12%, 18%, 28%).
    * **Counter Stock Validation:** Retail items consume `WH/Stock/Counter`.
-   * **Auto-Godown Transfer (Transaction Atomic & Concurrency Protected):** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal stock transfer is executed inside the **same atomic Odoo database transaction** as the sale using PostgreSQL row-level locks (`SELECT ... FOR UPDATE` on `stock.quant`) and native stock reservation (`_action_assign()`). Competing cashier transactions queue safely, strictly guaranteeing **no overselling and no negative inventory**.
+   * **Auto-Godown Transfer (Transaction Atomic & Concurrency Protected):** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal stock transfer is executed inside the **same atomic Odoo database transaction** as the sale using PostgreSQL row-level locks on `stock.quant` and native stock reservation (`_action_assign()`). Competing cashier transactions queue safely; maintaining zero overselling and zero negative stock is a core invariant proven through concurrent integration tests, with Odoo's reservation machinery acting as the sole authority.
    * **Kitchen Dishes (`detailed_type = 'consu'`):** Displays infinite availability badge (`∞`).
 3. **Quantity, Rate & Portion Selection:**
    * Adjust quantity; optional authorized price override.

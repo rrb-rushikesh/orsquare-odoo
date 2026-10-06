@@ -92,7 +92,7 @@ Retailers encounter ancillary charges on purchase invoices: Freight Inward, Unlo
   - Behind the scenes, the system triggers Odoo's native **Landed Costs** framework (`stock.landed.cost`).
   - It creates a landed cost record linked directly to the incoming purchase receipt picking (`stock.picking`).
   - Odoo natively computes the valuation adjustment layer (`stock.valuation.layer`), automatically allocating the capitalized amount across line items (by value or volume) and updating the Moving Weighted Average Cost (AVCO) with 100% standard accounting compliance.
-  - Custom valuation mathematics are strictly avoided; ORSquare provides only the simple checkbox in the UI, delegating accounting execution entirely to standard Odoo.
+  - **UX Control Boundary:** **ORSquare's checkbox is only a UX control; the actual valuation must be performed by Odoo's landed-cost mechanism. Do not build a parallel ORSquare costing engine.**
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -138,20 +138,20 @@ The user raised a critical scenario:
 
 ---
 
-### D. Multi-Tax Regime Architecture: Alcoholic Liquor State VAT / TCS vs. GST
+### D. Multi-Tax Regime Architecture: Configurable State Levies / TCS vs. GST
 
-Because ORSquare serves wine and beverage retail, the system **never treats taxes as one monolithic GST family**.
+Because ORSquare serves wine and beverage retail across India, the system **never treats taxes as one monolithic GST family, nor does it hard-code state-specific tax rates or names**.
 
 #### 1. Statutory Constitutional Division:
 * **Alcoholic Liquor for Human Consumption:** Under Article 366(12A) of the Constitution of India and Section 9(1) of the CGST Act, alcoholic beverages are constitutionally excluded from GST. They are governed by:
-  - **State Excise Duties & State VAT:** (e.g. Maharashtra Value Added Tax / MVAT on liquor).
-  - **Income Tax TCS (Sec 206C(1)):** Tax Collected at Source on wholesale liquor procurement (typically 1% or 2%).
+  - **State Excise Duties & State Value Added Tax:** Subject to state-specific taxation and levies that vary across states and change over time. The platform supports Maharashtra as the initial reference setup, but the architecture is fully configurable for any Indian state's tax structure and rates without hardcoding.
+  - **Income Tax TCS (Sec 206C(1)):** Tax Collected at Source on wholesale liquor procurement (currently listed at 1% for alcoholic liquor as per Section 206C provisions).
 * **Non-Liquor Retail Merchandise:** Packaged snacks, peanuts, cashews, bottled soda, packaged water, glassware, and kitchen food dishes are standard GST-taxable commodities under the CGST/SGST Acts (0%, 5%, 12%, 18%, 28%).
 
-#### 2. Technical Odoo Mapping:
-* Each product carries an authoritative `tax_regime` flag (`liquor_vat`, `gst`, or `exempt`).
-* Standard Odoo Tax models (`account.tax`) are partitioned:
-  - Liquor lines compute State VAT and Income Tax TCS, posting to dedicated State Tax / TCS asset/liability accounts.
+#### 2. Technical Odoo Mapping & Tax Regimes (No Restrictive Flags):
+* A product is not constrained by a single permanent boolean flag. Instead, ORSquare utilizes Odoo's native **tax regime and tax mapping configuration** (`account.tax` and `account.fiscal.position`):
+  - Products participate in appropriate tax treatments based on transaction context, customer/vendor state, date, and statutory configuration.
+  - Liquor lines compute the configured State Tax/VAT and Income Tax TCS, posting to dedicated State Tax / TCS asset/liability accounts.
   - Retail lines compute CGST + SGST (or IGST), posting to standard GST Input/Output ledgers (`l10n_in`).
 * **Statutory Return Segregation:** GST tax returns (GSTR-1, GSTR-3B) classify liquor turnover as Non-GST / Nil-rated supply, while State VAT returns receive liquor figures, preventing statutory cross-contamination.
 

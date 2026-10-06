@@ -26,10 +26,12 @@ ORSquare enforces standard product nomenclature to prevent retail inventory erro
   * **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter.
   * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings.
   * **Shop Consumables (Packaged snacks, peanuts):** Configurable as tracked storables or untracked counter consumables.
-  * **Tax Regime Flag (`tax_regime`):**
-    - `liquor_vat`: Alcoholic liquor for human consumption (State VAT + Income Tax TCS under Sec 206C(1)). Constitutionally excluded from GST.
-    - `gst`: General retail items, snacks, beverages, water, glassware, and kitchen dishes (standard Indian GST `l10n_in`).
-    - `exempt`: Non-taxable goods.
+  * **Tax Regime / Tax Mapping Configuration:**
+    - Products map to configurable statutory tax regimes rather than relying on a rigid, static boolean flag, because items can participate in different tax treatments based on transaction context, customer/vendor state, date, or statutory classification.
+    - Standard configuration includes:
+      - *Alcoholic Liquor:* Configured under the applicable State Excise / State VAT and Section 206C Income Tax TCS regime (constitutionally excluded from GST under Art. 366(12A) & Sec. 9(1) CGST Act). Shipped with Maharashtra as the initial reference setup, but fully configurable for any Indian state's tax structure and rates without hardcoding.
+      - *General Retail Goods & Kitchen:* Standard Indian GST mappings (`l10n_in`: 0%, 5%, 12%, 18%, 28%) for snacks, soda, water, barware, and kitchen dishes.
+      - *Exempt / Nil-Rated:* Non-taxable supplies.
 * **Pricing & Portions:**
   * Maximum Retail Price (MRP), Selling Rate (`list_price`), and Cost Rate (`standard_price`).
   * **Portion Pricing (Half & Full Portions):** Replaces legacy duplicate products (`Name (Half)`). Managed as native Odoo Product Variants (`product.template` + `Portion` attribute) under a clean toggle: `[✓] Offer Half & Full portions`.

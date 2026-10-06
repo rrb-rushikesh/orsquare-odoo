@@ -38,11 +38,11 @@ Purchases supports two operational modes via a progressive disclosure toggle:
 ### B. Advanced Purchase Bill (Wholesale Invoice Reproduction)
 When `[✓] Advanced Bill` is toggled:
 * **Invoice Metadata:** Supplier Invoice No. (for GSTR-2B matching), Payment Due Date, Transport Permit No. (TP No) & Date (statutory liquor transport compliance).
-* **Multi-Tax Regimes:** Line items are calculated according to product tax classification:
-  - *Alcoholic Liquor:* State VAT (e.g. MVAT) and Section 206C(1) TCS. Excluded from GST.
-  - *General Merchandise:* Standard Indian GST (`l10n_in`).
+* **Multi-Tax Regimes & Configurable Tax Mappings:** Line items are calculated according to configurable tax regime and mapping configurations:
+  - *Alcoholic Liquor:* State levies/VAT and Section 206C(1) Income Tax TCS (outside GST under Art. 366(12A) & Sec. 9(1) CGST Act). Shipped with Maharashtra reference config, fully configurable for any Indian state without hardcoding.
+  - *General Retail Goods & Kitchen:* Standard Indian GST (`l10n_in`: 0%, 5%, 12%, 18%, 28%).
 * **Discounts:** Item-level discounts (% or ₹) and prorated bill-level Trade Discounts.
-* **Additional Expenses & Native Landed Costs:** Freight, Handling, Insurance with `[✓] Capitalize into Inventory Cost` switch. When enabled, invokes standard Odoo **Landed Costs** (`stock.landed.cost`) to capitalize expenses into AVCO inventory valuation layers (`stock.valuation.layer`) without custom valuation math.
+* **Additional Expenses & Native Landed Costs:** Freight, Handling, Insurance with `[✓] Capitalize into Inventory Cost` switch. The switch is strictly a UX control; actual valuation is performed 100% by Odoo's native Landed Costs engine (`stock.landed.cost`) into AVCO inventory valuation layers (`stock.valuation.layer`) without building a parallel ORSquare costing engine.
 * **Configurable Cost Composition Policy:** Independent Settings toggles for factoring discounts, freight, and taxes into product piece rates.
 * **Tax Override & Penny Round-off:** Direct override of calculated tax to match printed supplier invoice ($\pm ₹5.00$ auto-booked to Round-off ledger).
 
