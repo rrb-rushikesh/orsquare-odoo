@@ -39,7 +39,7 @@ Noise you can ignore in the logs: `duplicate key ... orsquare_brand_name_unique`
 | Change history, directory, throttle | `models/governance.py`, `models/directory.py`, `models/login_throttle.py` |
 | Sign-in, two-step code, enrolment | `controllers/main.py` (`_resolve_db`, `login`, `mfa*`) |
 | Console backend (fleet, plans, operators, provisioning) | `addons/orsquare_platform/models/{platform,service}.py` |
-| Console UI | `frontend/src/features/dev/` ; shared screens in `frontend/src/features/governance/` |
+| Console UI (Tryton parity: FleetPage, BusinessPanel drawer, NewBusinessDialog, StudioPanel workbench) | `frontend/src/features/dev/`, `frontend/src/components/ui/`, `frontend/src/styles/dev-theme.css` |
 | Route guards (`/dev` vs `/`) | `frontend/src/auth/surface.ts`, `frontend/src/App.tsx` |
 | Settings page | `frontend/src/pages/SettingsPage.tsx` |
 | Offline outbox and sync | `frontend/src/lib/sync.ts`, `addons/orsquare/models/sync_service.py` |

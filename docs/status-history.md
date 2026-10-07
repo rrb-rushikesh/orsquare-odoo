@@ -191,3 +191,14 @@ Built as approved after the governance review (`docs/governance.md` is the refer
 - **Heads-up:** the local developer account must enrol an authenticator at next sign-in (that is intended). For a purely
   local machine you may set `orsquare.platform.require_mfa = 0`.
 
+## Developer Console Redesign: Tryton Parity & Architecture (2026-10-08)
+
+- **Exact parity with `orsquare-tryton`:** Developer Console (`/dev`) completely redesigned to match the Tryton implementation.
+- **Styling Architecture:** Configured Tailwind CSS v4 (`@tailwindcss/vite`), custom design system tokens in `theme.css`, `controls.css`, `primitives.css`, and scoped `dev-theme.css` without preflight CSS resets to preserve POS retailer screens.
+- **UI Primitives ported:** `Drawer`, `Modal`, `ChoiceCards`, `PasswordField`, `PhoneField`, `Stepper`, `Switch`, `Tag`, `Toast`, `Menu`, and `Button` (with `cva` variants).
+- **Onboarding Form (`NewBusinessDialog`):** 4-section modal wizard with auto slug generation, plan tier selection cards, owner credentials with dice-roll password generator, international phone format with country selector, and live registration summary preview.
+- **Profile Property Form (`BusinessPanel`):** Slide-over drawer on `/dev/b/:slug` with IdentityBlock, OwnerBlock, SubscriptionBlock (with ±30d, ±7d, +365d quick shift chips and suspend/reactivate toggles), CashiersBlock (with limits counter, reset password/PIN modal, and `AddCashierDialog`), StudioBlock launcher, and ActivityBlock.
+- **Business Studio Form (`StudioPanel`):** 3-column configuration workbench with sidebar tab navigation, feature toggle switches, presets, and live JSON inspector.
+- **Fleet, Audit & System views:** Modernized `FleetPage` with stage filter segments (`All`, `Active`, `Expiring`, `Grace`, `Suspended`), selection shift banner, CSV download; `AuditPage`; `SystemPage`.
+- **Evidence:** Frontend `npm test` 126 passed, 1 skipped. `npm run typecheck` clean. `npm run build` succeeds cleanly.
+

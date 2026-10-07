@@ -13,7 +13,7 @@ Odoo is the only accounting, stock and tax authority. One account = one shop = o
 | Odoo shop backend (sales, stock, purchases, accounts, daybook, sync, realtime) | built; 250 tests pass | `addons/orsquare/`, [architecture](docs/backend-architecture.md), [API reference](docs/backend-api-reference.md) |
 | Governance (roles, tab grants as groups, server-side API gate, plan entitlements, change log, two-step sign-in, sign-in directory) | built; tested; browser-verified | [docs/governance.md](docs/governance.md) |
 | Platform backend (fleet registry, plans, operators with admin/support levels, provisioning, archive/delete, audit) | built; 24 tests pass; benchmarked at 10,000 shops | `addons/orsquare_platform/` |
-| Developer Console (`/dev`): Fleet, shop drawer (overview, Business Studio, Team, Activity), Plans, Operators, Audit, System | built; browser-verified | `frontend/src/features/dev/`, [tab spec](docs/tabs/dev-console.md) |
+| Developer Console (`/dev`): Fleet, shop profile drawer (`/dev/b/:slug`, Identity, Owner, Subscription ±days, Cashiers, Studio, Activity), New Business onboarding modal, 3-column Studio workbench, Audit, System | built; Tryton visual & functional parity; browser-verified | `frontend/src/features/dev/`, [tab spec](docs/tabs/dev-console.md) |
 | Retailer Settings: Business Studio, Team & Access, Security & activity | built; browser-verified | `frontend/src/features/governance/`, `frontend/src/pages/SettingsPage.tsx` |
 | Stock tab variants (standard / WineStock matrix) and Accounts variants (standard / Advanced workspace), chosen per shop | built; ported from the live repo | `WineStockPage.tsx`, `AdvancedAccountsPage.tsx`, routed in `App.tsx` |
 | Retailer screens (Sales, Products, Purchases, Stock, Accounts, Cash Flow, Ledger, Dashboard) | partly connected through Odoo adapters | [restoration evidence](docs/retailer-restoration.md) |
@@ -26,7 +26,7 @@ Last run 2026-10-08 on the local Docker stack:
 
 - Shop suite `scripts/run_tests.sh /orsquare orsquare_dev`: **250 passed**.
 - Platform suite `scripts/run_platform_tests.sh`: **24 passed**.
-- Frontend `npm test`: **125 passed, 1 skipped** (physical printer). `npx tsc --noEmit` clean. `npm run build` passes.
+- Frontend `npm test`: **126 passed, 1 skipped** (physical printer). `npx tsc --noEmit` clean. `npm run build` passes cleanly.
 - 10,000-shop registry benchmark `scripts/bench_platform.py`: fleet page about 3 ms, search about 21 ms, audit 15 to 23 ms, sign-in lookup 0.18 ms (single local PostgreSQL; a measurement, not a guarantee).
 - Landing `npm run check` and a restore drill on another host were **not** re-run.
 

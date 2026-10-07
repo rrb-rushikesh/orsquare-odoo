@@ -1,36 +1,30 @@
 # Tab Specification: Developer Console (`/dev`)
 
-> **Status review — 2026-10-08:** Built and browser-verified against the local stack. Backend: `addons/orsquare_platform/`. UI: `frontend/src/features/dev/` (shared governance screens in `frontend/src/features/governance/`). Model, scale numbers and open decisions: [governance.md](../governance.md). What is still missing is listed at the end.
+> **Status review — 2026-10-08:** Redesigned to exact visual and architectural parity with Tryton console (`C:\Repo\orsquare-tryton`). Built with Tailwind CSS v4, scoped token layers (`dev-theme.css`, `theme.css`, `controls.css`, `primitives.css`), and UI primitives (`Drawer`, `Modal`, `ChoiceCards`, `PasswordField`, `PhoneField`, `Stepper`, `Switch`, `Tag`). Backend: `addons/orsquare_platform/`. UI: `frontend/src/features/dev/` (adapter bridge in `frontend/src/features/dev/api.ts`).
 
-**Route:** `/dev` (platform operators only; a shop user is redirected to `/` and never sees it). A visitor who is not signed in gets the operator sign-in; there is no link from the retailer app.
-**Purpose:** The people who run ORSquare manage the whole fleet of shops from here.
+**Route:** `/dev` (platform operators only; a shop user is redirected to `/` and never sees it). Deep links to business property drawers use `/dev/b/:slug`. A visitor who is not signed in gets the operator sign-in; there is no link from the retailer app.
+**Purpose:** The central platform console for operators managing fleet registration, subscriptions, cashier staffing, Business Studio configurations, audit trails, and system diagnostics.
 
-## Access
+## Visual Design & Architecture
 
-* Sign in with email and password, then the 6-digit authenticator code. An operator with no authenticator sees only the enrolment screen until it is set up (server enforced).
-* Two levels: **Admin** (everything) and **Support** (look, never change). The Operators tab and every change control are hidden from Support, and the server refuses them anyway. There is always one active admin.
-* Every action is written to the append-only audit trail with the operator's name; changes made inside a shop also appear in that shop's own log as `platform:<operator>`.
+The Developer Console mirrors the Tryton implementation:
+- **Top Shell (`DevApp.tsx`)**: Header with BrandLogo, Console tag, navigation segments (Businesses, Audit, System), sign-out button, and compact density toggle.
+- **Styling Architecture**: Tailwind CSS v4 (`@tailwindcss/vite`) with custom CSS variable tokens for controls, surfaces, typography, and primitives. Configured without preflight resets to guarantee zero interference with the POS retailer counter screens.
 
-## Tabs
+## Views & Forms
 
-| Tab | What it does |
+| Screen / Component | What it does |
 | --- | --- |
-| **Fleet** | Every shop, paged on the server (25/50/100/200), search by shop/code/owner/mobile, filter by lifecycle (active, trial, expiring, expired, suspended, archived) and plan, sortable columns. Admin: *Provision shop* (clones the template; owner login and mobile are reserved in the sign-in directory first). |
-| **Shop drawer: Overview** | Owner, plan, expiry, preset; health (software version vs template with "needs upgrade", database size, staff count against the plan, last business day, studio version and preset drift, directory on/off). Admin: change plan and expiry (+7 / +30 / +365 days), reset owner password, suspend (reason required), reactivate, archive, and, for an archived shop only, delete permanently (type the shop code). |
-| **Shop drawer: Business Studio** | The same editor the owner has: presets, tabs, features, stock and accounts views, sales-register switches, day cutoff. Greyed-out items are outside the plan. Saves are version-locked. |
-| **Shop drawer: Team & access** | The shop's staff: add, change role/data switches/tab grants, disable, set password, remove two-step. Respects the plan's staff limit. |
-| **Shop drawer: Activity** | The shop's own change log and the operator actions taken on that shop. |
-| **Plans** | List and edit plans (features and tabs included, staff limit); *Apply to shops* pushes a plan in slices with progress; create custom plans; built-ins cannot be deleted; a plan with shops on it cannot be deleted. |
-| **Operators** (admin) | Add operators (password 12+), change level, disable/enable, set password, reset authenticator. |
-| **Audit trail** | Filter by action, operator, text and dates; paged. |
-| **System** | Engine and module versions, database counts, sign-in key count, the new-shop template and its version, *Rebuild directory* with progress and conflict list, and databases that exist but are not in the fleet (*Add to fleet*). |
+| **Fleet Page (`FleetPage.tsx`)** | Fleet table with stage filter segments (`All`, `Active`, `Expiring`, `Grace`, `Suspended`), search filter input, selection banner with batch shift, CSV export, and `+ New business` button. Row click opens the business property drawer at `/dev/b/:slug`. |
+| **Onboarding Form (`NewBusinessDialog.tsx`)** | 4-section modal wizard with live summary aside: (1) Identity & auto-slug generation, (2) Plan tier selection cards, (3) Owner credentials with password generator dice roll, (4) Phone number with country calling code picker. Provisions shop directly via Odoo RPC. |
+| **Profile Property Form (`BusinessPanel.tsx`)** | Slide-over drawer on `/dev/b/:slug` with six key management blocks:<br>• **IdentityBlock**: Shop code, slug, created date, stage badge, tier badge.<br>• **OwnerBlock**: Owner email, phone, reset password modal.<br>• **SubscriptionBlock**: Plan details, validity date, progress bar, quick shift chips (`-30d`, `-7d`, `+7d`, `+30d`, `+365d`), suspend/reactivate toggles.<br>• **CashiersBlock**: Active count vs plan limit, toggle active, reset PIN/password, and **Add Cashier** dialog (`AddCashierDialog`).<br>• **StudioBlock**: Live preview and launcher for Business Studio.<br>• **ActivityBlock**: Historical shop audit logs. |
+| **Business Studio Form (`studio/StudioPanel.tsx`)** | 3-column configuration workbench: left navigation sidebar (POS, Billing, Hardware, Payments, Inventory, Integrations), center feature toggles and preset selector, right inspection pane with live JSON preview and apply button. |
+| **Audit Page (`AuditPage.tsx`)** | Audit event log filtering by operator, action type, target shop, and JSON metadata. |
+| **System Page (`SystemPage.tsx`)** | Diagnostic panel showing database status, Odoo server engine version, platform registry health, and directory rebuild utilities. |
 
 ## Rules (do not break)
 
 * Developer-only: AGENTS.md section 13. Server-side enforcement: section 15.
 * Nothing in the console reads shop business data (sales, stock, money). It manages the shop, not the business.
-* Lists must stay server-paged and indexed (benchmark: `scripts/bench_platform.py`).
-
-## Not built
-
-Backups and restore from the console (use the runbook), billing and invoicing, per-shop health history over time, bulk actions on many shops, an automated browser test for this page, and routing shops across several database pools (capacity decision pending).
+* Lists stay server-paged and indexed (benchmark: `scripts/bench_platform.py`).
+* Retain zero preflight reset isolation in `dev-theme.css` so counter POS screens remain unaffected.
