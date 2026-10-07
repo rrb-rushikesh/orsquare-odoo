@@ -143,6 +143,24 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 * **Postponed (Future Scope):** Closing Stock Audit & Reconciliation Engine, and Indian Wine Shop Sheet Register & WineStock Matrix.
 * **Skipped:** Product Master Library & Fuzzy Spreadsheet Importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
 
+### J. In-Browser PWA Architecture & Platform Developer Console Isolation
+* **Status:** Locked Decision (2026-10-07).
+* **Strict Browser PWA Mandate (Anti-Piracy):** To eliminate reverse engineering, decompilation, and software cracking risks, ORSquare must never be distributed as native desktop binaries (`.exe`, `.msi`, Electron, Tauri). The entire application runs inside modern browser engines (Chrome/Edge/Chromium) installed via native **"Install as app" (PWA standalone mode)**.
+* **Synchronous Frame-0 Auth Hydration:** `AuthContext` restores cached session credentials synchronously from `localStorage` on initial mount, eliminating login screen flicker and desync.
+* **Strict Developer Console Isolation (`/dev`):** The Developer Console is strictly an internal platform operator tool.
+  - Retail shop staff (owners, cashiers, stockkeepers, or any user associated with a shop company) are **unconditionally redirected to their retailer shop (`/`) in 0ms** upon visiting `/dev`.
+  - Unauthenticated guests visiting `/dev` are redirected to `/login`.
+  - Only verified platform developers (`surface: 'dev'`) authenticated against `orsquare_platform` can access the console.
+
+### K. Receivable & Payable Retail Terminology & Visual Standard
+* **Status:** Locked Decision (2026-10-07).
+* **Strict Elimination of "Debit" / "Credit" in Retail Surfaces:** Retail shop operators and cashiers require clarity over who owes money without confusing double-entry book-balancing jargon. In all retailer-facing surfaces (Accounts tab, Khata ledger, statements, and transaction modals), double-entry terms (`Debit`, `Credit`, `Dr`, `Cr`) are strictly replaced:
+  - **Receivable:** Money owed to the shop by customers. Always colored **Green** (`var(--ok, #198038)` / `var(--rec-fg, #235c35)` / `var(--rec-bg, #edf6f0)`).
+  - **Payable:** Money owed by the shop to suppliers. Always colored **Red** (`var(--err, #da1e28)` / `var(--pay-fg, #8a2e2e)` / `var(--pay-bg, #faebeb)`).
+  - **Settled:** Zero balance. Rendered neutral/muted (`var(--muted)`).
+  - **Advance:** Reverse prepayment held on an account. Rendered blue (`var(--adv-fg, #0f62fe)`).
+* **Double-Entry Integrity Maintained:** Backend double-entry journal entries, GL models, and wire payload contracts (`opening_balance_type: 'Debit' | 'Credit'`) remain completely unchanged and authoritative.
+
 ---
 
 ## 3. High-Level System Architecture

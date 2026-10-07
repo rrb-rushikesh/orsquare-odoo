@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "codebase-memory": {
+      "command": "${LOCALAPPDATA}\\Programs\\codebase-memory-mcp\\codebase-memory-mcp.exe",
+      "args": []
+    },
+    "basic-memory": {
+      "command": "uvx",
+      "args": ["--prerelease=allow", "basic-memory", "mcp"]
+    }
+  }
+}

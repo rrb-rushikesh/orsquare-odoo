@@ -49,3 +49,51 @@ Consolidated the two stale root handover documents here. Historical architecture
 Cleanup is committed locally in three groups: unused frontend code/dependencies, API documentation generation, and Markdown/status consolidation. All completed work has been fast-forward merged into `main` at the owner's request. The fully merged `codex/restore-original-retailer` branch has been deleted; only local `main` remains. Remote branch inventory also shows only `main`. Prior backend and original-UI restoration commits are preserved.
 
 **Push was not executed.** Automatic approval review again rejected pushing `main` to the existing `origin`, `https://github.com/rrb-rushikesh/orsquare-odoo.git`: it requires user approval explicitly naming that destination and publication of all committed repository code/documentation on `main`. The owner's request to merge and "push online" did not satisfy the review's specificity requirement. Fetch succeeded and the remote shares this project's history. GitHub CLI authentication is unavailable. Do not bypass the rejection or claim the current work is online; obtain the exact publication approval before retrying.
+
+## UI Layout Fix & Component Standardization (2026-10-07)
+
+- **Layout & Scrollbar Bug Resolved:** Removed `.shell-topnav > .page` from forced thin scrollbar rules in `frontend/src/styles/components.css`. Eliminated detached vertical scrollbar at 1600px and dead-space gutters on wide screens (1920px+). Primary page scroll restored to invisible desktop standard (`scrollbar-width: none`).
+- **Layout Guardrail Rule 11:** Enshrined in `AGENTS.md` and `CLAUDE.md`: zero floating scrollbars, invisible page scrolling ("installed software" feel), and edge-to-edge surface continuity.
+- **Component Standardization from `orsquare-tryton`:** Researched `UI_STANDARDS.md` in `orsquare-tryton`. Built reusable primitives in `frontend/src/components/ui/` (`Button`, `IconButton`, `SearchField`, `ToolbarSelect`, `Segmented`, `DateRangeFilter`, `Field`, `tokens.ts`) with unified `--ctl-h: 38px/40px` toolbar geometry using `@base-ui/react`, `clsx`, and `class-variance-authority`. Applied across Products, Purchases, Stock, Cash Flow, Accounts, Settings, and SalesHistoryRegister without altering the Carbon visual identity.
+- **Toolbar Stretch & Squish Bug Fixed (Screenshots 1.png & 2.png):** Overrode general `.field-control { width: 100% }` for toolbar selects (`select.tb-select`, `.tb-select-sm: 140px`, `.tb-select-md: 160px`, `.tb-select-lg: 170px`) with `flex: 0 0 auto !important`. Standardized SearchField to `flex: 1 1 240px; min-width: 200px; max-width: 480px`. Dropdowns never balloon and search inputs never cut off placeholders.
+- **Guardrail Rule 12 Enshrined:** Added Rule 12 (Standardized Toolbar & Control Sizing) to `AGENTS.md` and `CLAUDE.md`.
+- **Validation:** `npm run typecheck` passed (0 errors); all 107 vitest tests passed; production build passed (`✓ built in 1.92s`).
+
+## In-Browser PWA Architecture, Session Routing & Developer Console (2026-10-07)
+
+- **Login Screen Flicker & Desync Resolved (Video 2026-10-07 20-12-03.mp4):**
+  - **Synchronous Session Hydration:** In `frontend/src/auth/AuthContext.tsx`, `me`, `shopCode`, and `ready` are now initialized synchronously from `localStorage` (`readCached()`) on frame 0. If cached credentials exist, the store connects to IndexedDB immediately without waiting for network roundtrips.
+  - **Synchronous Route Guard:** In `frontend/src/App.tsx`, wrapped `/login` in `<RedirectIfAuth />`. Authenticated users navigating to `/login` (or opening new browser tabs) are immediately redirected to `/` with 0ms visual delay. The login form is never painted or flashed.
+  - **LoginPage Guard:** Added immediate `<Navigate to="/" replace />` in `frontend/src/pages/LoginPage.tsx` if `me` is authenticated.
+- **Service Worker Dev Server Compatibility:**
+  - In `frontend/public/sw.js`, added bypass for Vite dev and HMR paths (`/@`, `/src/`, `/node_modules/`).
+  - In `frontend/src/main.tsx`, enabled Service Worker registration with `?sw=1` opt-in during development, running automatically in production.
+- **Platform Developer Console (`/dev`) Connected:**
+  - Ported and modernized Developer Console suite into `frontend/src/features/dev/` (`DevApp.tsx`, `NewShopModal.tsx`, `ShopDrawer.tsx`, `api.ts`, `types.ts`).
+  - Wired into `frontend/src/App.tsx` with `<DevGuard />` at route `/dev/*`, gated to platform operators, system admins, and shop owners.
+  - Connects to native Odoo backend `orsquare.platform.service` for fleet inspection, shop provisioning (`create_shop`), lifecycle management (suspend, reactivate, extend expiry, reset password), audit logs, and system diagnostics.
+  - Lazy-loaded into its own isolated 23 kB chunk (`DevApp-*.js`), ensuring zero bloat on cashier and counter bundle sizes.
+- **Validation:**
+  - `npm run typecheck`: Passed (0 errors).
+  - `npm test`: **107 passed, 1 physical-printer test skipped**.
+  - `npm run build`: Production build passed (`✓ built in 1.86s`).
+  - Landing `npm run check`: Passed (11 pages checked).
+
+## Accounts Tab Modernization & Receivable/Payable Convention (2026-10-07)
+
+- **Eliminated Confusing Double-Entry Jargon:**
+  - Replaced all user-facing instances of "Debit" and "Credit" (`Dr` / `Cr`) across the Accounts tab (`AccountsPage.tsx`) and Khata ledger statements (`AccountLedgerView.tsx`).
+  - Strict semantic retail terminology: **Receivable** (money owed to shop) and **Payable** (money owed to suppliers).
+- **Clear Semantic Financial Coloring:**
+  - **Receivable:** **Green** (`var(--ok, #198038)` / `var(--rec-fg, #235c35)` / `var(--rec-bg, #edf6f0)`).
+  - **Payable:** **Red** (`var(--err, #da1e28)` / `var(--pay-fg, #8a2e2e)` / `var(--pay-bg, #faebeb)`).
+  - **Settled:** Neutral / Muted (`var(--muted)`).
+  - **Advance:** Blue (`var(--adv-fg, #0f62fe)`).
+- **Component & View Updates:**
+  - `AccountLedgerView.tsx`: Metrics bar updated to `Period Receivable (+)` (Green) and `Period Payable (-)` (Red). Table columns updated to `Receivable (+)` and `Payable (-)`. Closing balance row updated with green receivable and red payable amounts. Entry detail drawer updated to `Receivable` and `Payable`.
+  - `AccountsPage.tsx`: Summary tiles updated from "Debtor accounts" / "Creditor accounts" to "Receivable accounts" / "Payable accounts". Table balance column displays clean formatted amounts with semantic status pills, omitting raw `Dr` / `Cr` text. Account drawer balance type renamed to "Opening position" with "Receivable (Owed to Shop)" and "Payable (Owed to Supplier)". Restored `IconPlus` on the Add Account button.
+  - `tokens.css`: Aligned `--dr-fg` to green (`#235c35`) and `--cr-fg` to red (`#8a2e2e`).
+- **Guardrail Rule 14 Enshrined:** Added Rule 14 (Receivable & Payable Retail Terminology) to `AGENTS.md` and `CLAUDE.md`.
+- **Validation:** `npm run typecheck` passed (0 errors); `npm test` passed (107 passed, 1 skipped).
+
+

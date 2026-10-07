@@ -1,0 +1,7 @@
+#!/bin/sh
+# Block commits when AGENTS.md and CLAUDE.md differ (they must be identical mirrors).
+if ! cmp -s AGENTS.md CLAUDE.md; then
+  echo "ERROR: AGENTS.md and CLAUDE.md differ. They must be identical."
+  echo "Fix: powershell -File scripts/sync-agent-files.ps1  then re-stage both files."
+  exit 1
+fi
