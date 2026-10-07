@@ -1,3 +1,10 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_platform_shop_system,platform.shop system,model_orsquare_platform_shop,base.group_system,1,1,1,0
+access_platform_shop_support,platform.shop support,model_orsquare_platform_shop,group_platform_support,1,0,0,0
 access_platform_audit_system,platform.audit system,model_orsquare_platform_audit,base.group_system,1,0,0,0
+access_platform_audit_support,platform.audit support,model_orsquare_platform_audit,group_platform_support,1,0,0,0
+access_platform_plan_system,platform.plan system,model_orsquare_platform_plan,base.group_system,1,1,1,1
+access_platform_plan_support,platform.plan support,model_orsquare_platform_plan,group_platform_support,1,0,0,0
+access_platform_login_system,platform.login system,model_orsquare_platform_login,base.group_system,1,1,1,1
+access_platform_login_support,platform.login support,model_orsquare_platform_login,group_platform_support,1,0,0,0
+access_platform_throttle_system,platform.throttle system,model_orsquare_platform_throttle,base.group_system,1,0,0,0

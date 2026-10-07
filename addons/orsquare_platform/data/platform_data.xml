@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Built-in plans. No limits by default: the owner of the platform decides what each plan allows. -->
+    <record id="plan_trial" model="orsquare.platform.plan">
+        <field name="code">trial</field>
+        <field name="name">Trial</field>
+        <field name="sequence">10</field>
+        <field name="description">Free trial period.</field>
+        <field name="builtin" eval="True"/>
+    </record>
+    <record id="plan_basic" model="orsquare.platform.plan">
+        <field name="code">basic</field>
+        <field name="name">Basic</field>
+        <field name="sequence">20</field>
+        <field name="builtin" eval="True"/>
+    </record>
+    <record id="plan_pro" model="orsquare.platform.plan">
+        <field name="code">pro</field>
+        <field name="name">Pro</field>
+        <field name="sequence">30</field>
+        <field name="builtin" eval="True"/>
+    </record>
+    <!-- Operators hold the keys to every shop: longer passwords than shop staff. -->
+    <function model="ir.config_parameter" name="set_param" eval="('auth_password_policy.minlength', '12')"/>
+</odoo>

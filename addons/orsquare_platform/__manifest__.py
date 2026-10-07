@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ORSquare Platform (Developer Console backend)',
-    'version': '18.0.1.0.0',
+    'version': '18.0.2.0.0',
     'category': 'Technical',
     'summary': 'Fleet registry, shop provisioning, suspension and audit trail for the platform operator',
     'description': """
@@ -12,8 +12,12 @@ and writes an append-only audit trail of every operator action.
     """,
     'author': 'ORSquare',
     'license': 'LGPL-3',
-    'depends': ['base'],
-    'data': ['security/ir.model.access.csv'],
+    'depends': ['base', 'auth_totp', 'auth_password_policy'],
+    'data': [
+        'security/platform_security.xml',
+        'security/ir.model.access.csv',
+        'data/platform_data.xml',
+    ],
     'installable': True,
     'application': False,
 }
