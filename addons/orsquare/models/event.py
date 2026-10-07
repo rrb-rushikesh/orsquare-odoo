@@ -10,6 +10,8 @@
 """
 import json
 import logging
+import threading
+import time
 import urllib.request
 
 from odoo import _, api, fields, models
@@ -17,6 +19,8 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
+_PUSH_BREAKER = {'until': 0.0}
+PUSH_BREAKER_SECONDS = 30
 EVENT_LOCK_KEY = 7_203_001  # arbitrary constant, scoped to this database
 
 
@@ -53,14 +57,25 @@ class OrsquareEvent(models.Model):
 
     @staticmethod
     def _push(url, api_key, channel, message):
-        try:
-            body = json.dumps({'method': 'publish', 'params': {'channel': channel, 'data': message}}).encode()
-            req = urllib.request.Request(
-                url.rstrip('/') + '/api', data=body,
-                headers={'Content-Type': 'application/json', 'Authorization': 'apikey %s' % (api_key or '')})
-            urllib.request.urlopen(req, timeout=2).read()
-        except Exception:  # never let a push failure surface into business flows
-            _logger.warning("ORSquare realtime push failed for %s", channel, exc_info=True)
+        """Fire-and-forget: the HTTP call (and its DNS lookup, which no socket timeout covers) runs on a daemon
+        thread so a dead or unresolvable Centrifugo can never slow a bill.  After a failure the push is skipped
+        for 30 s (circuit breaker); clients recover whatever they missed from the event feed."""
+        if time.monotonic() < _PUSH_BREAKER['until']:
+            return
+
+        def send():
+            try:
+                body = json.dumps({'method': 'publish', 'params': {'channel': channel, 'data': message}}).encode()
+                req = urllib.request.Request(
+                    url.rstrip('/') + '/api', data=body,
+                    headers={'Content-Type': 'application/json', 'Authorization': 'apikey %s' % (api_key or '')})
+                urllib.request.urlopen(req, timeout=2).read()
+            except Exception as exc:  # never let a push failure surface into business flows
+                _PUSH_BREAKER['until'] = time.monotonic() + PUSH_BREAKER_SECONDS
+                _logger.warning("ORSquare realtime push failed for %s (%s); pausing pushes for %ss",
+                                channel, exc, PUSH_BREAKER_SECONDS)
+
+        threading.Thread(target=send, name='orsquare-push', daemon=True).start()
 
     @api.model
     def since(self, company, since_seq, limit=500, with_money=None):

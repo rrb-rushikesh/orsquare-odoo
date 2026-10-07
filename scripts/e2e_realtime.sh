@@ -68,6 +68,7 @@ async def run(name, token, secs):
         got['subs'] = sorted((reply.get('connect') or {}).get('subs', {}).keys())
         # a client trying to subscribe itself to the money channel must be refused
         await ws.send(json.dumps({'id': 2, 'subscribe': {'channel': 'shop:%s:money' % sys.argv[1]}}))
+        print('READY', flush=True)
         deadline = asyncio.get_event_loop().time() + secs
         got['self_subscribe_error'] = None
         while asyncio.get_event_loop().time() < deadline:
@@ -79,6 +80,9 @@ async def run(name, token, secs):
                 if not line.strip():
                     continue
                 msg = json.loads(line)
+                if msg == {}:
+                    await ws.send('{}')   # answer the server's keep-alive ping
+                    continue
                 if msg.get('id') == 2 and 'error' in msg:
                     got['self_subscribe_error'] = msg['error'].get('code')
                 push = msg.get('push')
@@ -90,15 +94,24 @@ asyncio.run(run(sys.argv[2], sys.argv[3], int(sys.argv[4])))
 EOF
 run_client() {
   MSYS_NO_PATHCONV=1 docker run --rm --network "$NET" -v "$(pwd -W 2>/dev/null || pwd)\\scratch\\rt_client.py:/rt_client.py:ro" \
-    python:3.12-slim sh -c "pip install -q websockets >/dev/null 2>&1 && python /rt_client.py $DB $1 $2 18" > "scratch/rt_$1.out" 2>&1
+    python:3.12-slim sh -c "pip install -q websockets >/dev/null 2>&1 && python /rt_client.py $DB $1 $2 20" > "scratch/rt_$1.out" 2>&1
 }
 run_client cashier "$TC" & run_client owner "$TO" &
-sleep 14   # clients install websockets and connect
+# wait until BOTH clients are connected (they install websockets first), instead of guessing a delay
+for i in $(seq 1 60); do
+  grep -q READY scratch/rt_cashier.out 2>/dev/null && grep -q READY scratch/rt_owner.out 2>/dev/null && break
+  sleep 1
+done
 
 # 3. Odoo publishes a sale after commit
 cat > scratch/rt_publish.py <<'EOF'
 env['orsquare.event'].publish(env.company, 'sale_settled', {'order_id': 4242, 'name': 'RT/0001'}, money={'total': 1234.5})
 env.cr.commit()
+# pushes run on background threads (a live server keeps running); this short-lived shell must wait for them
+import threading
+for t in threading.enumerate():
+    if t.name == 'orsquare-push':
+        t.join(5)
 print('PUBLISHED')
 EOF
 MSYS_NO_PATHCONV=1 docker exec -i odoo18-spike-web odoo shell -c /etc/odoo/odoo.conf -d "$DB" --http-port=8099 --no-http < scratch/rt_publish.py 2>&1 | grep PUBLISHED
