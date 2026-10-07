@@ -1,0 +1,172 @@
+/* Developer Console shell. Colours and geometry come from the shared tokens (flat 0px, hairlines, Plex). */
+
+.dev-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.dev-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-height: 48px;
+  padding: 0 var(--s4);
+  background: var(--layer);
+  border-bottom: 1px solid var(--line);
+}
+
+.dev-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.dev-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dev-tabs::-webkit-scrollbar { display: none; }
+
+.dev-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--s4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dev-tab:hover { background: var(--layer-hover); color: var(--ink); }
+.dev-tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--blue); font-weight: 600; }
+.dev-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.dev-operator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dev-operator strong { color: var(--ink); font-weight: 600; }
+
+/* The page scrolls invisibly, like the retailer shell. */
+.dev-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: var(--s5);
+}
+.dev-main::-webkit-scrollbar { display: none; }
+
+.dev-stack { display: flex; flex-direction: column; gap: var(--s4); }
+.dev-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); }
+.dev-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.dev-mono { font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace; font-size: 12px; }
+.dev-muted { color: var(--muted); }
+
+.dev-alert {
+  padding: 10px 14px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--err);
+  background: var(--layer);
+  color: var(--err-fg);
+}
+.dev-alert.ok { border-left-color: var(--ok); color: var(--ok-fg); }
+
+/* Key / value grid used by the shop drawer. */
+.dev-kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--layer);
+  border: 1px solid var(--line);
+}
+.dev-kv dt { font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; color: var(--muted); }
+.dev-kv dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; word-break: break-word; }
+
+.dev-section-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: var(--s2);
+}
+.dev-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+.dev-staff {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  background: var(--canvas);
+}
+.dev-staff + .dev-staff { margin-top: -1px; }
+
+.dev-form { display: flex; flex-direction: column; gap: var(--s3); }
+.dev-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.dev-form-foot { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s2); }
+.dev-prefix { display: flex; align-items: center; gap: 6px; }
+.dev-prefix .dev-mono { color: var(--muted); white-space: nowrap; }
+
+/* Sign-in */
+.dev-login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s5);
+  background: var(--layer);
+}
+.dev-login-card {
+  width: 100%;
+  max-width: 384px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  padding: var(--s6, 32px);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.dev-login-card h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.dev-login-card p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .dev-bar { flex-wrap: wrap; padding: var(--s2) var(--s3); }
+  .dev-main { padding: var(--s3); }
+  .dev-form .row, .dev-kv { grid-template-columns: 1fr; }
+}
+
+/* sortable column headers, date filters, progress bar, drawer sub-tabs */
+.dev-sort { all: unset; cursor: pointer; font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; }
+.dev-sort:hover { color: var(--ink); text-decoration: underline; }
+.dev-sort:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dev-date { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.dev-date .field-control { width: 150px; }
+.dev-progress { height: 8px; background: var(--layer-2); width: 100%; }
+.dev-progress > span { display: block; height: 100%; background: var(--blue); transition: width 160ms linear; }
+.dev-subtabs { border-bottom: 1px solid var(--line); margin: 0 calc(var(--s5) * -1); padding: 0 var(--s5); min-height: 40px; flex: 0 0 auto; }

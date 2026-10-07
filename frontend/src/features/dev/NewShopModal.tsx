@@ -1,17 +1,22 @@
 import { useState, type FormEvent } from 'react';
-import { Btn, Field } from '@/components/ui';
+import { Btn, Field, Modal } from '@/components/ui';
 import { platformApi } from './api';
-import type { PlatformShopRow } from './types';
+import type { Plan, PlatformShopRow } from './types';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (shop: PlatformShopRow) => void;
+  plans: Plan[];
 }
 
-export function NewShopModal({ open, onClose, onCreated }: Props) {
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+
+/** The form unmounts with the modal, so every opening starts empty. */
+function NewShopForm({ onClose, onCreated, plans }: Omit<Props, 'open'>) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugEdited, setSlugEdited] = useState(false);
   const [ownerName, setOwnerName] = useState('');
   const [ownerLogin, setOwnerLogin] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
@@ -22,170 +27,102 @@ export function NewShopModal({ open, onClose, onCreated }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (!open) return null;
-
-  async function handleSubmit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setError('');
     setBusy(true);
     try {
       const created = await platformApi.createShop({
         name: name.trim(),
-        slug: slug.trim().toLowerCase(),
+        slug,
         owner_name: ownerName.trim() || ownerLogin.trim(),
         owner_login: ownerLogin.trim().toLowerCase(),
         owner_password: ownerPassword,
         phone: phone.trim() || undefined,
         preset,
         plan,
-        trial_days: Number(trialDays) || 14,
+        trial_days: plan === 'trial' ? Number(trialDays) || 14 : 0,
         state_code: 'MH',
       });
       onCreated(created);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Failed to create shop.');
-    } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', background: 'var(--layer)', border: '1px solid var(--line)', padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ink)' }}>Provision New Shop</h2>
-          <button className="btn-icon" onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ink-2)' }}>✕</button>
+    <form onSubmit={submit} className="dev-form">
+      {error && <div className="dev-alert" role="alert">{error}</div>}
+
+      <Field label="Shop business name" required>
+        <input className="field-control" required autoFocus placeholder="e.g. Galaxy Wine Store" value={name}
+          onChange={(e) => { setName(e.target.value); if (!slugEdited) setSlug(slugify(e.target.value)); }} />
+      </Field>
+
+      <Field label="Database code" required hint="Lowercase letters, numbers and _ (2 to 30). Cannot be changed later.">
+        <div className="dev-prefix">
+          <span className="dev-mono">orsquare_shop_</span>
+          <input className="field-control" required pattern="[a-z0-9_]{2,30}" placeholder="galaxy" value={slug}
+            onChange={(e) => { setSlugEdited(true); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); }} />
         </div>
+      </Field>
 
-        {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--red-light, rgba(218, 30, 40, 0.1))', color: 'var(--red, #da1e28)', border: '1px solid var(--red, #da1e28)', marginBottom: 16, fontSize: 13 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="Shop Business Name">
-            <input
-              className="field-control"
-              type="text"
-              required
-              placeholder="e.g. Galaxy Wine Store"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (!slug) {
-                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20));
-                }
-              }}
-            />
-          </Field>
-
-          <Field label="Database Slug (Code)">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontFamily: 'monospace' }}>orsquare_shop_</span>
-              <input
-                className="field-control"
-                type="text"
-                required
-                pattern="^[a-z0-9_]{2,25}$"
-                placeholder="e.g. galaxy"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              />
-            </div>
-          </Field>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Owner Name">
-              <input
-                className="field-control"
-                type="text"
-                required
-                placeholder="e.g. Vikram Patel"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Phone / Mobile">
-              <input
-                className="field-control"
-                type="tel"
-                placeholder="e.g. 9876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Owner Login ID">
-              <input
-                className="field-control"
-                type="text"
-                required
-                autoComplete="off"
-                placeholder="e.g. vikram"
-                value={ownerLogin}
-                onChange={(e) => setOwnerLogin(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Owner Password">
-              <input
-                className="field-control"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                placeholder="Min 8 characters"
-                value={ownerPassword}
-                onChange={(e) => setOwnerPassword(e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Business Preset">
-              <select className="field-control" value={preset} onChange={(e) => setPreset(e.target.value)}>
-                <option value="wine_shop">Wine Shop (Matrix / Pegs)</option>
-                <option value="bar">Bar & Lounge</option>
-                <option value="restaurant">Restaurant (Tables / KOT)</option>
-                <option value="grocery">Grocery / Retail</option>
-              </select>
-            </Field>
-
-            <Field label="Subscription Plan">
-              <select className="field-control" value={plan} onChange={(e) => setPlan(e.target.value)}>
-                <option value="trial">Trial (14 Days)</option>
-                <option value="basic">Basic Plan</option>
-                <option value="pro">Pro Plan</option>
-              </select>
-            </Field>
-          </div>
-
-          {plan === 'trial' && (
-            <Field label="Trial Duration (Days)">
-              <input
-                className="field-control"
-                type="number"
-                min={1}
-                max={90}
-                value={trialDays}
-                onChange={(e) => setTrialDays(Number(e.target.value))}
-              />
-            </Field>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-            <Btn variant="secondary" onClick={onClose} disabled={busy}>Cancel</Btn>
-            <Btn variant="primary" type="submit" disabled={busy}>
-              {busy ? 'Cloning & Provisioning…' : 'Create Shop Database'}
-            </Btn>
-          </div>
-        </form>
+      <div className="row">
+        <Field label="Owner name" required>
+          <input className="field-control" required placeholder="e.g. Vikram Patel" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
+        </Field>
+        <Field label="Mobile" hint="The owner can sign in with this number.">
+          <input className="field-control" type="tel" placeholder="9876543210" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </Field>
       </div>
-    </div>
+
+      <div className="row">
+        <Field label="Owner login" required hint="Email or username. Unique across all shops.">
+          <input className="field-control" required autoComplete="off" placeholder="owner@shop.com" value={ownerLogin} onChange={(e) => setOwnerLogin(e.target.value)} />
+        </Field>
+        <Field label="Owner password" required hint="At least 8 characters.">
+          <input className="field-control" type="password" required minLength={8} autoComplete="new-password" value={ownerPassword}
+            onChange={(e) => setOwnerPassword(e.target.value)} />
+        </Field>
+      </div>
+
+      <div className="row">
+        <Field label="Business preset">
+          <select className="field-control" value={preset} onChange={(e) => setPreset(e.target.value)}>
+            <option value="wine_shop">Wine shop (pegs, brand × size stock)</option>
+            <option value="bar">Bar &amp; lounge</option>
+            <option value="restaurant">Restaurant (tables, kitchen)</option>
+            <option value="grocery">Grocery / retail</option>
+          </select>
+        </Field>
+        <Field label="Plan">
+          <select className="field-control" value={plan} onChange={(e) => setPlan(e.target.value)}>
+            {(plans.length ? plans : [{ code: 'trial', name: 'Trial' } as Plan]).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      {plan === 'trial' && (
+        <Field label="Trial length (days)">
+          <input className="field-control" type="number" min={1} max={90} value={trialDays} onChange={(e) => setTrialDays(Number(e.target.value))} />
+        </Field>
+      )}
+
+      <div className="dev-form-foot">
+        <Btn variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancel</Btn>
+        <Btn variant="primary" type="submit" loading={busy}>{busy ? 'Provisioning…' : 'Create shop'}</Btn>
+      </div>
+    </form>
+  );
+}
+
+export function NewShopModal({ open, onClose, onCreated, plans }: Props) {
+  return (
+    <Modal open={open} onClose={onClose} title="Provision new shop" width={560} closeOnEscape>
+      <NewShopForm onClose={onClose} onCreated={onCreated} plans={plans} />
+    </Modal>
   );
 }
