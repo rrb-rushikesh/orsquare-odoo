@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_platform_shop_system,platform.shop system,model_orsquare_platform_shop,base.group_system,1,1,1,0
+access_platform_audit_system,platform.audit system,model_orsquare_platform_audit,base.group_system,1,0,0,0

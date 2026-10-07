@@ -74,11 +74,22 @@ class OrsquareApi(http.Controller):
         request.update_env(user=uid)
         return True
 
+    @staticmethod
+    def _me_model(env):
+        """Shop databases answer with the staff identity; the platform database with the developer's."""
+        return 'orsquare.staff.service' if 'orsquare.staff.service' in env else 'orsquare.platform.service'
+
+    @staticmethod
+    def _suspended(env):
+        return env['ir.config_parameter'].sudo().get_param('orsquare.suspended') == '1'
+
     def _guard(self, handler, mutating=False):
         """Authentication + CSRF-ish checks + uniform error mapping around ``handler``."""
         try:
             if not self._authenticate():
                 return _err(401, 'unauthenticated', 'Sign in required.')
+            if self._suspended(request.env):
+                return _err(403, 'account_suspended', 'This shop is suspended. Please contact ORSquare support.')
             if mutating and not self._trusted_origin():
                 return _err(403, 'untrusted_origin', 'Origin not allowed.')
             return _ok(handler())
@@ -126,6 +137,9 @@ class OrsquareApi(http.Controller):
             ip = request.httprequest.remote_addr
             registry = odoo.registry(db)
             with registry.cursor() as cr:
+                if self._suspended(api.Environment(cr, SUPERUSER_ID, {})):
+                    return _err(403, 'account_suspended', 'This shop is suspended. Please contact ORSquare support.')
+            with registry.cursor() as cr:
                 throttle = api.Environment(cr, SUPERUSER_ID, {})['orsquare.login_throttle']
                 if throttle.is_blocked(login, ip):
                     return _err(429, 'too_many_attempts', 'Too many failed sign-ins. Try again in a few minutes.')
@@ -151,7 +165,7 @@ class OrsquareApi(http.Controller):
                     http.root.session_store.save(session)
                 request.future_response.set_cookie(
                     'session_id', session.sid, max_age=http.get_session_max_inactivity(env), httponly=True)
-                return _ok(env['orsquare.staff.service'].me())
+                return _ok(env[self._me_model(env)].me())
         except AccessDenied:
             return _err(401, 'bad_credentials', 'Wrong shop, login or password.')
         except UserError as exc:
@@ -166,7 +180,7 @@ class OrsquareApi(http.Controller):
 
     @http.route('/api/session/me', type='http', auth='none', methods=['GET'], csrf=False, readonly=False)
     def me(self, **kw):
-        return self._guard(lambda: request.env['orsquare.staff.service'].me())
+        return self._guard(lambda: request.env[self._me_model(request.env)].me())
 
     @http.route('/api/session/gate', type='http', auth='none', methods=['GET'], csrf=False, readonly=False)
     def gate(self, **kw):
@@ -207,7 +221,7 @@ class OrsquareApi(http.Controller):
             body = self._json_body()
             entry = API_REGISTRY.get(body.get('service'))
             method = body.get('method')
-            if not entry or method not in entry[1]:
+            if not entry or method not in entry[1] or entry[0] not in request.env:
                 raise AccessError("Unknown API method.")
             params = body.get('params') or {}
             if not isinstance(params, dict):
