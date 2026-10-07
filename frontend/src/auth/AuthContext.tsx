@@ -1,0 +1,176 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ApiError, session, type Me } from '@/lib/api';
+import { startStore, stopStore } from '@/lib/sync';
+
+/**
+ * Who is signed in and what they may see.
+ *
+ * Identity lives in Odoo (users, groups); this context only mirrors `staff.me()` so the UI can hide what the
+ * server would refuse anyway.  The server re-checks every call - hiding here is convenience, never security.
+ */
+
+/** Tab keys exactly as the backend grants them. */
+export type Perm =
+  | 'dashboard' | 'sales' | 'purchases' | 'stock' | 'products' | 'accounts' | 'cashflow' | 'daybook'
+  | 'calendar' | 'reports' | 'settings';
+
+export interface ShopInfo {
+  id: string;
+  name: string;
+  code: string;
+  role: string;
+  phone?: string;
+  /** Business-day cutoff is applied by the server; kept for display only. */
+  lockInTime?: string;
+  experience?: undefined;
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  login: string;
+  role: string;
+  isStaff: false;
+  me: Me;
+}
+
+export interface AuthApi {
+  user: AppUser | null;
+  me: Me | null;
+  activeShop: ShopInfo | null;
+  shopCode: string;
+  wsUid: string;
+  ready: boolean;
+  role: string;
+  isOwner: boolean;
+  isEmployee: boolean;
+  seesMoney: boolean;
+  seesValuation: boolean;
+  canManageReturns: boolean;
+  can: (perm: Perm) => boolean;
+  featureOn: (key: string) => boolean;
+  sessionError: string | null;
+  signIn: (shop: string, login: string, password: string) => Promise<Me>;
+  refreshUserProfile: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthCtx = createContext<AuthApi | null>(null);
+
+const SHOP_KEY = 'or2_shop';
+const ME_KEY = 'or2_me';
+
+function readCached(): { shop: string; me: Me } | null {
+  try {
+    const shop = localStorage.getItem(SHOP_KEY);
+    const me = localStorage.getItem(ME_KEY);
+    return shop && me ? { shop, me: JSON.parse(me) as Me } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Features that are always available to billing staff; the rest come from the shop's own switches. */
+const ALWAYS_ON = new Set(['discount', 'quick_discount', 'custom_rate', 'khata_credit', 'today_sales_checkout']);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [me, setMe] = useState<Me | null>(null);
+  const [shopCode, setShopCode] = useState('');
+  const [ready, setReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const adopt = useCallback((m: Me, shop: string) => {
+    setMe(m);
+    setShopCode(shop);
+    setSessionError(null);
+    try {
+      localStorage.setItem(SHOP_KEY, shop);
+      localStorage.setItem(ME_KEY, JSON.stringify(m));
+    } catch { /* private mode */ }
+    void startStore(shop, m);
+  }, []);
+
+  const drop = useCallback(() => {
+    setMe(null);
+    stopStore();
+    try { localStorage.removeItem(ME_KEY); } catch { /* ignore */ }
+  }, []);
+
+  // Restore the session on load. The router renders a splash until this settles, so a refresh on /sales
+  // never flashes the login screen - it redirects to /login only on an explicit 401.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const cached = readCached();
+      try {
+        const m = await session.me();
+        if (alive) adopt(m, cached?.shop || '');
+      } catch (e) {
+        if (!alive) return;
+        if (e instanceof ApiError && e.status === 401) {
+          drop();
+        } else if (cached) {
+          adopt(cached.me, cached.shop); // offline reopen: run from the local copy
+          setSessionError('Working offline - bills will sync when the connection returns.');
+        } else {
+          setSessionError(e instanceof Error ? e.message : 'Could not reach the server.');
+        }
+      } finally {
+        if (alive) setReady(true);
+      }
+    })();
+    const onUnauthorized = () => drop();
+    window.addEventListener('or2:unauthorized', onUnauthorized);
+    return () => { alive = false; window.removeEventListener('or2:unauthorized', onUnauthorized); };
+  }, [adopt, drop]);
+
+  const signIn = useCallback(async (shop: string, login: string, password: string) => {
+    const m = await session.login(shop.trim(), login.trim(), password);
+    adopt(m, shop.trim());
+    return m;
+  }, [adopt]);
+
+  const refreshUserProfile = useCallback(async () => {
+    try { adopt(await session.me(), shopCode); } catch { /* the sync loop surfaces connectivity */ }
+  }, [adopt, shopCode]);
+
+  const signOut = useCallback(async () => {
+    try { await session.logout(); } catch { /* cookie may already be gone */ }
+    drop();
+  }, [drop]);
+
+  const value = useMemo<AuthApi>(() => {
+    const isOwner = !!me?.roles.includes('owner');
+    const tabs = new Set<string>(me?.tabs ?? []);
+    const role = me ? (isOwner ? 'owner' : me.roles[0] || '') : '';
+    const user: AppUser | null = me
+      ? { id: String(me.id), name: me.name, login: me.login, role, isStaff: false, me }
+      : null;
+    const activeShop: ShopInfo | null = me
+      ? { id: shopCode || String(me.company.id), name: me.company.name, code: shopCode, role, lockInTime: undefined }
+      : null;
+    return {
+      user, me, activeShop, shopCode,
+      wsUid: me ? `${shopCode}:${me.id}` : '',
+      ready, role, isOwner, isEmployee: !!me && !isOwner,
+      seesMoney: !!me?.flags.can_see_money,
+      seesValuation: !!me?.flags.can_see_valuation,
+      canManageReturns: !!me?.flags.can_manage_returns,
+      can: (perm) => tabs.has(perm),
+      featureOn: (key) => {
+        if (!me) return false;
+        if (key in me.features) return !!(me.features as Record<string, unknown>)[key];
+        return ALWAYS_ON.has(key);
+      },
+      sessionError, signIn, refreshUserProfile, signOut,
+    };
+  }, [me, shopCode, ready, sessionError, signIn, refreshUserProfile, signOut]);
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+export function useAuth(): AuthApi {
+  const ctx = useContext(AuthCtx);
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  return ctx;
+}
