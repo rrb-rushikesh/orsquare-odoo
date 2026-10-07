@@ -13,7 +13,7 @@ import logging
 from datetime import timedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import AccessError, RedirectWarning, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ class OrsquareSyncService(models.AbstractModel):
                 Log.create({'mutation_id': mid, 'device_id': device, 'device_seq': seq, 'kind': kind,
                             'status': 'ok', 'result': self._jsonable(result)})
             return {'status': 'ok', 'result': self._jsonable(result)}
-        except (UserError, ValidationError, AccessError) as exc:
+        except (UserError, ValidationError, AccessError, RedirectWarning) as exc:
             code = 'access_denied' if isinstance(exc, AccessError) else 'rejected'
             message = exc.args[0] if exc.args else str(exc)
         except Exception as exc:  # unexpected: still advance the cursor, never loop forever

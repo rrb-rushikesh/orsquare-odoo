@@ -255,9 +255,11 @@ class OrsquareShopBootstrap(models.AbstractModel):
         mh = self.env.ref('base.state_in_mh', raise_if_not_found=False)
         vat = Tax.search([('name', '=', 'State VAT (Liquor)'), ('company_id', '=', company.id)], limit=1)
         if not vat:
+            group = self.env['account.tax.group'].search([('name', '=', 'State VAT (Liquor)')], limit=1)                 or self.env['account.tax.group'].create({
+                    'name': 'State VAT (Liquor)', 'country_id': self.env.ref('base.in').id})
             vat = Tax.create({
                 'name': 'State VAT (Liquor)', 'type_tax_use': 'sale', 'amount_type': 'percent', 'amount': 0.0,
-                'description': 'State VAT', 'company_id': company.id,
+                'description': 'State VAT', 'company_id': company.id, 'tax_group_id': group.id,
                 'invoice_repartition_line_ids': [
                     (0, 0, {'repartition_type': 'base', 'document_type': 'invoice'}),
                     (0, 0, {'repartition_type': 'tax', 'document_type': 'invoice',
@@ -286,10 +288,70 @@ class OrsquareShopBootstrap(models.AbstractModel):
         Regime.create({'name': 'Exempt', 'kind': 'exempt', 'company_id': company.id,
                        'sale_tax_ids': [(6, 0, exempt.ids)]})
 
+    # ------------------------------------------------------------------ localisation + tenant configuration
+    @api.model
+    def ensure_india(self, company):
+        """Indian shop defaults: country and INR.
+
+        The Indian chart (GST taxes, HSN) must be chosen BEFORE accounting is installed (scripts/
+        build_template.sh sets the company country first, exactly as Odoo's own database creation
+        does). Swapping a chart later would delete accounts that POS already references, so here we
+        only verify and, for a pristine company, align country/currency; we never swap a chart.
+        """
+        india = self.env.ref('base.in')
+        inr = self.env.ref('base.INR')
+        inr.active = True
+        if company.chart_template != 'in':
+            _logger.warning("Company %s is not on the Indian chart (%s); build the template with the "
+                            "company country set to India before installing orsquare.", company.name,
+                            company.chart_template)
+            return False
+        vals = {}
+        if company.country_id != india:
+            vals['country_id'] = india.id
+        if company.currency_id != inr and not self.env['account.move'].sudo().search_count(
+                [('company_id', '=', company.id), ('state', '=', 'posted')]):
+            vals['currency_id'] = inr.id
+        if vals:
+            company.write(vals)
+        return bool(vals)
+
+    @api.model
+    def configure_shop(self, name, owner_name, owner_login, owner_password, state_code='MH', gstin=None,
+                       street=None, city=None, zip_code=None, phone=None, email=None, fssai_no=None,
+                       liquor_license_no=None, upi_id=None, tz='Asia/Kolkata', preset=None):
+        """Turn a cloned template database into one specific shop (idempotent per owner login).
+
+        Also neutralises the template's default ``admin/admin`` login: a shop database must never ship
+        a known password.
+        """
+        import secrets
+        company = self.env.company
+        state = self.env['res.country.state'].search([('country_id.code', '=', 'IN'), ('code', '=', state_code)], limit=1)
+        company.partner_id.write({k: v for k, v in {
+            'name': name, 'vat': gstin, 'street': street, 'city': city, 'zip': zip_code, 'phone': phone,
+            'email': email, 'state_id': state.id or False}.items() if v})
+        company.write({k: v for k, v in {
+            'name': name, 'orsquare_fssai_no': fssai_no, 'orsquare_liquor_license_no': liquor_license_no,
+            'orsquare_upi_id': upi_id, 'orsquare_tz': tz}.items() if v})
+        if state:
+            mh_regime = self.env['orsquare.tax_regime'].search([('kind', '=', 'liquor'), ('company_id', '=', company.id)], limit=1)
+            if mh_regime:
+                mh_regime.state_id = state
+        admin = self.env.ref('base.user_admin', raise_if_not_found=False)
+        if admin:
+            admin.sudo().write({'password': secrets.token_urlsafe(32)})
+        staff = self.env['orsquare.staff.service'].sudo()      # platform provisioning: privileged by design
+        owner_id = staff.create_staff(owner_name, owner_login, owner_password, ['owner'])
+        if preset:
+            staff.apply_preset(preset)
+        return {'company_id': company.id, 'owner_id': owner_id, 'database': self.env.cr.dbname}
+
     # ------------------------------------------------------------------ entry point
     @api.model
     def bootstrap_company(self, company):
         """Run every idempotent shop-setup step for ``company``."""
+        self.ensure_india(company)
         self.ensure_accounts(company)
         self.env['stock.warehouse'].search([('company_id', '=', company.id)])._orsquare_ensure_topology()
         self.apply_valuation_policy(company)

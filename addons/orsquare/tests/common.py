@@ -7,8 +7,8 @@ _REF = itertools.count(1)
 
 
 class OrsquareCase(TransactionCase):
-    open_day_on_setup = True
     """Shared fixtures: an open daybook, a stocked bottle product, tender helpers."""
+    open_day_on_setup = True
 
     @classmethod
     def setUpClass(cls):
@@ -16,6 +16,10 @@ class OrsquareCase(TransactionCase):
         env = cls.env
         cls.company = env.company
         cls.company.orsquare_auto_godown_transfer = False
+        # Indian tax invoices need the shop's address and state (l10n_in rule).
+        cls.company.partner_id.write({
+            'street': '12 MG Road', 'city': 'Pune', 'zip': '411001',
+            'state_id': env.ref('base.state_in_mh').id, 'country_id': env.ref('base.in').id})
         cls.wh = env['stock.warehouse'].orsquare_main_warehouse(cls.company)
         cls.stock = env['orsquare.stock.service']
         cls.sales = env['orsquare.sale.service']

@@ -21,7 +21,8 @@ API_REGISTRY = {
         'create_category', 'tax_regimes', 'set_regime_tax_rate', 'set_regime_tcs_rate', 'save_product',
         'suggest_price', 'set_margin_rule', 'list_products', 'floors', 'create_floor', 'bulk_create_tables'}),
     'staff': ('orsquare.staff.service', {
-        'me', 'list_staff', 'create_staff', 'update_staff', 'get_settings', 'update_settings'}),
+        'me', 'list_staff', 'create_staff', 'update_staff', 'get_settings', 'update_settings', 'list_presets',
+        'apply_preset'}),
     'wipe': ('orsquare.wipe.service', {'preview', 'wipe_shop'}),
     'day': ('orsquare.api.facade', {
         'day_open', 'day_current', 'day_seal', 'day_reaudit', 'transfer', 'open_bottle', 'finish_bottle',

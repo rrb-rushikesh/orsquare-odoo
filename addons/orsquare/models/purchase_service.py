@@ -17,7 +17,7 @@ from datetime import datetime, time, timezone
 import zoneinfo
 
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, RedirectWarning, UserError
 from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
@@ -285,7 +285,10 @@ class OrsquarePurchaseService(models.AbstractModel):
                 bill.write({'invoice_line_ids': [(0, 0, {
                     'name': _("Round-off to supplier's printed total"), 'quantity': 1.0,
                     'price_unit': diff, 'account_id': account.id, 'tax_ids': [(6, 0, [])]})]})
-        bill.action_post()
+        try:
+            bill.action_post()
+        except RedirectWarning as warning:
+            raise UserError(_("%s\nOpen Settings > Business details to complete it.", warning.args[0]))
 
         # 4. capitalised charges / discounts -> Odoo's native landed cost allocation
         landed = env['stock.landed.cost']

@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import AccessError, RedirectWarning, UserError, ValidationError
 from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
@@ -383,7 +383,11 @@ class OrsquareSaleService(models.AbstractModel):
         order._create_order_picking()
         order._compute_total_cost_in_real_time()
         if order.to_invoice:
-            order._generate_pos_order_invoice()
+            try:
+                order._generate_pos_order_invoice()
+            except RedirectWarning as warning:
+                # e.g. l10n_in needs the shop's address AND state before it can post a tax invoice
+                raise UserError(_("%s\nOpen Settings > Business details to complete it.", warning.args[0]))
         bottles.refresh_if_drained()
 
         # ---- offline physical conflicts are accepted and flagged ---------------------------------

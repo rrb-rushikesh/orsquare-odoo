@@ -16,7 +16,7 @@ import json
 import logging
 
 from odoo import http
-from odoo.exceptions import AccessDenied, AccessError, UserError, ValidationError
+from odoo.exceptions import AccessDenied, AccessError, RedirectWarning, UserError, ValidationError
 from odoo.http import request, Response
 
 from ..api_registry import API_REGISTRY
@@ -78,7 +78,7 @@ class OrsquareApi(http.Controller):
             return _err(401, 'unauthenticated', str(exc))
         except AccessError as exc:
             return _err(403, 'forbidden', exc.args[0] if exc.args else 'Not allowed.')
-        except (UserError, ValidationError) as exc:
+        except (UserError, ValidationError, RedirectWarning) as exc:
             return _err(422, 'rejected', exc.args[0] if exc.args else str(exc))
         except Exception:
             _logger.exception("ORSquare API error")

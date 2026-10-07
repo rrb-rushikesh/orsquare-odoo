@@ -190,6 +190,12 @@ class TestSales(OrsquareCase):
         self.assertEqual(inv.state, 'posted')
         self.assertEqual(inv.amount_total, 4500.0)
 
+    def test_17b_missing_shop_address_gives_actionable_error_not_a_crash(self):
+        self.company.partner_id.state_id = False
+        cust = self.env['res.partner'].create({'name': 'Hotel NoAddr'})
+        with self.assertRaisesRegex(UserError, "Business details"):
+            self.sell([{'product_id': self.whisky.id, 'qty': 1}], partner_id=cust.id, to_invoice=True)
+
     def test_18_events_are_published_in_order(self):
         seq0 = self.env['orsquare.event'].latest_seq(self.company)
         self.sell([{'product_id': self.whisky.id, 'qty': 1}])

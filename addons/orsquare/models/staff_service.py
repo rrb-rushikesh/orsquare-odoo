@@ -25,6 +25,22 @@ ROLE_DEFAULT_TABS = {
     'cashier': ['sales', 'daybook', 'accounts', 'cashflow'],
     'stockkeeper': ['stock', 'purchases', 'products'],
 }
+# Business Studio presets: a starting point the owner can still adjust toggle by toggle
+PRESETS = {
+    'wine_shop': {'orsquare_feature_open_bottle': True, 'orsquare_feature_kitchen': False,
+                  'orsquare_feature_tables': False, 'orsquare_auto_godown_transfer': True,
+                  'orsquare_enabled_tabs': 'dashboard,sales,purchases,stock,products,accounts,cashflow,daybook,calendar,reports,settings'},
+    'bar': {'orsquare_feature_open_bottle': True, 'orsquare_feature_kitchen': True,
+            'orsquare_feature_tables': True, 'orsquare_auto_godown_transfer': True,
+            'orsquare_enabled_tabs': 'dashboard,sales,purchases,stock,products,accounts,cashflow,daybook,calendar,reports,settings'},
+    'restaurant': {'orsquare_feature_open_bottle': False, 'orsquare_feature_kitchen': True,
+                   'orsquare_feature_tables': True, 'orsquare_auto_godown_transfer': False,
+                   'orsquare_enabled_tabs': 'dashboard,sales,purchases,products,accounts,cashflow,daybook,calendar,reports,settings'},
+    'grocery': {'orsquare_feature_open_bottle': False, 'orsquare_feature_kitchen': False,
+                'orsquare_feature_tables': False, 'orsquare_auto_godown_transfer': True,
+                'orsquare_enabled_tabs': 'dashboard,sales,purchases,stock,products,accounts,cashflow,daybook,calendar,reports,settings'},
+}
+
 # settings an owner may change through the API (whitelist, never mass-assign)
 SETTINGS_FIELDS = [
     'orsquare_enabled_tabs', 'orsquare_feature_open_bottle', 'orsquare_feature_kitchen', 'orsquare_feature_tables',
@@ -175,6 +191,19 @@ class OrsquareStaffService(models.AbstractModel):
             vals['active'] = bool(active)
         user.write(vals)
         return True
+
+    # ------------------------------------------------------------------ presets
+    @api.model
+    def list_presets(self):
+        return sorted(PRESETS)
+
+    @api.model
+    def apply_preset(self, name):
+        """Apply a shop preset (tabs + feature toggles). Everything stays adjustable afterwards."""
+        self._require_owner()
+        if name not in PRESETS:
+            raise UserError(_("Unknown preset '%s'.", name))
+        return self.update_settings(dict(PRESETS[name]))
 
     # ------------------------------------------------------------------ settings (Business Studio)
     @api.model
