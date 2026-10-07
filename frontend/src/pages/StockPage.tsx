@@ -8,6 +8,9 @@ import { searchProducts, searchGeneric } from '@/lib/search'
 import {
   NoAccess,
   Btn,
+  IconButton,
+  SearchField,
+  ToolbarSelect,
   Drawer,
   EmptyState,
   Panel,
@@ -336,30 +339,26 @@ function StockPage() {
                 <span className="t-caption">{shownNetwork.length} shown</span>
               </div>
               <div className="panel-actions">
-                <div className="toolbar-grow search-box">
-                  <input className="field-control" placeholder="Search product…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                <Btn
-                  variant="ghost"
-                  className="btn-icon"
-                  style={{ width: 40, height: 40 }}
-                  aria-label="Stock movement history"
-                  disabled title="Stock movement history is not available yet."
-                  data-tooltip="Stock movement history"
+                <SearchField
+                  placeholder="Search product…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onClear={() => setSearch('')}
+                />
+                <IconButton
+                  label="Stock movement history"
+                  tooltip="Stock movement history"
+                  disabled
+                  title="Stock movement history is not available yet."
                   onClick={() => setMode('history')}
-                >
-                  <IconHistory size={16} />
-                </Btn>
-                <Btn
-                  variant="ghost"
-                  className="btn-icon"
-                  style={{ width: 40, height: 40 }}
-                  aria-label="Export to spreadsheet"
-                  data-tooltip="Export to spreadsheet"
+                  icon={<IconHistory size={16} />}
+                />
+                <IconButton
+                  label="Export to spreadsheet"
+                  tooltip="Export to spreadsheet"
                   onClick={exportNetworkCsv}
-                >
-                  <IconSheet size={16} />
-                </Btn>
+                  icon={<IconSheet size={16} />}
+                />
                 <Btn variant="primary" disabled={stockProducts.length === 0} onClick={openTransfer}>
                   <IconTransfer /> Transfer stock
                 </Btn>
@@ -453,10 +452,15 @@ function StockPage() {
                 <span className="t-caption">{filtered.length} shown</span>
               </div>
               <div className="panel-actions">
+                <SearchField
+                  placeholder="Search product or barcode…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onClear={() => setSearch('')}
+                />
                 {categoryOptions.length > 0 && (
-                  <select
-                    className="field-control"
-                    style={{ width: 170 }}
+                  <ToolbarSelect
+                    width="lg"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     aria-label="Filter by category"
@@ -465,49 +469,23 @@ function StockPage() {
                     {categoryOptions.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
-                  </select>
+                  </ToolbarSelect>
                 )}
-                <div className="toolbar-grow search-box">
-                  <input className="field-control" placeholder="Search product or barcode…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                  {search !== '' && (
-                    <button
-                      type="button"
-                      className="search-clear"
-                      aria-label="Clear search"
-                      title="Clear search"
-                      onClick={() => setSearch('')}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <Btn
-                  variant="ghost"
-                  className="btn-icon"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    ...(lowOnly ? { background: 'var(--blue)', borderColor: 'var(--blue)', color: '#ffffff' } : {}),
-                  }}
-                  aria-label="Filter low stock only"
+                <IconButton
+                  label="Filter low stock only"
+                  tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
                   aria-pressed={lowOnly}
-                  title="Filter low stock only"
-                  data-tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
                   onClick={() => setLowOnly((v) => !v)}
-                >
-                  <IconLowStock size={16} />
-                </Btn>
-                <Btn
-                  variant="ghost"
-                  className="btn-icon"
-                  style={{ width: 40, height: 40 }}
-                  aria-label="Stock movement history"
-                  disabled title="Stock movement history is not available yet."
-                  data-tooltip="Stock movement history"
+                  icon={<IconLowStock size={16} />}
+                />
+                <IconButton
+                  label="Stock movement history"
+                  tooltip="Stock movement history"
+                  disabled
+                  title="Stock movement history is not available yet."
                   onClick={() => setMode('history')}
-                >
-                  <IconHistory size={16} />
-                </Btn>
+                  icon={<IconHistory size={16} />}
+                />
                 <Btn variant="primary" disabled={stockProducts.length === 0} onClick={openTransfer}>
                   <IconTransfer /> Transfer stock
                 </Btn>

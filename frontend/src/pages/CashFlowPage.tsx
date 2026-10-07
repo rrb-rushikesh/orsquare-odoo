@@ -7,7 +7,7 @@ import type { PIncExp, PPurchase, PSale, PVoucher } from '@/lib/repo'
 import { formatDate, money } from '@/lib/utils'
 import { fuzzyMatch } from '@/lib/search'
 import { todayKey } from '@/lib/clock'
-import { NoAccess, Btn, Drawer, EmptyState, Field, NumInput, Panel, Tag, useToast } from '@/components/ui'
+import { NoAccess, Btn, SearchField, ToolbarSelect, Drawer, EmptyState, Field, NumInput, Panel, Tag, useToast } from '@/components/ui'
 import { DataTable, type DTCol } from '@/components/DataTable'
 import { DateRangeFilter, useDateRange, ddisplay } from '@/components/DateRangeFilter'
 
@@ -418,18 +418,15 @@ function CashFlowPage() {
             </span>
           </div>
           <div className="panel-actions">
-            <div className="toolbar-grow search-box">
-              <input
-                className="field-control"
-                placeholder="Search bill, party, product, voucher…"
-                aria-label="Search cash flow"
-                value={partyQuery}
-                onChange={(e) => setPartyQuery(e.target.value)}
-              />
-            </div>
-            <select
-              className="field-control"
-              style={{ width: 130 }}
+            <SearchField
+              placeholder="Search bill, party, product, voucher…"
+              aria-label="Search cash flow"
+              value={partyQuery}
+              onChange={(e) => setPartyQuery(e.target.value)}
+              onClear={() => setPartyQuery('')}
+            />
+            <ToolbarSelect
+              width="sm"
               value={filter}
               onChange={(e) => setFilter(e.target.value as Filter)}
               aria-label="Filter by transaction type"
@@ -439,7 +436,7 @@ function CashFlowPage() {
                   {f.label}
                 </option>
               ))}
-            </select>
+            </ToolbarSelect>
             {isEmployee ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="seg" role="group" aria-label="Date scope">

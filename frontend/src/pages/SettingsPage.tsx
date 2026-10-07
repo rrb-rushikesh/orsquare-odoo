@@ -42,7 +42,7 @@ import { normalizeTablesConfig, tableId, tableLabels } from '@/lib/tables'
 import type { TablePattern, TablesConfig } from '@/types'
 import { money } from '@/lib/utils'
 import { pullCatalogDelta, flushOfflineSalesQueue, listQueueForReview, retryQueuedSale, discardQueuedSale, getOfflineCacheStats, purgeCatalogCache, type QueueInspectionRow } from '@/lib/sync'
-import { Btn, ConfirmDialog, Drawer, EmptyState, Field, NoAccess, Panel, Tag, useToast } from '@/components/ui'
+import { Btn, ConfirmDialog, Drawer, EmptyState, Field, NoAccess, Panel, SearchField, Tag, useToast } from '@/components/ui'
 import {
   IconGear,
   IconLayers,
@@ -2345,14 +2345,12 @@ function TeamPanel() {
             </span>
           </div>
           <div className="panel-actions">
-            <div className="toolbar-grow search-box">
-              <input
-                className="field-control"
-                placeholder="Search staff by name or email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+            <SearchField
+              placeholder="Search staff by name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+            />
             {atLimit ? (
               <span className="t-caption" style={{ color: 'var(--err)' }}>
                 Plan limit of {data?.cap} staff reached.

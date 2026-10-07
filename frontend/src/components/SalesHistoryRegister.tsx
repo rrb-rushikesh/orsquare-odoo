@@ -14,7 +14,20 @@ import { beginPrint, outcomeMessage } from '@/lib/printing/service'
 import { loadPrefs } from '@/lib/prefs'
 import type { DiscountScheme } from '@/types'
 import { GST_SLABS } from '@/types'
-import { Btn, ConfirmDialog, Drawer, EmptyState, Field, NumInput, Panel, Tag, useToast } from '@/components/ui'
+import {
+  Btn,
+  ConfirmDialog,
+  Drawer,
+  EmptyState,
+  Field,
+  IconButton,
+  NumInput,
+  Panel,
+  SearchField,
+  Tag,
+  ToolbarSelect,
+  useToast,
+} from '@/components/ui'
 import { DataTable, type DTCol } from '@/components/DataTable'
 import { DateRangeFilter, dateRowMatches, useDateRange } from '@/components/DateRangeFilter'
 import { searchProducts } from '@/lib/search'
@@ -829,41 +842,38 @@ export function SalesHistoryRegister({
             <span className="t-caption">{filteredSales.length} of {salesSorted.length} shown</span>
           </div>
           <div className="panel-actions">
-            <div className="search-box" style={{ flex: '1 1 220px', minWidth: 180 }}>
-              <input
-                className="field-control"
-                placeholder="Search or scan bill barcode…"
-                aria-label="Search sales history"
-                value={saleQuery}
-                onChange={(e) => setSaleQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  // A barcode scanner types the printed bill number and presses Enter: open that bill straight away.
-                  if (e.key !== 'Enter') return
-                  const code = saleQuery.trim().toLowerCase()
-                  if (!code) return
-                  const exact = filteredSales.filter((s) => String(s.billNo).toLowerCase() === code)
-                  const hit = exact.length === 1 ? exact[0] : filteredSales.length === 1 ? filteredSales[0] : null
-                  if (hit) {
-                    e.preventDefault()
-                    void openSale(hit)
-                  } else {
-                    // Outside the date filter (an older bill scanned from a customer's receipt): look it up across all dates.
-                    e.preventDefault()
-                    repo.listSales(shopId, { search: code, limit: 5 })
-                      .then((rows) => {
-                        const one = rows.filter((r) => String(r.billNo).toLowerCase() === code)
-                        const found = one.length === 1 ? one[0] : rows.length === 1 ? rows[0] : null
-                        if (found) void openSale(found)
-                        else toast('No bill found for that code.', 'err')
-                      })
-                      .catch(() => toast('Could not look that bill up. Check the connection.', 'err'))
-                  }
-                }}
-              />
-            </div>
-            <select
-              className="field-control"
-              style={{ width: 140 }}
+            <SearchField
+              placeholder="Search or scan bill barcode…"
+              aria-label="Search sales history"
+              value={saleQuery}
+              onChange={(e) => setSaleQuery(e.target.value)}
+              onClear={() => setSaleQuery('')}
+              onKeyDown={(e) => {
+                // A barcode scanner types the printed bill number and presses Enter: open that bill straight away.
+                if (e.key !== 'Enter') return
+                const code = saleQuery.trim().toLowerCase()
+                if (!code) return
+                const exact = filteredSales.filter((s) => String(s.billNo).toLowerCase() === code)
+                const hit = exact.length === 1 ? exact[0] : filteredSales.length === 1 ? filteredSales[0] : null
+                if (hit) {
+                  e.preventDefault()
+                  void openSale(hit)
+                } else {
+                  // Outside the date filter (an older bill scanned from a customer's receipt): look it up across all dates.
+                  e.preventDefault()
+                  repo.listSales(shopId, { search: code, limit: 5 })
+                    .then((rows) => {
+                      const one = rows.filter((r) => String(r.billNo).toLowerCase() === code)
+                      const found = one.length === 1 ? one[0] : rows.length === 1 ? rows[0] : null
+                      if (found) void openSale(found)
+                      else toast('No bill found for that code.', 'err')
+                    })
+                    .catch(() => toast('Could not look that bill up. Check the connection.', 'err'))
+                }
+              }}
+            />
+            <ToolbarSelect
+              width="sm"
               value={salesMethod}
               onChange={(e) => setSalesMethod(e.target.value)}
               aria-label="Filter by payment method"
@@ -873,10 +883,9 @@ export function SalesHistoryRegister({
               <option value="UPI">UPI</option>
               <option value="Khata">Khata</option>
               <option value="Split">Split</option>
-            </select>
-            <select
-              className="field-control"
-              style={{ width: 140 }}
+            </ToolbarSelect>
+            <ToolbarSelect
+              width="sm"
               value={salesState}
               onChange={(e) => setSalesState(e.target.value)}
               aria-label="Filter by invoice state"
@@ -886,19 +895,15 @@ export function SalesHistoryRegister({
               <option value="godown">From godown</option>
               <option value="corrected">Corrected</option>
               <option value="voided">Voided</option>
-            </select>
+            </ToolbarSelect>
             <DateRangeFilter state={salesDate} onChange={setSalesDate} todayKeyOverride={todayBiz} />
             {showCsv && seesMoney && (
-              <Btn
-                variant="ghost"
-                className="btn-icon"
-                style={{ width: 40, height: 40 }}
-                aria-label="Export to spreadsheet"
-                data-tooltip="Export to spreadsheet"
+              <IconButton
+                label="Export to spreadsheet"
+                tooltip="Export to spreadsheet"
                 onClick={exportSalesCsv}
-              >
-                <IconSheet size={16} />
-              </Btn>
+                icon={<IconSheet size={16} />}
+              />
             )}
           </div>
         </div>

@@ -8,6 +8,9 @@ import { todayKey } from '@/lib/clock'
 import {
   NoAccess,
   Btn,
+  IconButton,
+  SearchField,
+  ToolbarSelect,
   ConfirmDialog,
   EmptyState,
   Panel,
@@ -265,25 +268,22 @@ function ProductsPage() {
             <span className="t-caption">{filtered.length} shown</span>
           </div>
           <div className="panel-actions">
-            <div className="toolbar-grow search-box">
-              <input
-                className="field-control"
-                placeholder="Search by name or barcode…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <select className="field-control" style={{ width: 170 }} value={sort} onChange={(e) => setSort(e.target.value)} title="Sort products">
+            <SearchField
+              placeholder="Search by name or barcode…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+            />
+            <ToolbarSelect width="lg" value={sort} onChange={(e) => setSort(e.target.value)} title="Sort products">
               <option value="newest">Newest added</option>
               <option value="name-asc">Name · A–Z</option>
               <option value="name-desc">Name · Z–A</option>
               <option value="ml-asc">Unit · Low → High</option>
               <option value="ml-desc">Unit · High → Low</option>
-            </select>
+            </ToolbarSelect>
             {kitchenEnabled && (
-              <select
-                className="field-control"
-                style={{ width: 140 }}
+              <ToolbarSelect
+                width="sm"
                 value={productTypeFilter}
                 onChange={(e) => setProductTypeFilter(e.target.value as 'all' | 'retail' | 'kitchen')}
                 title="Filter by product type"
@@ -291,60 +291,41 @@ function ProductsPage() {
                 <option value="all">All items</option>
                 <option value="retail">Retail only</option>
                 <option value="kitchen">Kitchen dishes</option>
-              </select>
+              </ToolbarSelect>
             )}
-            <select className="field-control" style={{ width: 160 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <ToolbarSelect width="md" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} title="Filter by category">
               <option value="All">All categories</option>
               {categories.map((c) => (
                 <option key={c}>{c}</option>
               ))}
-            </select>
-            <Btn
-              variant="ghost"
-              className="btn-icon"
-              style={{
-                width: 40,
-                height: 40,
-                ...(lowOnly ? { background: 'var(--blue)', borderColor: 'var(--blue)', color: '#ffffff' } : {}),
-              }}
-              aria-label="Filter low stock only"
+            </ToolbarSelect>
+            <IconButton
+              label="Filter low stock only"
+              tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
               aria-pressed={lowOnly}
-              title="Filter low stock only"
-              data-tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
               onClick={() => setLowOnly((v) => !v)}
-            >
-              <IconLowStock size={16} />
-            </Btn>
-            <Btn
-              variant="ghost"
-              className="btn-icon"
-              style={{ width: 40, height: 40 }}
-              aria-label="Export to spreadsheet"
-              data-tooltip="Export to spreadsheet"
+              icon={<IconLowStock size={16} />}
+            />
+            <IconButton
+              label="Export to spreadsheet"
+              tooltip="Export to spreadsheet"
               onClick={exportCsv}
-            >
-              <IconSheet size={16} />
-            </Btn>
-            <Btn
-              variant="ghost"
-              className="btn-icon"
-              style={{ width: 40, height: 40 }}
-              disabled title="Product import is not available yet." aria-label="Import products from Excel"
-              data-tooltip="Import products from Excel (Retail only)"
+              icon={<IconSheet size={16} />}
+            />
+            <IconButton
+              label="Import products from Excel"
+              tooltip="Import products from Excel (Retail only)"
+              disabled
+              title="Product import is not available yet."
               onClick={() => setImportOpen(true)}
-            >
-              <IconUpload size={16} />
-            </Btn>
-            <Btn
-              variant="ghost"
-              className="btn-icon"
+              icon={<IconUpload size={16} />}
+            />
+            <IconButton
+              label="Manage categories and units"
+              tooltip="Manage categories and units"
               onClick={() => setManageOpen(true)}
-              data-tooltip="Manage categories and units"
-              aria-label="Manage categories and units"
-              title="Manage categories and units"
-            >
-              <IconGear size={16} />
-            </Btn>
+              icon={<IconGear size={16} />}
+            />
             <Btn
               variant="primary"
               onClick={() => {

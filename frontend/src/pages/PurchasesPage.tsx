@@ -31,6 +31,10 @@ import { BillFinder } from '@/components/BillFinder'
 import {
   NoAccess,
   Btn,
+  IconButton,
+  SearchField,
+  ToolbarSelect,
+  Segmented,
   ConfirmDialog,
   Drawer,
   EmptyState,
@@ -119,32 +123,13 @@ function RetSeg<T extends string>({ value, onChange, options, ariaLabel }: {
   ariaLabel: string
 }) {
   return (
-    <div role="group" aria-label={ariaLabel} style={{ display: 'inline-flex', flexWrap: 'wrap', border: '1px solid var(--line)' }}>
-      {options.map((o, i) => {
-        const on = value === o.value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(o.value)}
-            style={{
-              minHeight: 40,
-              padding: '8px 14px',
-              fontSize: 13,
-              cursor: 'pointer',
-              border: 0,
-              borderLeft: i > 0 ? '1px solid var(--line)' : undefined,
-              background: on ? 'var(--blue)' : 'var(--canvas)',
-              color: on ? '#ffffff' : 'var(--ink-2)',
-              fontWeight: on ? 600 : 400,
-            }}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
+    <Segmented
+      label={ariaLabel}
+      value={value}
+      onChange={onChange}
+      options={options}
+      appearance="toolbar"
+    />
   )
 }
 
@@ -991,18 +976,15 @@ function PurchasesPage() {
               <span className="t-caption">{filtered.length} shown</span>
             </div>
             <div className="panel-actions">
-              <div className="toolbar-grow search-box">
-                <input
-                  className="field-control"
-                  placeholder="Search bill no. or supplier…"
-                  aria-label="Search purchase bills"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <select
-                className="field-control"
-                style={{ width: 140 }}
+              <SearchField
+                placeholder="Search bill no. or supplier…"
+                aria-label="Search purchase bills"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => setSearch('')}
+              />
+              <ToolbarSelect
+                width="sm"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
                 aria-label="Filter by payment status"
@@ -1011,43 +993,33 @@ function PurchasesPage() {
                 <option>Paid</option>
                 <option>Partial</option>
                 <option>Unpaid</option>
-              </select>
+              </ToolbarSelect>
               <DateRangeFilter state={purDate} onChange={setPurDate} align="right" />
-              <Btn
-                variant="ghost"
-                className="btn-icon"
-                style={{ width: 40, height: 40 }}
-                aria-label="Export to spreadsheet"
-                data-tooltip="Export to spreadsheet"
+              <IconButton
+                label="Export to spreadsheet"
+                tooltip="Export to spreadsheet"
                 onClick={exportCsv}
-              >
-                <IconSheet size={16} />
-              </Btn>
+                icon={<IconSheet size={16} />}
+              />
               {canManageReturns && (
-                <Btn
-                  variant="ghost"
-                  className="btn-icon"
-                  disabled title="Return or Exchange is not available yet."
-                  aria-label="Return or Exchange items"
-                  data-tooltip="Return or Exchange items"
+                <IconButton
+                  label="Return or Exchange items"
+                  tooltip="Return or Exchange items"
+                  disabled
+                  title="Return or Exchange is not available yet."
                   aria-pressed={mode === 'returns'}
-                  style={mode === 'returns' ? { background: 'var(--blue)', borderColor: 'var(--blue)', color: '#ffffff' } : undefined}
                   onClick={() => setMode((m) => (m === 'returns' ? 'register' : 'returns'))}
-                >
-                  <IconBoxReturn size={16} />
-                </Btn>
+                  icon={<IconBoxReturn size={16} />}
+                />
               )}
-              <Btn
-                variant="ghost"
-                className="btn-icon"
-                style={{ width: 40, height: 40 }}
-                aria-label="Purchase edit history"
-                disabled title="Purchase edit history is not available yet."
-                data-tooltip="Purchase edit history"
+              <IconButton
+                label="Purchase edit history"
+                tooltip="Purchase edit history"
+                disabled
+                title="Purchase edit history is not available yet."
                 onClick={() => setHistoryOpen(true)}
-              >
-                <IconHistory size={16} />
-              </Btn>
+                icon={<IconHistory size={16} />}
+              />
               <Btn variant="primary" onClick={() => setCreating(true)}>+ New purchase</Btn>
             </div>
           </div>
