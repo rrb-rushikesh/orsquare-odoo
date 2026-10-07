@@ -87,7 +87,7 @@ class OrsquareOpenedBottle(models.Model):
         if tmpl.orsquare_short_code:
             return tmpl.orsquare_short_code.upper()
         words = re.findall(r"[A-Za-z0-9]+", tmpl.name or 'BTL')
-        initials = ''.join(w[0] for w in words[:3]).upper()
+        initials = ''.join(w[0] for w in [w for w in words if not w[0].isdigit()][:3]).upper()
         return initials or 'BTL'
 
     # ------------------------------------------------------------------ open

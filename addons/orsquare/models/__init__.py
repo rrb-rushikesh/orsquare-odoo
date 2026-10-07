@@ -20,3 +20,5 @@ from . import reports_service
 from . import staff_service
 from . import catalog_service
 from . import wipe_service
+from . import sync_service
+from . import api_facade

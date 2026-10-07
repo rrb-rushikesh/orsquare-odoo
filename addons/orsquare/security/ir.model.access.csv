@@ -16,3 +16,4 @@ access_opened_bottle_stockkeeper,orsquare.opened_bottle stockkeeper,model_orsqua
 access_tax_regime_user,orsquare.tax_regime user,model_orsquare_tax_regime,base.group_user,1,0,0,0
 access_tax_regime_owner,orsquare.tax_regime owner,model_orsquare_tax_regime,group_orsquare_owner,1,1,1,1
 access_console_audit_owner,orsquare.console_audit owner,model_orsquare_console_audit,group_orsquare_owner,1,0,0,0
+access_sync_log_owner,orsquare.sync_log owner,model_orsquare_sync_log,group_orsquare_owner,1,0,0,0

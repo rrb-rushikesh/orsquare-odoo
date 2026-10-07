@@ -180,7 +180,7 @@ class OrsquareCatalogService(models.AbstractModel):
         return Rule.create({'categ_id': int(categ_id), 'uom_id': int(uom_id), 'margin_amount': float(margin_amount)}).id
 
     @api.model
-    def list_products(self, search=None, kind=None, limit=200, offset=0):
+    def list_products(self, search=None, kind=None, limit=200, offset=0, changed_since=None):
         """Catalog listing; purchase cost only for staff with valuation rights."""
         domain = [('available_in_pos', '=', True)]
         if search:
@@ -190,15 +190,21 @@ class OrsquareCatalogService(models.AbstractModel):
             domain.append(('is_kitchen', '=', True))
         elif kind == 'retail':
             domain.append(('is_kitchen', '=', False))
+        if changed_since:
+            domain = [d for d in domain if d != ('available_in_pos', '=', True)]
+            domain.append(('write_date', '>', changed_since))
         see = self._valuation()
         out = []
-        for t in self.sudo().env['product.template'].search(domain, limit=limit, offset=offset, order='name'):
+        for t in self.sudo().env['product.template'].with_context(active_test=not changed_since).search(
+                domain, limit=limit, offset=offset, order='name'):
             row = {
                 'id': t.id, 'name': t.name, 'barcode': t.barcode or '', 'short_code': t.orsquare_short_code or '',
                 'price': t.list_price, 'uom': t.uom_id.name, 'capacity_ml': t.orsquare_capacity_ml,
                 'kind': 'kitchen' if t.is_kitchen else ('retail' if t.is_storable else 'consumable'),
                 'brand': t.orsquare_brand_id.name or '', 'regime': t.orsquare_tax_regime_id.name or '',
-                'can_open': t.orsquare_can_open,
+                'can_open': t.orsquare_can_open, 'active': t.active and t.available_in_pos,
+                'taxes': [{'name': x.name, 'amount': x.amount, 'amount_type': x.amount_type,
+                           'price_include': x.price_include} for x in t.taxes_id],
                 'pegs': [{'ml': p.ml, 'price': p.price} for p in t.orsquare_peg_size_ids],
                 'variants': [{'id': v.id, 'name': v.display_name, 'price': v.lst_price} for v in t.product_variant_ids]
                 if len(t.product_variant_ids) > 1 else [],

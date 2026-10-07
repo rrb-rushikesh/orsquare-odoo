@@ -89,7 +89,8 @@ class OrsquareStaffService(models.AbstractModel):
         return {
             'id': user.id, 'name': user.name, 'login': user.login,
             'roles': user.orsquare_roles(),
-            'flags': {k: user.has_group(g) or user.has_group(ROLE_GROUPS['owner']) for k, g in FLAG_GROUPS.items()},
+            'flags': {k: self.env.su or user.has_group(g) or user.has_group(ROLE_GROUPS['owner'])
+                      for k, g in FLAG_GROUPS.items()},
             'tabs': user.orsquare_effective_tabs(),
             'company': {
                 'id': company.id, 'name': company.name, 'currency': company.currency_id.name,

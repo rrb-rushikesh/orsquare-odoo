@@ -8,3 +8,5 @@ from . import test_purchases
 from . import test_returns
 from . import test_back_office
 from . import test_admin
+from . import test_sync
+from . import test_http
