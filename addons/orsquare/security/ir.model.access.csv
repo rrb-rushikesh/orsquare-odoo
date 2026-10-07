@@ -13,3 +13,5 @@ access_stock_discrepancy_stockkeeper,orsquare.stock_discrepancy stockkeeper,mode
 access_stock_discrepancy_cashier,orsquare.stock_discrepancy cashier,model_orsquare_stock_discrepancy,group_orsquare_cashier,1,0,0,0
 access_opened_bottle_cashier,orsquare.opened_bottle cashier,model_orsquare_opened_bottle,group_orsquare_cashier,1,0,0,0
 access_opened_bottle_stockkeeper,orsquare.opened_bottle stockkeeper,model_orsquare_opened_bottle,group_orsquare_stockkeeper,1,1,0,0
+access_tax_regime_user,orsquare.tax_regime user,model_orsquare_tax_regime,base.group_user,1,0,0,0
+access_tax_regime_owner,orsquare.tax_regime owner,model_orsquare_tax_regime,group_orsquare_owner,1,1,1,1

@@ -25,6 +25,16 @@ ORSQUARE_ACCOUNTS = {
     'discount_received': ('400001', 'Discount Received', 'income_other', False),
     'discount_allowed': ('210706', 'Discount Allowed', 'expense', False),
     'landed_clearing': ('100906', 'Landed Cost Clearing', 'asset_current', True),
+    'state_vat_payable': ('112361', 'State VAT Payable (Liquor)', 'liability_current', False),
+}
+
+# key: (name, landed_cost_ok, account key used as the product's expense account)
+SERVICE_PRODUCTS = {
+    'discount_cap': ('Trade Discount (capitalised into stock cost)', True, 'stock_interim_in'),
+    'discount_exp': ('Discount Received (income)', False, 'discount_received'),
+    'charge_cap': ('Freight & Handling (capitalised into stock cost)', True, 'stock_interim_in'),
+    'charge_exp': ('Freight & Handling (expense)', False, 'freight_inward'),
+    'tcs': ('TCS Receivable (Sec 206C)', False, 'tcs_receivable'),
 }
 
 
@@ -172,6 +182,79 @@ class OrsquareShopBootstrap(models.AbstractModel):
                 loc.sudo().write({'valuation_in_account_id': acc.id, 'valuation_out_account_id': acc.id})
         return loc
 
+    @api.model
+    def chart_account(self, code, company=None):
+        company = company or self.env.company
+        account = self.env['account.account'].with_company(company).search([('code', '=', code)], limit=1)
+        if not account:
+            raise ValueError("Account %s is missing from the chart of accounts" % code)
+        return account
+
+    @api.model
+    def service_product(self, key, company=None):
+        """Non-stock service products used as bill lines for discounts, charges and TCS."""
+        company = company or self.env.company
+        name, landed, acc_key = SERVICE_PRODUCTS[key]
+        product = self.env.ref('orsquare.svc_%s_%s' % (key, company.id), raise_if_not_found=False)
+        if product and product.exists():
+            return product
+        vals = {
+            'name': name, 'type': 'service', 'sale_ok': False, 'purchase_ok': True, 'is_storable': False,
+            'landed_cost_ok': landed, 'taxes_id': [(6, 0, [])], 'supplier_taxes_id': [(6, 0, [])],
+            'property_account_expense_id': self.account(acc_key, company).id,
+            'company_id': company.id,
+        }
+        if landed:
+            vals['split_method_landed_cost'] = 'by_current_cost_price'
+        product = self.env['product.product'].with_company(company).create(vals)
+        self.env['ir.model.data'].sudo().create({
+            'module': 'orsquare', 'name': 'svc_%s_%s' % (key, company.id),
+            'model': 'product.product', 'res_id': product.id, 'noupdate': True})
+        return product
+
+    # ------------------------------------------------------------------ statutory tax regimes
+    @api.model
+    def ensure_tax_regimes(self, company):
+        """Seed regimes (idempotent). Rates are configuration, never code: the Maharashtra
+        reference ships with State VAT at 0 % until the operator sets the current statutory rate."""
+        Regime = self.env['orsquare.tax_regime']
+        Tax = self.env['account.tax'].with_company(company)
+        if Regime.search_count([('company_id', '=', company.id)]):
+            return
+        mh = self.env.ref('base.state_in_mh', raise_if_not_found=False)
+        vat = Tax.search([('name', '=', 'State VAT (Liquor)'), ('company_id', '=', company.id)], limit=1)
+        if not vat:
+            vat = Tax.create({
+                'name': 'State VAT (Liquor)', 'type_tax_use': 'sale', 'amount_type': 'percent', 'amount': 0.0,
+                'description': 'State VAT', 'company_id': company.id,
+                'invoice_repartition_line_ids': [
+                    (0, 0, {'repartition_type': 'base', 'document_type': 'invoice'}),
+                    (0, 0, {'repartition_type': 'tax', 'document_type': 'invoice',
+                            'account_id': self.account('state_vat_payable', company).id})],
+                'refund_repartition_line_ids': [
+                    (0, 0, {'repartition_type': 'base', 'document_type': 'refund'}),
+                    (0, 0, {'repartition_type': 'tax', 'document_type': 'refund',
+                            'account_id': self.account('state_vat_payable', company).id})],
+            })
+        Regime.create({
+            'name': 'Alcoholic Liquor - Maharashtra (reference)', 'kind': 'liquor', 'company_id': company.id,
+            'state_id': mh.id if mh else False, 'sale_tax_ids': [(6, 0, vat.ids)], 'tcs_rate': 1.0,
+            'note': "Outside GST (Art. 366(12A), Sec. 9(1) CGST Act). State VAT rate is intentionally 0 here: "
+                    "set the current statutory rate on the tax. TCS under Sec. 206C(1) is configurable.",
+        })
+        for rate in (0, 5, 12, 18, 28):
+            sale = Tax.search([('name', '=', '%s%% GST S' % rate if rate else '0%'), ('type_tax_use', '=', 'sale'),
+                               ('company_id', '=', company.id)], limit=1)
+            purchase = Tax.search([('name', '=', '%s%% GST' % rate if rate else '0%'), ('type_tax_use', '=', 'purchase'),
+                                   ('company_id', '=', company.id)], limit=1)
+            Regime.create({
+                'name': 'GST %s%%' % rate if rate else 'GST Nil-rated (0%)', 'kind': 'gst', 'company_id': company.id,
+                'sale_tax_ids': [(6, 0, sale.ids)], 'purchase_tax_ids': [(6, 0, purchase.ids)],
+            })
+        exempt = Tax.search([('name', '=', '0% Exempt'), ('company_id', '=', company.id)], limit=1)
+        Regime.create({'name': 'Exempt', 'kind': 'exempt', 'company_id': company.id,
+                       'sale_tax_ids': [(6, 0, exempt.ids)]})
+
     # ------------------------------------------------------------------ entry point
     @api.model
     def bootstrap_company(self, company):
@@ -183,4 +266,7 @@ class OrsquareShopBootstrap(models.AbstractModel):
         company.point_of_sale_update_stock_quantities = 'real'
         self.scrap_location(company)
         self.pos_config(company)
+        for key in SERVICE_PRODUCTS:
+            self.service_product(key, company)
+        self.ensure_tax_regimes(company)
         return True

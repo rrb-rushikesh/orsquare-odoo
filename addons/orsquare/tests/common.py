@@ -31,7 +31,7 @@ class OrsquareCase(TransactionCase):
         vals = {
             'name': name, 'type': 'consu', 'is_storable': storable,
             'standard_price': cost, 'list_price': price, 'available_in_pos': True,
-            'taxes_id': [(6, 0, [])],
+            'taxes_id': [(6, 0, [])], 'supplier_taxes_id': [(6, 0, [])],
         }
         if uom_xmlid:
             uom = cls.env.ref(uom_xmlid)

@@ -25,6 +25,13 @@ def post_init_hook(env):
             'digits': 6,
         })
 
+    # 1b. Prices carry 6 decimals (exact line totals when a rate is derived from a total) and
+    #     discount percentages 4 decimals.
+    for name, digits in (('Product Price', 6), ('Discount', 4)):
+        prec = env['decimal.precision'].search([('name', '=', name)], limit=1)
+        if prec:
+            prec.write({'digits': digits})
+
     # 2. Configure core platform base units
     for xmlid in CORE_BASE_UNITS:
         uom = env.ref(xmlid, raise_if_not_found=False)
