@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 from odoo import api, SUPERUSER_ID
 
+CORE_BASE_UNITS = [
+    'uom.product_uom_litre',
+    'uom.product_uom_unit',
+    'uom.product_uom_kgm',
+    'uom.product_uom_gram',
+]
+
+
 def post_init_hook(env):
     """
     Bootstrap hook executed after module installation/upgrade.
@@ -18,13 +26,7 @@ def post_init_hook(env):
         })
 
     # 2. Configure core platform base units
-    core_base_units = [
-        'uom.product_uom_litre',
-        'uom.product_uom_unit',
-        'uom.product_uom_kgm',
-        'uom.product_uom_gram',
-    ]
-    for xmlid in core_base_units:
+    for xmlid in CORE_BASE_UNITS:
         uom = env.ref(xmlid, raise_if_not_found=False)
         if uom:
             uom.write({
@@ -32,3 +34,7 @@ def post_init_hook(env):
                 'is_shop_visible': True,
                 'rounding': 0.000001,
             })
+
+    # 3. Shop bootstrap: accounts, retail topology (Godown/Counter/Opened), AVCO valuation policy
+    for company in env['res.company'].search([]):
+        env['orsquare.shop.bootstrap'].bootstrap_company(company)
