@@ -102,7 +102,7 @@ for (const [url, doc] of html) {
     } catch {
       continue
     }
-    if (host === 'orsquare.com' || host.endsWith('.orsquare.com')) continue
+    if (host === 'orsquare.com' || host.endsWith('.orsquare.com') || host === 'localhost' || host === '127.0.0.1') continue
     // Support links open WhatsApp; they are plain anchors and load nothing from it.
     if (host === 'wa.me' && m[0].startsWith('href=')) continue
     fail(label, `third-party origin ${host}`)

@@ -30,8 +30,8 @@ export function absoluteUrl(path: string): string {
   return `${SITE_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`
 }
 
-/** Where "Sign in" goes. Defaults to the app's sign-in on the same host, `/login`. */
-export const APP_URL = appUrl(envUrl('PUBLIC_APP_URL', '/login'))
+/** Where "Login" goes. Defaults to the app's sign-in at http://localhost:5173/login in dev, or PUBLIC_APP_URL in prod. */
+export const APP_URL = appUrl(envUrl('PUBLIC_APP_URL', 'http://localhost:5173/login'))
 
 /**
  * Git Bash on Windows rewrites a value like `/login` into `C:/Program Files/Git/login` when it is set
@@ -39,7 +39,7 @@ export const APP_URL = appUrl(envUrl('PUBLIC_APP_URL', '/login'))
  * or an http(s) URL is a valid target; anything else falls back to the app's own `/login`.
  */
 function appUrl(value: string): string {
-  return value.startsWith('/') || /^https?:\/\//i.test(value) ? value : '/login'
+  return value.startsWith('/') || /^https?:\/\//i.test(value) ? value : 'http://localhost:5173/login'
 }
 
 /**
