@@ -50,7 +50,8 @@ Open owner items: confirm TCS-never-in-cost (D6); set real State VAT (ships 0%);
 | Stock: levels, transfer, history, open-bottle list | DONE (basic) |
 | Products (list, form w/ pegs + opening stock + Odoo price suggestion, masters drawer) | DONE, verified in browser |
 | Purchases (register, simple/advanced bill with Odoo reverse-rate preview, offline-queueable, return/exchange drawer) | DONE (return/exchange UI built, not yet browser-verified) |
-| Accounts / Cash Flow / Dashboard | IN PROGRESS |
+| Accounts / Cash Flow / Dashboard | DONE, verified in browser (Dashboard refreshes on sync; realtime tickers pending Centrifugo client) |
+| Sales extras: open-bottle tray + pegs, returns/exchanges (bill finder), restaurant tables + autosave + KOT, printing (lib/print.ts: QZ raw ESC/POS or browser dialog; offline provisional slip) | DONE, verified in browser except physical printing |
 | Settings (Team & Access, Business Studio), Ledger | TODO |
 | Daybook, Calendar | SKIPPED by owner for now |
 | Variants | placeholder only |
@@ -66,6 +67,7 @@ Open owner items: confirm TCS-never-in-cost (D6); set real State VAT (ships 0%);
 - A sale once took 16 s because a dead Centrifugo URL blocked the request: fixed (125 ms). Always measure.
 
 ## 7. Log (newest first)
+- 2026-10-07 s2: Sales extras done and browser-verified (peg bill, 495 exchange refund, table 2 bill + KOT). Bugs found+fixed by measuring: per-render array identity caused a request loop (always memoize derived payload objects used as effect deps); settings change now forces full re-bootstrap; SNAPSHOT_VERSION=3. Tabs `_render` now returns `peg`.
 - 2026-10-07 s2: Products + Purchases done. Backend adds: purchases.list_bills/bill_detail, preview_bill returns per-line rate/amount, bootstrap+delta carry suppliers, product rows carry po_uom/uoms/uom_id/brand_id/regime_id. Frontend snapshot has SNAPSHOT_VERSION (bump when sections change, else stale devices show gaps).
 - 2026-10-07 s2: frontend foundation + Sales + Stock committed; backend quote/async push committed. Handover file created. Starting: Dashboard, Products, Purchases, Accounts, Cash Flow, Sales extras, Console, landing.
 

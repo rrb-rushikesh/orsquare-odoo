@@ -75,6 +75,7 @@ class OrsquareTabService(models.AbstractModel):
                 'key': l.orsquare_line_key, 'line_id': l.id, 'product_id': l.product_id.id,
                 'name': l.full_product_name, 'qty': l.qty, 'price': l.price_unit, 'discount': l.discount,
                 'total': l.price_subtotal_incl, 'note': l.orsquare_note or '', 'is_peg': bool(l.orsquare_peg_ml),
+                'peg': {'bottle_id': l.orsquare_opened_bottle_id.id, 'ml': l.orsquare_peg_ml} if l.orsquare_peg_ml else None,
                 'station': self._station(l), 'sent_qty': l.orsquare_kot_qty,
                 'pending_qty': round(l.qty - l.orsquare_kot_qty, 6),
             })

@@ -67,7 +67,7 @@ export function subscribe(l: () => void) {
 // ------------------------------------------------------------------------------------------------ persistence
 
 /** Bump when the snapshot gains or changes a section: devices holding an older copy re-download instead of showing gaps. */
-const SNAPSHOT_VERSION = 2;
+const SNAPSHOT_VERSION = 3;
 
 const SECTIONS = ['me', 'products', 'stock', 'customers', 'suppliers', 'categories', 'units', 'brands', 'regimes', 'openBottles',
   'day', 'floors', 'tables', 'promos', 'discrepanciesOpen', 'seq', 'serverTs'] as const;
@@ -136,6 +136,8 @@ async function pullDelta() {
   serverTs = d.server_ts || serverTs;
   set(patch);
   void persist();
+  // A settings change (features, tabs, roles) alters many sections at once: take a fresh snapshot.
+  if (p.me) return bootstrapNow();
   if (d.has_more) await pullDelta();
 }
 
