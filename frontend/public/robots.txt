@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /modules
+Allow: /about
+Allow: /privacy
+Allow: /terms
+Allow: /contact
+
+# Private app routes & internal APIs
+Disallow: /api/
+Disallow: /dev/
+Disallow: /admin/
+Disallow: /sales
+Disallow: /products
+Disallow: /purchases
+Disallow: /stock
+Disallow: /cashflow
+Disallow: /accounts
+Disallow: /settings
+Disallow: /daybook
+
+Sitemap: https://orsquare.com/sitemap.xml

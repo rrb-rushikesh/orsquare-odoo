@@ -1,0 +1,445 @@
+/* Native Carbon-style register grid.
+   Replaces the former jspreadsheet-ce wrapper with plain React tables: dense
+   rows, grouped headers, sticky header/footer, an optional frozen first column
+   and fit-to-width columns. No third-party grid library is involved.
+
+   This component owns no VERTICAL scroll box of its own (no max-height) —
+   the page decides where that boundary is (see `.sr-viewport` in
+   sheet-register.css), so several stacked instances (the Sheet "All" tab)
+   share one continuous scroll region instead of each fighting for its own
+   nested scrollbar, and sticky header/footer stick to that shared region. */
+
+.rg-wrap {
+  width: 100%;
+  overflow: visible;
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-sizing: border-box;
+  font-size: 11px;
+  position: relative;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.rg-wrap::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.rg-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  border-left: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- headers ---------- */
+.rg-th {
+  position: sticky;
+  z-index: 20;
+  background: var(--layer);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.32px;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
+}
+.rg-group {
+  text-align: center;
+  font-weight: 700;
+  background: var(--layer-2, #e8e8e8);
+  border-right: 1px solid var(--line-divider, #c6c6c6) !important;
+}
+
+/* Subtle vertical partition separating distinct units/sizes */
+.rg-col-divider,
+.rg-th.rg-col-divider,
+.rg-cell.rg-col-divider,
+.rg-foot.rg-col-divider {
+  border-right: 1px solid var(--line-divider, #c6c6c6) !important;
+}
+.rg-col.num {
+  text-align: center;
+  padding: 6px 5px;
+}
+.rg-center { text-align: center; }
+
+/* ---------- body ---------- */
+.rg-cell {
+  padding: 5px 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+.rg-cell.num {
+  text-align: center;
+  padding: 5px 5px;
+}
+.rg-cell.rg-center { text-align: center; }
+.rg-table tbody tr:nth-child(even) > .rg-cell { background: var(--layer); }
+.rg-table tbody tr.rg-row-sel > .rg-cell {
+  background: #d0e2ff !important;
+  border-top: 1px solid #161616 !important;
+  border-bottom: 2px solid #161616 !important;
+}
+.rg-table tbody tr.rg-row-expanded > .rg-cell {
+  border-bottom: 2px solid var(--blue, #0f62fe);
+}
+
+/* Spreadsheet-style active cell: the row stays highlighted, and the clicked
+   cell is distinguishable from its row at a glance — an inset IBM-blue ring
+   plus a white core. Never removed on row change, so the operator can always
+   see which value they are reading. */
+.rg-table tbody tr.rg-row-sel > .rg-cell.rg-cell-active {
+  position: relative;
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 2px var(--blue, #0f62fe);
+  z-index: 2;
+}
+.rg-table tbody tr.rg-row-sel > .rg-cell.rg-cell-active.rg-freeze {
+  background: #ffffff !important;
+}
+
+/* Live sale ticker: a "+N" that rises off the row and fades. Reads as a market
+   tape rather than decoration — it is the only thing that moves on a sale. */
+.rg-sale-tick {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok-fg, #0e6027);
+  text-shadow: 0 0 7px rgba(36, 161, 72, 0.6);
+  animation: rg-tick-rise 1600ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  z-index: 3;
+}
+@keyframes rg-tick-rise {
+  0% { opacity: 0; transform: translateY(4px) scale(0.85); }
+  18% { opacity: 1; transform: translateY(0) scale(1.06); }
+  45% { opacity: 1; transform: translateY(-9px) scale(1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rg-sale-tick { animation: rg-tick-fade 900ms ease-out forwards; }
+  @keyframes rg-tick-fade {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+}
+
+.rg-table tbody tr.rg-sale-pulse > .rg-cell {
+  animation: rg-sale-flash 2s ease-out;
+}
+@keyframes rg-sale-flash {
+  0% { background-color: #a7f0ba; }
+  100% { background-color: var(--canvas); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rg-table tbody tr.rg-sale-pulse > .rg-cell { animation: none; }
+}
+
+/* ---------- frozen first column ---------- */
+.rg-freeze {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: var(--canvas);
+}
+.rg-th.rg-freeze {
+  z-index: 25;
+  background: var(--layer);
+}
+.rg-freeze-edge {
+  border-right: 1px solid var(--line-divider, #c6c6c6) !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+}
+.rg-cell.rg-freeze { background: var(--canvas); }
+.rg-table tbody tr:nth-child(even) > .rg-cell.rg-freeze { background: var(--layer); }
+.rg-table tbody tr.rg-row-sel > .rg-cell.rg-freeze {
+  background: #c2dbff !important;
+  border-top: 1px solid #161616 !important;
+  border-bottom: 2px solid #161616 !important;
+}
+
+/* ---------- footer: static (never floats or glitches over content) ---------- */
+.rg-foot-row > .rg-foot {
+  position: static;
+  background: var(--layer-2, #e8e8e8) !important;
+  color: var(--ink, #161616);
+  font-weight: 700;
+  padding: 6px 5px;
+  border-top: 2px solid var(--line-divider, #b0b0b0);
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.rg-foot.num { text-align: center; }
+.rg-foot.rg-center { text-align: center; }
+.rg-foot.rg-freeze { background: var(--layer-2, #e8e8e8) !important; }
+
+/* ---------- accordion drawer rows ----------
+   A `<tr>` cannot be height-animated, so the row is always present and the
+   inner wrapper is revealed by max-height. The wrapper therefore sizes itself
+   to its own CONTENT (height:auto by construction) rather than to the grid's
+   available height, and scrolls horizontally when the breakdown is wider than
+   the space under the row. */
+.rg-drawer-row {
+  display: table-row;
+}
+.rg-drawer-cell {
+  padding: 0 !important;
+  background: var(--layer, #f4f4f4);
+  border-bottom: 2px solid var(--line-strong, #161616);
+  border-right: 1px solid var(--line);
+  max-width: 0;
+  min-width: 0;
+}
+.rg-drawer-scroll {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 200ms ease-out;
+  opacity: 0;
+}
+.rg-drawer-row.open .rg-drawer-scroll {
+  max-height: 340px;
+  opacity: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rg-drawer-row.closing .rg-drawer-scroll {
+  max-height: 0;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rg-drawer-scroll { transition: none; }
+}
+.rg-drawer-wrapper {
+  padding: 10px 14px;
+  background: var(--layer-accent, rgba(15, 98, 254, 0.04));
+  border-left: 4px solid var(--blue, #0f62fe);
+  box-sizing: border-box;
+  /* Size to content: never stretch to the grid's width or height. */
+  width: max-content;
+  min-width: min(100%, 420px);
+  max-width: 100%;
+}
+
+.rg-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.rg-drawer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rg-drawer-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: var(--blue, #0f62fe);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+}
+.rg-drawer-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.rg-drawer-note {
+  font-size: 11px;
+  color: var(--muted, #525252);
+  margin-left: 8px;
+}
+.rg-drawer-header-right {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rg-drawer-table-wrap {
+  overflow-x: auto;
+  background: var(--canvas, #fff);
+  border: 1px solid var(--line);
+  box-sizing: border-box;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.rg-subtable {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.rg-subtable th,
+.rg-subtable td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px;
+}
+.rg-subtable th {
+  background: var(--layer);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.32px;
+}
+.rg-subtable td {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.rg-subtable td.num { text-align: center; }
+.rg-subtable .rg-variant-title {
+  font-family: var(--font, sans-serif);
+  font-weight: 600;
+  color: var(--blue, #0f62fe);
+}
+
+/* ---------- helpers ---------- */
+.rg-indent { display: inline-block; padding-left: 18px; }
+.rg-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+/* The label cell is the ticker anchor, so it must establish a positioning
+   context without disturbing the sticky/frozen column behaviour. */
+.rg-table tbody td.rg-cell:first-child { position: relative; }
+
+.rg-brandline {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+.rg-brandinfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rg-brandcode {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.rg-brandsub {
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  margin-top: 1px;
+}
+
+/* Status dot: quick at-a-glance scan of out/low/ok without reading numbers. */
+.rg-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.rg-dot.err { background: var(--err); }
+.rg-dot.warn { background: var(--warn-fg, #b28600); }
+.rg-dot.ok { background: var(--ok); }
+
+/* Expand/collapse control for a multi-item brand row.
+   Deliberately compact: a count badge plus a caret, no "items" word. It sits
+   inside the brand column, so every pixel it saves is a pixel the numbers get.
+   The whole control is one 20x20 hit area (AGENTS.md §27 touchscreen rule). */
+.rg-chip {
+  margin-left: 2px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.rg-chip:hover { background: var(--layer); }
+.rg-chip:focus-visible { outline: 2px solid var(--blue, #0f62fe); outline-offset: 1px; }
+.rg-chip__count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.rg-chip__caret {
+  position: absolute;
+  right: -1px;
+  bottom: -3px;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--subtle, #8c8c8c);
+  pointer-events: none;
+}
+.rg-chip[aria-expanded='true'] {
+  background: var(--blue, #0f62fe);
+  border-color: var(--blue, #0f62fe);
+  color: #fff;
+}
+.rg-chip[aria-expanded='true'] .rg-chip__caret { color: #fff; }
+.rg-chip--variant {
+  border-color: var(--blue, #0f62fe);
+  color: var(--blue, #0f62fe);
+}
+.rg-chip--variant[aria-expanded='true'] {
+  background: var(--blue, #0f62fe);
+  color: #fff;
+}
+@media (pointer: coarse) {
+  .rg-chip { width: 32px; height: 32px; }
+  .rg-chip__count { font-size: 12px; }
+}
+
+/* The "All" sheet flows several registers inside one bordered surface, so the
+   inner grids drop their own border to keep it continuous. */
+.sheet-stream .rg-wrap { border: 0; }

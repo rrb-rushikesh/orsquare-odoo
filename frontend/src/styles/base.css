@@ -1,0 +1,169 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  /* Full-height app frame: the shell owns the viewport and scrolls internally,
+     so installed/standalone windows behave like desktop software. */
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.43;
+  letter-spacing: 0.16px;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* No rubber-band / pull-to-refresh bounce inside the app frame. */
+  overscroll-behavior: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--blue-link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+::selection {
+  background: var(--layer-accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.t-display {
+  font-weight: 300;
+  line-height: 1.17;
+  letter-spacing: -0.4px;
+}
+
+.t-caption {
+  font-size: 12px;
+  line-height: 1.33;
+  letter-spacing: 0.32px;
+  color: var(--subtle);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--layer);
+  min-height: 120px;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: sk 1.3s infinite;
+}
+
+[data-theme='dark'] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+@keyframes sk {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---------- Touchscreen & Tablet POS Ergonomics ---------- */
+
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  textarea,
+  a,
+  .btn,
+  .seg-btn,
+  .pay-seg-btn,
+  .chip,
+  .floor-cell,
+  .seat-row {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn,
+  .seg-btn,
+  .pay-seg-btn {
+    min-height: 44px;
+  }
+
+  /* The closing-count variance field is the one control a cashier uses with one
+     thumb while holding a bottle, so it gets a full touch target and the
+     numeric keypad rather than the desktop control set. */
+  .closing-variance-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+/* ---------- Rendering performance ---------- */
+
+/*
+ * Motion policy: only compositor-friendly properties (background-color, color,
+ * border-color, opacity, transform) are animated. Animating layout properties
+ * (width/height/top/left/margin) forces layout+paint on every frame and is the
+ * usual cause of "sticky" interaction and dropped frames. Keep it on the GPU.
+ * See the transition declarations in components.css / extras.css.
+ */
+
+/* Respect the OS "reduce motion" setting: this is both an accessibility
+   requirement and a robustness win on low-end POS hardware. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
