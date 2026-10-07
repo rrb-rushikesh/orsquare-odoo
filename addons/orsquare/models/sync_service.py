@@ -15,7 +15,8 @@ from datetime import timedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, RedirectWarning, UserError, ValidationError
 
-from .security_utils import require_staff
+from ..api_registry import MUTATION_TABS
+from .security_utils import require_staff, require_tab
 
 _logger = logging.getLogger(__name__)
 
@@ -202,6 +203,8 @@ class OrsquareSyncService(models.AbstractModel):
         # 3. execute in a savepoint: a business error never blocks the rest of the batch
         try:
             with env.cr.savepoint():
+                # the same tab gate as the online API: a revoked tab cannot be used by replaying an old outbox
+                require_tab(env, *MUTATION_TABS[kind])
                 result = getattr(env[model], method)(payload) if kind in ('sale', 'purchase') \
                     else self._call(env, model, method, payload)
                 Log.create({'mutation_id': mid, 'device_id': device, 'device_seq': seq, 'kind': kind,

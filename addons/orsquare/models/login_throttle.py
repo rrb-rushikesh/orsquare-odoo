@@ -11,15 +11,9 @@ MAX_FAILURES = 5
 WINDOW = timedelta(minutes=5)
 
 
-class OrsquareLoginThrottle(models.Model):
-    _name = 'orsquare.login_throttle'
-    _description = "API Login Throttle"
-
-    key = fields.Char(required=True, index=True)
-    failures = fields.Integer(default=0)
-    window_start = fields.Datetime(default=fields.Datetime.now)
-
-    _sql_constraints = [('key_unique', 'unique(key)', "One throttle row per key.")]
+class ThrottleLogic:
+    """The throttle's behaviour, shared by the shop model below and the platform's own copy (the platform database
+    does not have this module installed, but its operators need exactly the same protection)."""
 
     @api.model
     def _key(self, login, ip):
@@ -40,10 +34,10 @@ class OrsquareLoginThrottle(models.Model):
         key = self._key(login, ip)
         with self.pool.cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            row = env['orsquare.login_throttle'].search([('key', '=', key)], limit=1)
+            row = env[self._name].search([('key', '=', key)], limit=1)
             now = fields.Datetime.now()
             if not row:
-                env['orsquare.login_throttle'].create({'key': key, 'failures': 1, 'window_start': now})
+                env[self._name].create({'key': key, 'failures': 1, 'window_start': now})
             elif now - row.window_start > WINDOW:
                 row.write({'failures': 1, 'window_start': now})
             else:
@@ -52,3 +46,14 @@ class OrsquareLoginThrottle(models.Model):
     @api.model
     def clear(self, login, ip):
         self.search([('key', '=', self._key(login, ip))]).unlink()
+
+
+class OrsquareLoginThrottle(ThrottleLogic, models.Model):
+    _name = 'orsquare.login_throttle'
+    _description = "API Login Throttle"
+
+    key = fields.Char(required=True, index=True)
+    failures = fields.Integer(default=0)
+    window_start = fields.Datetime(default=fields.Datetime.now)
+
+    _sql_constraints = [('key_unique', 'unique(key)', "One throttle row per key.")]

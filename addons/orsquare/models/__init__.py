@@ -19,6 +19,7 @@ from . import stock_reports
 from . import accounts_service
 from . import cashflow_service
 from . import reports_service
+from . import governance
 from . import staff_service
 from . import catalog_service
 from . import wipe_service

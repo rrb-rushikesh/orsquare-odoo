@@ -19,3 +19,4 @@ access_console_audit_owner,orsquare.console_audit owner,model_orsquare_console_a
 access_sync_log_owner,orsquare.sync_log owner,model_orsquare_sync_log,group_orsquare_owner,1,0,0,0
 access_promo_cashier,orsquare.promo cashier,model_orsquare_promo,group_orsquare_cashier,1,0,0,0
 access_promo_owner,orsquare.promo owner,model_orsquare_promo,group_orsquare_owner,1,1,1,1
+access_config_audit_owner,orsquare.config_audit owner,model_orsquare_config_audit,group_orsquare_owner,1,0,0,0

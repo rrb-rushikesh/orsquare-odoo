@@ -13,3 +13,4 @@ from . import test_http
 from . import test_bills
 from . import test_security
 from . import test_restaurant_promos
+from . import test_governance

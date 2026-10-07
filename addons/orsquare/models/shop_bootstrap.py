@@ -343,6 +343,9 @@ class OrsquareShopBootstrap(models.AbstractModel):
             admin.sudo().write({'password': secrets.token_urlsafe(32)})
         staff = self.env['orsquare.staff.service'].sudo()      # platform provisioning: privileged by design
         owner_id = staff.create_staff(owner_name, owner_login, owner_password, ['owner'])
+        if phone:
+            # the owner can also sign in with this number
+            self.env['res.users'].browse(owner_id).sudo().partner_id.write({'phone': phone})
         if preset:
             staff.apply_preset(preset)
         return {'company_id': company.id, 'owner_id': owner_id, 'database': self.env.cr.dbname}

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import json
+
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 
@@ -34,6 +36,19 @@ class ResCompany(models.Model):
     orsquare_feature_open_bottle = fields.Boolean(string="Open Bottle (Peg) Mode", default=True)
     orsquare_feature_kitchen = fields.Boolean(string="Kitchen Extension", default=False)
     orsquare_feature_tables = fields.Boolean(string="Restaurant Tables", default=False)
+    # surface variants: the same tab, a different presentation (data is identical, only the view changes)
+    orsquare_stock_variant = fields.Selection(
+        [('standard', 'Standard stock list'), ('wine', 'Brand x size matrix (WineStock)')],
+        string="Stock View", default='standard', required=True)
+    orsquare_accounts_variant = fields.Selection(
+        [('standard', 'Standard accounts'), ('advanced', 'Advanced accounts workspace')],
+        string="Accounts View", default='standard', required=True)
+    # which preset the shop started from, and which version of it (lets the platform spot a stale preset)
+    orsquare_profile = fields.Char(string="Business Preset", copy=False)
+    orsquare_preset_version = fields.Integer(string="Preset Version", copy=False)
+    # optimistic-lock counter: bumped on every real Business Studio change; an editor holding an older
+    # number is told to reload instead of silently overwriting a colleague's change
+    orsquare_settings_version = fields.Integer(string="Settings Version", default=1, copy=False)
 
     # --- Sales Register Controls -----------------------------------------------------------
     orsquare_auto_godown_transfer = fields.Boolean(
@@ -102,3 +117,41 @@ class ResCompany(models.Model):
     def orsquare_tab_list(self):
         self.ensure_one()
         return [t for t in (self.orsquare_enabled_tabs or '').split(',') if t]
+
+    # ------------------------------------------------------------------ plan entitlements
+    def orsquare_entitlements(self):
+        """What the shop's plan allows, as pushed by the platform: {plan, features, tabs, max_staff}.
+
+        A missing key means "no limit". The shop never *deletes* anything because of a plan; what is enabled
+        stays stored and simply is not effective while it is outside the entitlement.
+        """
+        self.ensure_one()
+        raw = self.env['ir.config_parameter'].sudo().get_param('orsquare.entitlements')
+        try:
+            data = json.loads(raw) if raw else {}
+        except ValueError:
+            data = {}
+        return data if isinstance(data, dict) else {}
+
+    def orsquare_entitled_tabs(self):
+        self.ensure_one()
+        allowed = self.orsquare_entitlements().get('tabs')
+        everything = [t for t, _n in ORSQUARE_TABS]
+        return everything if not allowed else [t for t in everything if t in set(allowed)]
+
+    def orsquare_feature_entitled(self, feature):
+        self.ensure_one()
+        allowed = self.orsquare_entitlements().get('features')
+        return True if not allowed else feature in set(allowed)
+
+    def orsquare_feature_on(self, feature):
+        """Switched on by the owner AND allowed by the plan."""
+        self.ensure_one()
+        return bool(self['orsquare_feature_%s' % feature]) and self.orsquare_feature_entitled(feature)
+
+    def orsquare_effective_tab_list(self):
+        """Tabs the shop really has: switched on AND in the plan."""
+        self.ensure_one()
+        entitled = set(self.orsquare_entitled_tabs())
+        return [t for t in self.orsquare_tab_list() if t in entitled]
+

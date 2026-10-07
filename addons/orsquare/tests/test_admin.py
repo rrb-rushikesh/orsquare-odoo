@@ -52,9 +52,9 @@ class TestStaffAccess(AdminCase):
                                                             tabs=['sales', 'stock'])
         user = self.env['res.users'].browse(uid)
         self.assertEqual(user.orsquare_effective_tabs(), ['sales', 'stock'])
-        self.staff.with_user(self.owner).update_settings({'orsquare_enabled_tabs': ['sales', 'daybook']})
+        self.staff.with_user(self.owner).update_settings({'orsquare_enabled_tabs': ['sales', 'daybook', 'settings']})
         self.assertEqual(user.orsquare_effective_tabs(), ['sales'], "owner switched Stock off shop-wide")
-        self.assertEqual(self.owner.orsquare_effective_tabs(), ['sales', 'daybook'])
+        self.assertEqual(self.owner.orsquare_effective_tabs(), ['sales', 'daybook', 'settings'])
 
     def test_05_role_default_tabs(self):
         uid = self.staff.with_user(self.owner).create_staff('Stock', 'stk', 'StkPass12345', ['stockkeeper'])
