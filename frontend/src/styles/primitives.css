@@ -1,0 +1,63 @@
+/*
+ * The few primitives Tailwind utilities cannot express cleanly. Rules here are
+ * limited to: pseudo-element content, data-URI backgrounds and keyframes.
+ * Everything else belongs in a component's utility classes. Every rule below was
+ * transcribed from a measured rule of the original (cited in comments).
+ */
+
+/* Original: extras.css "icon button / tooltip". */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: #161616;
+  color: #ffffff;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 400;
+  letter-spacing: 0.16px;
+  line-height: 1.33;
+  padding: 5px 9px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+  z-index: var(--z-tooltip);
+  border-radius: 0;
+  border: 1px solid #161616;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Original: components.css "form fields" - native select with the chevron
+   drawn as a background image (appearance: none). */
+.lab-select-chevron {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23525252' stroke-width='2.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+@keyframes lab-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes lab-slide-in {
+  from { transform: translateX(24px); opacity: 0.6; }
+}
+
+@keyframes lab-rise-stack {
+  from { transform: translateY(8px); opacity: 0; }
+}

@@ -1,0 +1,136 @@
+/*
+ * Tailwind theme = the measured product scale, nothing else.
+ *
+ * `--*: initial` removes every default Tailwind token (palette, spacing, radii,
+ * shadows, type...). What is left are:
+ *   - colours that point at the original's CSS variables (so light/dark theme
+ *     switching keeps working through `[data-theme]`),
+ *   - a 1px spacing unit so `p-14` means exactly 14px (every number in the
+ *     component sources is therefore a measured pixel value),
+ *   - the type sizes / line-heights / trackings / weights measured in the
+ *     original app (see docs/DESIGN_INVENTORY.md §3.3).
+ */
+@theme inline {
+  --*: initial;
+
+  /* ---- spacing: 1 unit = 1px ------------------------------------------- */
+  --spacing: 1px;
+
+  /* ---- colours (all resolve to the original's tokens at runtime) -------- */
+  --color-blue: var(--blue);
+  --color-blue-hover: var(--blue-hover);
+  --color-blue-active: var(--blue-active);
+  --color-blue-link: var(--blue-link);
+  --color-focus: var(--focus);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-disabled: var(--disabled);
+  --color-canvas: var(--canvas);
+  --color-layer: var(--layer);
+  --color-layer-2: var(--layer-2);
+  --color-layer-hover: var(--layer-hover);
+  --color-layer-accent: var(--layer-accent);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-fg: var(--ok-fg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-fg: var(--warn-fg);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-err-fg: var(--err-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-gray-bg: var(--gray-bg);
+  --color-gray-fg: var(--gray-fg);
+  --color-purple-bg: var(--purple-bg);
+  --color-purple-fg: var(--purple-fg);
+  --color-track: var(--track);
+  /* Money semantics (tokens.css "Financial semantic" group): receivable = green, payable = red. */
+  --color-fin-rec: var(--fin-rec);
+  --color-fin-rec-bg: var(--fin-rec-bg);
+  --color-fin-rec-fg: var(--fin-rec-fg);
+  --color-fin-pay: var(--fin-pay);
+  --color-fin-pay-bg: var(--fin-pay-bg);
+  --color-fin-pay-fg: var(--fin-pay-fg);
+  --color-fin-neutral: var(--fin-neutral);
+  --color-fin-zero: var(--fin-zero);
+  --color-btn-secondary: var(--btn-secondary-bg);
+  --color-btn-secondary-fg: var(--btn-secondary-fg);
+  --color-btn-secondary-hover: var(--btn-secondary-hover);
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* ---- font ------------------------------------------------------------- */
+  --font-sans: var(--font);
+  --font-mono: var(--font-mono);
+  --font-mono-ui: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Measured font sizes. Name = size in px with "h" meaning ".5" (s13h = 13.5px). */
+  --text-s9h: 9.5px;
+  --text-s10: 10px;
+  --text-s10h: 10.5px;
+  --text-s11: 11px;
+  --text-s11h: 11.5px;
+  --text-s12: 12px;
+  --text-s12h: 12.5px;
+  --text-s13: 13px;
+  --text-s13h: 13.5px;
+  --text-s14: 14px;
+  --text-s15: 15px;
+  --text-s16: 16px;
+  --text-s17: 17px;
+  --text-s18: 18px;
+  --text-s20: 20px;
+  --text-s22: 22px;
+
+  /* Measured line heights (unitless, as in the original). */
+  --leading-l115: 1.15;
+  --leading-l12: 1.2;
+  --leading-l125: 1.25;
+  --leading-l13: 1.3;
+  --leading-l133: 1.33;
+  --leading-l135: 1.35;
+  --leading-l14: 1.4;
+  --leading-l143: 1.43;
+  --leading-l145: 1.45;
+  --leading-l15: 1.5;
+  --leading-l155: 1.55;
+  --leading-normal: normal;
+
+  /* Measured letter spacings. */
+  --tracking-none: 0;
+  --tracking-body: 0.16px;
+  --tracking-tile: 0.24px;
+  --tracking-caption: 0.32px;
+  --tracking-fine: 0.4px;
+  --tracking-th: 0.6px;
+  --tracking-micro: 0.7px;
+  --tracking-chip: 0.8px;
+
+  /* ---- breakpoints actually used by the original (max-width queries) ---- */
+  --breakpoint-narrow: 672px;
+}
+
+/* The original only ever uses max-width media queries at these widths. */
+@custom-variant narrow (@media (max-width: 672px));
+@custom-variant tablet (@media (max-width: 1056px));
+@custom-variant w1024 (@media (max-width: 1024px));
+@custom-variant w768 (@media (max-width: 768px));
+@custom-variant w480 (@media (max-width: 480px));
+@custom-variant w320 (@media (max-width: 320px));
+
+/* Density + theme switches live on <html data-density / data-theme>. */
+@custom-variant compact (&:where([data-density='compact'], [data-density='compact'] *));
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant coarse (@media (pointer: coarse));

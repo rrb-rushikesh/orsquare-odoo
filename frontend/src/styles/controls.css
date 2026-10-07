@@ -1,0 +1,88 @@
+/*
+ * CONTROL SIZING STANDARD - the single place where interactive-control geometry
+ * is defined. Components consume these through the `h-ctl` / `size-ctl`
+ * utilities below; nothing else should hardcode a control height.
+ * Rationale and rules: docs/UI_STANDARDS.md.
+ *
+ *   --ctl-h      height of every full-size control: text input, select, search,
+ *                md button, icon-only button (which is a ctl-h SQUARE).
+ *                44px comfortable (the product default) / 34px compact density.
+ *   --ctl-h-sm   inline / dense control (sm button, rename input): 32px, both densities.
+ *
+ * Values are the ones the original already used for its form controls, md
+ * buttons and the toolbar search / primary button (the toolbar's 38px selects
+ * and 40px icon buttons were the outliers the standard removes).
+ */
+:root {
+  --ctl-h: 44px;
+  --ctl-h-sm: 32px;
+}
+
+[data-density='compact'] {
+  --ctl-h: 34px;
+}
+
+@utility h-ctl {
+  height: var(--ctl-h);
+}
+
+@utility size-ctl {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+}
+
+@utility h-ctl-sm {
+  height: var(--ctl-h-sm);
+}
+
+/* Busy indicator for `loading` buttons: a 14px ring in the button's own colour. */
+@keyframes lab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lab-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: lab-spin 0.8s linear infinite;
+}
+
+/*
+ * TOUCH TARGETS. On a touch screen every tappable control answers a finger-sized area (44px) without moving anything: the dense controls of
+ * the desktop screens (icon buttons, quick chips, sort headers, pins, small switches) get an invisible hit area from a pseudo-element, so
+ * the layout stays as designed and no screen needs a phone-only copy. New dense controls: add their class here, not a media query in a feature.
+ */
+@media (pointer: coarse) {
+  .btn-icon,
+  .quick-chip,
+  .rg-sort-btn,
+  .rg-pin-mgr-btn,
+  .rg-row-pin-btn,
+  .sx .switch,
+  [aria-label^='Sort by '] {
+    position: relative;
+  }
+  .btn-icon::after,
+  .quick-chip::after,
+  .rg-sort-btn::after,
+  .rg-pin-mgr-btn::after,
+  .rg-row-pin-btn::after,
+  .sx .switch::after,
+  [aria-label^='Sort by ']::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .quick-discount-input {
+    min-height: 40px;
+  }
+}

@@ -13,6 +13,7 @@ import './styles/tokens.css'
 import './styles/base.css'
 import './styles/components.css'
 import './styles/extras.css'
+import './styles/dev-theme.css'
 import { applyPrefs, loadPrefs } from './lib/prefs'
 
 // Apply theme, density, and font tokens immediately on boot
