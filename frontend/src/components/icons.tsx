@@ -465,3 +465,47 @@ export const IconGripVertical = (p: P) => (
   </S>
 )
 
+export const IconEye = (p: P) => (
+  <S {...p}><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></S>
+)
+
+export const IconEyeOff = (p: P) => (
+  <S {...p}><path d="M3 3l18 18" /><path d="M10.6 6.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9" /><path d="M6.4 6.4C3.7 8.2 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 4.2-1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></S>
+)
+
+export const IconDice = (p: P) => (
+  <S {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" />
+    <circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="8.5" cy="15.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none" />
+  </S>
+)
+
+export const IconKey = (p: P) => (
+  <S {...p}><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9" /><path d="M16 7l3 3" /><path d="M14 9l2 2" /></S>
+)
+
+export const IconPause = (p: P) => (
+  <S {...p}><rect x="6" y="5" width="4" height="14" /><rect x="14" y="5" width="4" height="14" /></S>
+)
+
+export const IconPlay = (p: P) => (
+  <S {...p}><path d="M7 4.5v15L19 12 7 4.5Z" /></S>
+)
+
+export const IconMinus = (p: P) => (
+  <S {...p}><path d="M5 12h14" /></S>
+)
+
+export const IconSliders = (p: P) => (
+  <S {...p}><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h2" /><path d="M10 17h10" /><circle cx="8" cy="17" r="2" /></S>
+)
+
+export const IconStore = (p: P) => (
+  <S {...p}><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9v11h16V9" /><path d="M4 9a3 3 0 0 0 5.3 1.9A3 3 0 0 0 14.7 10.9 3 3 0 0 0 20 9" /><path d="M10 20v-5h4v5" /></S>
+)
+
+
