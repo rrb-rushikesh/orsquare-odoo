@@ -8,6 +8,8 @@ const LoginPage = lazy(() => import('@/pages/LoginPage'));
 const AppShell = lazy(() => import('@/components/AppShell'));
 const SalesPage = lazy(() => import('@/pages/SalesPage'));
 const StockPage = lazy(() => import('@/pages/StockPage'));
+const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
+const PurchasesPage = lazy(() => import('@/pages/PurchasesPage'));
 const ComingSoon = lazy(() => import('@/pages/ComingSoon'));
 
 /** Shown while the session is being restored. Never redirects: a refresh on /sales must stay on /sales. */
@@ -58,9 +60,9 @@ export default function App() {
             <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
               <Route index element={<Home />} />
               <Route path="sales" element={<Guard perm="sales" what="Sales"><SalesPage /></Guard>} />
-              <Route path="purchases" element={soon('Purchases', 'purchases')} />
+              <Route path="purchases" element={<Guard perm="purchases" what="Purchases"><PurchasesPage /></Guard>} />
               <Route path="stock" element={<Guard perm="stock" what="Stock"><StockPage /></Guard>} />
-              <Route path="products" element={soon('Products', 'products')} />
+              <Route path="products" element={<Guard perm="products" what="Products"><ProductsPage /></Guard>} />
               <Route path="accounts" element={soon('Accounts', 'accounts')} />
               <Route path="cashflow" element={soon('Cash Flow', 'cashflow')} />
               <Route path="daybook" element={soon('Day book', 'daybook')} />

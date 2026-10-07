@@ -22,6 +22,7 @@ export interface Snapshot {
   products: WireProduct[];
   stock: WireStock[];
   customers: WireCustomer[];
+  suppliers: WireCustomer[];
   categories: Bootstrap['categories'];
   units: Bootstrap['units'] | null;
   brands: Bootstrap['brands'];
@@ -39,7 +40,7 @@ export interface Snapshot {
 
 const EMPTY: Snapshot = {
   status: 'loading', error: null, online: true, syncing: false, lastSyncedAt: null, seq: 0, me: null,
-  products: [], stock: [], customers: [], categories: [], units: null, brands: [], regimes: [], openBottles: [],
+  products: [], stock: [], customers: [], suppliers: [], categories: [], units: null, brands: [], regimes: [], openBottles: [],
   day: null, floors: [], tables: [], promos: [], discrepanciesOpen: 0, pending: 0, rejected: [],
 };
 
@@ -65,12 +66,15 @@ export function subscribe(l: () => void) {
 
 // ------------------------------------------------------------------------------------------------ persistence
 
-const SECTIONS = ['me', 'products', 'stock', 'customers', 'categories', 'units', 'brands', 'regimes', 'openBottles',
+/** Bump when the snapshot gains or changes a section: devices holding an older copy re-download instead of showing gaps. */
+const SNAPSHOT_VERSION = 2;
+
+const SECTIONS = ['me', 'products', 'stock', 'customers', 'suppliers', 'categories', 'units', 'brands', 'regimes', 'openBottles',
   'day', 'floors', 'tables', 'promos', 'discrepanciesOpen', 'seq', 'serverTs'] as const;
 
 async function persist() {
   if (!db) return;
-  const rows = SECTIONS.map((key) => ({ key, value: key === 'serverTs' ? serverTs : (snap as any)[key] }));
+  const rows = [...SECTIONS.map((key) => ({ key: key as string, value: key === 'serverTs' ? serverTs : (snap as any)[key] })), { key: 'snapshotVersion', value: SNAPSHOT_VERSION }];
   try { await db.kv.bulkPut(rows); } catch { /* storage full or blocked: the app still works online */ }
 }
 
@@ -80,7 +84,7 @@ async function loadLocal(): Promise<boolean> {
     const rows = await db.kv.toArray();
     if (!rows.length) return false;
     const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    if (!m.me) return false;
+    if (!m.me || m.snapshotVersion !== SNAPSHOT_VERSION) return false;   // older copy: bootstrap again
     serverTs = m.serverTs as string | undefined;
     const patch: any = {};
     for (const k of SECTIONS) if (k !== 'serverTs' && m[k] !== undefined) patch[k] = m[k];
@@ -103,7 +107,7 @@ function applyBootstrap(b: Bootstrap) {
   serverTs = b.server_ts;
   set({
     status: 'ready', error: null, online: true, seq: b.seq, me: b.me, products: b.products, stock: b.stock,
-    customers: b.customers, categories: b.categories, units: b.units, brands: b.brands, regimes: b.regimes,
+    customers: b.customers, suppliers: b.suppliers ?? [], categories: b.categories, units: b.units, brands: b.brands, regimes: b.regimes,
     openBottles: b.open_bottles, day: b.day, floors: b.floors, tables: b.tables, promos: b.promos,
     discrepanciesOpen: b.discrepancies_open, lastSyncedAt: new Date().toISOString(),
   });
@@ -127,6 +131,7 @@ async function pullDelta() {
   if (p.day) patch.day = p.day;
   if (p.tables) patch.tables = p.tables;
   if (p.customers) patch.customers = p.customers;
+  if (p.suppliers) patch.suppliers = p.suppliers;
   if (p.me) patch.me = p.me;
   serverTs = d.server_ts || serverTs;
   set(patch);
@@ -205,16 +210,23 @@ export interface SettleResult {
   result?: any;
 }
 
-/** Bill a sale: straight to Odoo when online, otherwise into the durable outbox. */
-export async function submitSale(payload: Record<string, unknown> & { client_ref: string }): Promise<SettleResult> {
+const SERVICE_OF: Record<'sale' | 'purchase', [string, string]> = { sale: ['sales', 'settle'], purchase: ['purchases', 'record_bill'] };
+
+/**
+ * Send a mutation that the offline spec allows to be queued (a sale or a purchase bill).
+ * Online: straight to Odoo.  Only a NETWORK failure queues it (a business refusal such as "not enough stock" is
+ * shown to the user, never silently queued).  The `client_ref` is the idempotency key either way.
+ */
+export async function submitMutation(kind: 'sale' | 'purchase', payload: Record<string, unknown> & { client_ref: string }): Promise<SettleResult> {
+  const [service, method] = SERVICE_OF[kind];
   try {
-    const result = await call('sales', 'settle', { payload });
+    const result = await call(service, method, { payload });
     void refreshNow();
     return { queued: false, result };
   } catch (e) {
     if (!(e instanceof ApiError) || !e.network || !db) throw e;
     const row: OutboxRow = {
-      id: payload.client_ref, device_seq: await nextDeviceSeq(), kind: 'sale',
+      id: payload.client_ref, device_seq: await nextDeviceSeq(), kind,
       payload: { ...payload, offline: true }, created_at: new Date().toISOString(), status: 'queued',
     };
     await db.outbox.put(row);
@@ -223,6 +235,9 @@ export async function submitSale(payload: Record<string, unknown> & { client_ref
     return { queued: true };
   }
 }
+
+/** Bill a sale: straight to Odoo when online, otherwise into the durable outbox. */
+export const submitSale = (payload: Record<string, unknown> & { client_ref: string }) => submitMutation('sale', payload);
 
 export async function discardRejected(id: string) {
   await db?.outbox.delete(id);

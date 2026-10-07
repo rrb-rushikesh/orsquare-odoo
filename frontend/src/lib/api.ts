@@ -103,7 +103,7 @@ export interface Me {
 }
 
 export interface WireProduct {
-  id: number; product_id: number; category: string; category_id: number; low_stock_qty: number;
+  id: number; product_id: number; uom_id: number; po_uom_id: number; uoms: { id: number; name: string }[]; brand_id: number; regime_id: number; category: string; category_id: number; low_stock_qty: number;
   name: string; barcode: string; short_code: string; price: number; mrp: number | null; uom: string;
   capacity_ml: number; kind: 'retail' | 'kitchen' | 'consumable'; brand: string; regime: string; can_open: boolean;
   active: boolean; taxes: { name: string; amount: number; amount_type: string; price_include: boolean }[];
@@ -124,13 +124,14 @@ export interface Bootstrap {
   schema: number; seq: number; server_ts: string; me: Me;
   products: WireProduct[]; units: any; brands: any[]; categories: { id: number; name: string; regime: string }[];
   regimes: any[]; stock: WireStock[]; open_bottles: any[]; day: any | null; customers: WireCustomer[];
+  suppliers: WireCustomer[];
   payment_modes: string[]; floors: any[]; tables: any[]; promos: any[]; discrepancies_open: number;
 }
 
 export interface Delta {
   reset?: boolean; seq: number; reason?: string; events?: { seq: number; type: string; [k: string]: any }[];
   patches?: { products?: WireProduct[]; stock?: WireStock[]; open_bottles?: any[]; day?: any; tables?: any[];
-    me?: Me; customers?: WireCustomer[] };
+    me?: Me; customers?: WireCustomer[]; suppliers?: WireCustomer[] };
   has_more?: boolean; server_ts?: string;
 }
 
