@@ -255,3 +255,17 @@ class TestQuote(OrsquareCase):
                                   self.env.ref('base.group_user').id])]})
         with self.assertRaises(AccessError):
             self.sales.with_user(keeper).quote({'lines': [{'product_id': self.whisky.id, 'qty': 1}]})
+
+    def test_tax_inclusive_quote_cards_reconcile_with_payable(self):
+        tax = self.env['account.tax'].create({'name': 'Quote inclusive tax', 'amount': 5,
+            'amount_type': 'percent', 'type_tax_use': 'sale', 'price_include_override': 'tax_included',
+            'company_id': self.company.id})
+        product = self.make_product('Inclusive Quote Item', cost=10, price=105, taxes_id=[(6, 0, tax.ids)])
+        self.stock_in(product, 4, self.counter)
+        payload = {'lines': [{'product_id': product.id, 'qty': 2}],
+                   'bill_discount': {'kind': 'amount', 'value': 21}}
+        quoted = self.sales.quote(payload)
+        self.assertAlmostEqual(quoted['subtotal'] - quoted['discount'] + quoted['tax'], quoted['payable'], places=2)
+        settled = self.sales.settle(dict(payload, client_ref=self.ref(),
+            payments=[{'method': 'cash', 'amount': quoted['payable']}]))
+        self.assertEqual(settled['total'], quoted['payable'])

@@ -197,7 +197,7 @@ class OrsquareSaleService(models.AbstractModel):
             promo = env['orsquare.promo'].lookup(payload['promo_code'])
             bill_discount = {'kind': 'amount',
                              'value': promo._evaluate(gross_base, fields.Date.context_today(self))}
-        gross_before = sum(l['qty'] * l['price_unit'] * (1 - l['discount'] / 100.0) for l in line_vals)
+        untaxed_before = sum(l['price_subtotal'] for l in line_vals)
         self._apply_bill_discount(line_vals, bill_discount, currency, env, partner, fpos)
         total = float_round(sum(l['price_subtotal_incl'] for l in line_vals), precision_rounding=currency.rounding)
         untaxed = sum(l['price_subtotal'] for l in line_vals)
@@ -206,8 +206,8 @@ class OrsquareSaleService(models.AbstractModel):
         return {
             'lines': [{'product_id': l['product_id'], 'qty': l['qty'], 'untaxed': l['price_subtotal'],
                        'total': l['price_subtotal_incl'], 'name': l['full_product_name']} for l in line_vals],
-            'subtotal': float_round(gross_before, precision_rounding=currency.rounding),
-            'discount': float_round(gross_before - untaxed, precision_rounding=currency.rounding)
+            'subtotal': float_round(untaxed_before, precision_rounding=currency.rounding),
+            'discount': float_round(untaxed_before - untaxed, precision_rounding=currency.rounding)
             if bill_discount else 0.0,
             'tax': tax, 'total': total, 'concession': concession, 'payable': total - concession,
         }

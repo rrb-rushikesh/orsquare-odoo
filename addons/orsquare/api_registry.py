@@ -4,7 +4,7 @@ dispatcher refuses unknown services/methods, so adding a model method never sile
 
 API_REGISTRY = {
     'sales': ('orsquare.sale.service', {'settle', 'quote'}),
-    'purchases': ('orsquare.purchase.service', {'record_bill', 'preview_bill', 'return_to_supplier', 'list_bills', 'bill_detail'}),
+    'purchases': ('orsquare.purchase.service', {'record_bill', 'preview_bill', 'return_to_supplier', 'list_bills', 'bill_detail', 'summary'}),
     'stock': ('orsquare.stock.reports', {
         'set_opening_stock', 'adjust_stock', 'resolve_discrepancy', 'stock_position', 'stock_value_by_location',
         'movement_history', 'opened_shelf', 'needs_attention_stock'}),

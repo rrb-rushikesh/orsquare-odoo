@@ -105,6 +105,8 @@ class TestAccounts(BackOfficeCase):
         by_id = {r['id']: r for r in d['rows']}
         self.assertEqual(by_id[cust]['receivable'], 1500.0)
         self.assertEqual(by_id[sup]['payable'], 4000.0)
+        self.assertEqual((by_id[cust]['balance'], by_id[cust]['side']), (1500.0, 'Dr'))
+        self.assertEqual((by_id[sup]['balance'], by_id[sup]['side']), (4000.0, 'Cr'))
         self.assertEqual(by_id[cust]['kind'], 'customer')
         self.assertEqual(self.accounts.directory('suppliers')['rows'][0]['kind'], 'supplier')
 
@@ -119,7 +121,10 @@ class TestAccounts(BackOfficeCase):
         row = self.accounts.directory('customers', search='Khata Payer')['rows'][0]
         self.assertEqual(row['receivable'], 350.0)
         st = self.accounts.statement(cust.id)
+        self.assertTrue(all(r['side'] == ('Dr' if r['balance'] > 0 else 'Cr' if r['balance'] < 0 else 'Flat') for r in st['rows']))
         self.assertEqual(st['closing'], 350.0)
+        self.assertEqual(st['side'], 'Dr')
+        self.assertEqual(st['total_debit'] - st['total_credit'], st['closing'])
         self.assertEqual([r['balance'] for r in st['rows']][-1], 350.0)
 
     def test_03_cash_receipt_feeds_the_daybook_drawer(self):
@@ -154,6 +159,8 @@ class TestAccounts(BackOfficeCase):
         cashier = self.make_user('nomoney', ['orsquare.group_orsquare_cashier'])
         d = self.accounts.with_user(cashier).directory('all', search='Masked Cust')
         self.assertIsNone(d['rows'][0]['receivable'])
+        self.assertIsNone(d['rows'][0]['balance'])
+        self.assertIsNone(d['rows'][0]['side'])
         with self.assertRaises(AccessError):
             self.accounts.with_user(cashier).statement(cust)
 
@@ -192,6 +199,7 @@ class TestCashflow(BackOfficeCase):
         self.assertIn('pos_sale', types, "cash sale appears immediately (live), before the day is sealed")
         self.assertEqual(reg['cash_in'] - reg['cash_out'], 400.0 - 100.0)
         self.assertEqual(reg['closing'], reg['rows'][-1]['balance'])
+        self.assertEqual(reg['expenses_out'], 100.0)
 
     def test_04_khata_sale_is_not_cash_in(self):
         cust = self.env['res.partner'].create({'name': 'Credit Cust'})
@@ -225,6 +233,10 @@ class TestReports(BackOfficeCase):
         self.assertEqual(d['today']['drawer_cash'], 1600.0)
         self.assertEqual(d['stock_value']['counter'], 4600.0)
         self.assertEqual(len(d['trend']), 7)
+        self.assertEqual(d['retailer_summary']['todayTotal'], 800.0)
+        self.assertEqual(d['retailer_summary']['monthTotal'], 800.0)
+        self.assertEqual(d['retailer_summary']['cashInToday'], 800.0)
+        self.assertEqual(d['retailer_summary']['todayNetProfit'], 400.0)
 
     def test_02_dashboard_masks_for_cashier_with_dash_not_zero(self):
         cashier = self.make_user('dash_cashier', ['orsquare.group_orsquare_cashier'])
@@ -233,6 +245,7 @@ class TestReports(BackOfficeCase):
         self.assertIsNone(d['today']['gross_profit'])
         self.assertIsNone(d['today']['drawer_cash'])
         self.assertIsNone(d['stock_value'])
+        self.assertNotIn('todayTotal', d['retailer_summary'])
 
     def test_03_trend_uses_frozen_snapshots_for_sealed_days(self):
         self.sell([{'product_id': self.item.id, 'qty': 2}])

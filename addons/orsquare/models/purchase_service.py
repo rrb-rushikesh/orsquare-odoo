@@ -363,7 +363,29 @@ class OrsquarePurchaseService(models.AbstractModel):
             'supplier_invoice_no': m.ref or '', 'date': str(m.orsquare_business_date), 'type': m.move_type,
             'untaxed': m.amount_untaxed, 'tax': m.amount_tax, 'total': m.amount_total,
             'payment_state': m.payment_state, 'amount_due': m.amount_residual,
+            'amount_paid': m.amount_total - m.amount_residual,
+            'qty': sum(m.invoice_line_ids.filtered(lambda l: l.product_id).mapped('quantity')),
+            'line_count': len(m.invoice_line_ids.filtered(lambda l: l.product_id)),
         } for m in moves]
+
+    @api.model
+    def summary(self, date_from=None, date_to=None):
+        """Uncapped purchase cards from posted vendor documents."""
+        self._check_access()
+        domain = [('company_id', '=', self.env.company.id), ('state', '=', 'posted'),
+                  ('move_type', 'in', ('in_invoice', 'in_refund'))]
+        if date_from:
+            domain.append(('orsquare_business_date', '>=', date_from))
+        if date_to:
+            domain.append(('orsquare_business_date', '<=', date_to))
+        docs = self.sudo().env['account.move'].search(domain)
+        bills = docs.filtered(lambda m: m.move_type == 'in_invoice')
+        total = sum(bills.mapped('amount_total'))
+        outstanding = sum(bills.mapped('amount_residual'))
+        returned = sum(docs.filtered(lambda m: m.move_type == 'in_refund').mapped('amount_total'))
+        return {'total': total, 'paid': total - outstanding, 'outstanding': outstanding,
+                'bills': len(bills), 'qty': sum(bills.invoice_line_ids.filtered(lambda l: l.product_id).mapped('quantity')),
+                'returnsTotal': returned, 'netIntake': total - returned}
 
     @api.model
     def bill_detail(self, bill_id):
@@ -375,12 +397,13 @@ class OrsquarePurchaseService(models.AbstractModel):
             raise UserError(_("Bill not found."))
         lines = []
         for l in bill.invoice_line_ids.filtered(lambda x: x.product_id):
-            lines.append({'product_id': l.product_id.id, 'name': l.product_id.display_name, 'qty': l.quantity,
+            lines.append({'id': l.id, 'product_id': l.product_id.id, 'name': l.product_id.display_name, 'qty': l.quantity,
                           'uom': l.product_uom_id.name, 'rate': l.price_unit, 'discount': l.discount,
                           'total': l.price_total})
-        return {'id': bill.id, 'number': bill.name, 'supplier': bill.partner_id.name, 'type': bill.move_type,
+        return {'id': bill.id, 'number': bill.name, 'supplier': bill.partner_id.name, 'supplier_id': bill.partner_id.id, 'type': bill.move_type,
                 'date': str(bill.orsquare_business_date), 'supplier_invoice_no': bill.ref or '',
-                'total': bill.amount_total, 'amount_due': bill.amount_residual, 'payment_state': bill.payment_state,
+                'total': bill.amount_total, 'amount_due': bill.amount_residual, 'amount_paid': bill.amount_total - bill.amount_residual,
+                'qty': sum(l['qty'] for l in lines), 'payment_state': bill.payment_state,
                 'tp_no': getattr(bill, 'orsquare_tp_no', '') or '', 'lines': lines}
 
     # ------------------------------------------------------------------ returns & exchanges

@@ -82,10 +82,14 @@ class OrsquareCashflowService(models.AbstractModel):
             domain.append(('move_id.orsquare_business_date', '<=', date_to))
         lines = env['account.move.line'].search(domain, order='date, id')
         rows = [{
-            'at': l.create_date.isoformat(), 'date': str(l.move_id.orsquare_business_date or l.date),
+            'id': l.id, 'at': l.create_date.isoformat(), 'date': str(l.move_id.orsquare_business_date or l.date),
             'description': l.name or l.move_id.ref or l.move_id.name, 'voucher': l.move_id.name,
             'type': l.move_id.move_type if l.move_id.move_type != 'entry' else (l.payment_id and 'payment' or 'entry'),
             'mode': acc_mode[l.account_id.id], 'in': l.debit, 'out': l.credit, 'source': 'ledger',
+            'partner': l.partner_id.name or '', 'payment_id': l.payment_id.id or False,
+            'entry_kind': 'expense' if l.payment_id.destination_account_id.account_type in ('expense', 'expense_direct_cost', 'expense_depreciation') else
+                'income' if l.payment_id.destination_account_id.account_type in ('income', 'income_other') else
+                'payment' if l.payment_id.destination_account_id.account_type in ('asset_receivable', 'liability_payable') else 'entry',
         } for l in lines]
         # Live rows: POS payments of the still-open session are not in the ledger until the day is sealed.
         day = env['orsquare.business_day'].get_open_day(company)
@@ -106,4 +110,9 @@ class OrsquareCashflowService(models.AbstractModel):
             r['balance'] = float_round(running, precision_rounding=company.currency_id.rounding)
         cash_in, cash_out = sum(r['in'] for r in rows), sum(r['out'] for r in rows)
         return {'opening': opening, 'rows': rows, 'cash_in': cash_in, 'cash_out': cash_out,
-                'net': cash_in - cash_out, 'closing': running}
+                'net': cash_in - cash_out, 'closing': running,
+                'sales_in': sum(r['in'] for r in rows if r['source'] == 'pos_live' or r['type'] == 'out_invoice'),
+                'receipts_in': sum(r['in'] for r in rows if r.get('entry_kind') == 'payment'),
+                'payments_out': sum(r['out'] for r in rows if r.get('entry_kind') == 'payment'),
+                'income_in': sum(r['in'] for r in rows if r.get('entry_kind') == 'income'),
+                'expenses_out': sum(r['out'] for r in rows if r.get('entry_kind') == 'expense')}

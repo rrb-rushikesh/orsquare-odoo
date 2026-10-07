@@ -128,9 +128,15 @@ class OrsquareAccountsService(models.AbstractModel):
                 tot_pay += bal['payable']
             if kind != 'all' and k != kind.rstrip('s'):
                 continue
+            signed = bal['receivable'] - bal['payable']
+            side = 'Dr' if signed > 0 else 'Cr' if signed < 0 else 'Flat'
             rows.append({
                 'id': p.id, 'name': p.name, 'mobile': p.mobile or p.phone or '', 'kind': k,
                 'receivable': bal['receivable'] if see else None, 'payable': bal['payable'] if see else None,
+                'balance': abs(signed) if see else None, 'side': side if see else None,
+                'is_receivable': signed > 0 if see else False, 'is_payable': signed < 0 if see else False,
+                'is_advance': (signed < 0 if k == 'customer' else signed > 0 if k == 'supplier' else False) if see else False,
+                'is_settled': signed == 0 if see else False,
             })
         return {
             'rows': rows[offset:offset + limit], 'count': len(rows),
@@ -201,10 +207,13 @@ class OrsquareAccountsService(models.AbstractModel):
         running, rows = before, []
         for l in lines:
             running += l.balance
-            rows.append({'date': str(l.date), 'voucher': l.move_id.name, 'ref': l.move_id.ref or '',
+            rows.append({'id': l.id, 'date': str(l.date), 'voucher': l.move_id.name, 'ref': l.move_id.ref or '',
                          'description': l.name or '', 'debit': l.debit, 'credit': l.credit,
-                         'balance': float_round(running, precision_rounding=self.env.company.currency_id.rounding)})
-        return {'opening': before, 'rows': rows, 'closing': running}
+                         'balance': float_round(running, precision_rounding=self.env.company.currency_id.rounding),
+                         'side': 'Dr' if running > 0 else 'Cr' if running < 0 else 'Flat'})
+        return {'opening': before, 'opening_side': 'Dr' if before > 0 else 'Cr' if before < 0 else 'Flat', 'rows': rows, 'closing': running,
+                'total_debit': sum(lines.mapped('debit')), 'total_credit': sum(lines.mapped('credit')),
+                'side': 'Dr' if running > 0 else 'Cr' if running < 0 else 'Flat'}
 
     # ------------------------------------------------------------------ settlements
     @api.model

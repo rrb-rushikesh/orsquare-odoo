@@ -89,11 +89,15 @@ class OrsquareApiFacade(models.AbstractModel):
 
     # ------------------------------------------------------------------ bill finder (tier-2 server archive)
     @api.model
-    def bill_lookup(self, search=None, limit=30):
+    def bill_lookup(self, search=None, limit=30, date_from=None, date_to=None):
         """Search counter bills, invoices and returns by number, customer or amount."""
         self._need('orsquare.group_orsquare_cashier')
         env = self.env['pos.order'].sudo()
         domain = [('company_id', '=', self.env.company.id), ('state', 'in', ('paid', 'done', 'invoiced'))]
+        if date_from:
+            domain.append(('orsquare_business_date', '>=', date_from))
+        if date_to:
+            domain.append(('orsquare_business_date', '<=', date_to))
         if search:
             term = search.strip()
             clause = ['|', '|', '|', ('name', 'ilike', term), ('pos_reference', 'ilike', term),
@@ -108,6 +112,10 @@ class OrsquareApiFacade(models.AbstractModel):
             'order_id': o.id, 'name': o.name, 'date': o.date_order.isoformat(), 'business_date': str(o.orsquare_business_date),
             'customer': o.partner_id.name or '', 'total': o.amount_total,
             'invoice': o.account_move.name or '', 'is_refund': o.amount_total < 0,
+            'tax': o.amount_tax, 'partner_id': o.partner_id.id or False,
+            'method': 'Split' if len(o.payment_ids.payment_method_id) > 1 else
+                ('UPI' if o.payment_ids[:1].payment_method_id.orsquare_key == 'upi' else
+                 'Khata' if o.payment_ids[:1].payment_method_id.orsquare_key == 'khata' else 'Cash'),
         } for o in env.search(domain, order='date_order desc, id desc', limit=int(limit))]
 
     @api.model
@@ -119,6 +127,7 @@ class OrsquareApiFacade(models.AbstractModel):
             raise UserError(_("Unknown bill."))
         return {
             'order_id': order.id, 'name': order.name, 'date': order.date_order.isoformat(),
+            'business_date': str(order.orsquare_business_date),
             'customer': order.partner_id.name or '', 'partner_id': order.partner_id.id or False,
             'total': order.amount_total, 'tax': order.amount_tax,
             'invoice_id': order.account_move.id or False, 'invoice': order.account_move.name or '',

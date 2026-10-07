@@ -50,6 +50,7 @@ class OrsquareReportsService(models.AbstractModel):
             'business_date': str(today), 'day_state': day.state if day else 'not_opened',
             'bill_count': figures.get('bill_count', 0),
             'total_sales': figures.get('net_sales', 0.0) if money else None,
+            'gross_sales': figures.get('gross_sales', 0.0) if money else None,
             'payments': {
                 'cash': figures.get('cash_sales', 0.0), 'upi': figures.get('upi_sales', 0.0),
                 'khata': figures.get('khata_sales', 0.0)} if money else None,
@@ -73,7 +74,53 @@ class OrsquareReportsService(models.AbstractModel):
             'stock_value': self.env['orsquare.stock.reports'].stock_value_by_location(),
             'attention': self._attention(env, company, day),
             'quick_actions': ['new_sale', 'record_purchase', 'transfer_stock', 'new_entry'],
+            'retailer_summary': self._retailer_summary(env, company, today, figures, trend),
         }
+
+    @api.model
+    def _retailer_summary(self, env, company, today, figures, trend):
+        """Read projection for the original retailer cards, using native documents only."""
+        summary = {'dayKey': str(today), 'monthKey': str(today)[:7], 'weekKey': str(today),
+                   'todayBills': figures.get('bill_count', 0)}
+        if not self._money():
+            return summary
+        month_start = today.replace(day=1)
+        days = env['orsquare.business_day'].search([
+            ('company_id', '=', company.id), ('date', '>=', month_start), ('date', '<=', today)])
+        snapshots = [d._compute_snapshot() if d.state == 'open' else (d.snapshot or {}) for d in days]
+        yesterday = env['orsquare.business_day'].search([
+            ('company_id', '=', company.id), ('date', '=', today - timedelta(days=1))], limit=1)
+        previous = (yesterday._compute_snapshot() if yesterday.state == 'open' else yesterday.snapshot or {}) if yesterday else {}
+        cashflow = self.env['orsquare.cashflow.service']
+        daily_cash = cashflow.register(str(today), str(today))
+        month_cash = cashflow.register(str(month_start), str(today))
+        bills = env['account.move'].search([
+            ('company_id', '=', company.id), ('state', '=', 'posted'), ('move_type', '=', 'in_invoice'),
+            ('orsquare_business_date', '>=', month_start), ('orsquare_business_date', '<=', today)])
+        parties = self.env['orsquare.accounts.service'].directory(limit=1)['summary']
+        summary.update({
+            'todayTotal': figures.get('net_sales', 0.0), 'yestTotal': previous.get('net_sales', 0.0),
+            'yestBills': previous.get('bill_count', 0), 'monthTotal': sum(s.get('net_sales', 0.0) for s in snapshots),
+            'cashToday': figures.get('cash_sales', 0.0), 'upiToday': figures.get('upi_sales', 0.0),
+            'khataToday': figures.get('khata_sales', 0.0),
+            'retailTodaySales': figures.get('retail_sales', 0.0), 'kitchenTodaySales': figures.get('kitchen_sales', 0.0),
+            'monthCash': sum(s.get('cash_sales', 0.0) for s in snapshots),
+            'monthUpi': sum(s.get('upi_sales', 0.0) for s in snapshots),
+            'monthPurchases': sum(bills.mapped('amount_total')),
+            'cashInToday': daily_cash['cash_in'], 'cashOutToday': daily_cash['cash_out'],
+            'monthCashOut': month_cash['cash_out'], 'receivables': parties['receivables'], 'payables': parties['payables'],
+            'weekDaily': [{'date': r['date'], 'total': r['sales']} for r in trend],
+        })
+        if self._valuation():
+            # POS revenue/COGS is posted at session close. Use the native live/frozen day
+            # figures for trading profit and posted non-trading accounts for other activity.
+            daily_pl = self.profit_and_loss(str(today), str(today))
+            month_pl = self.profit_and_loss(str(month_start), str(today))
+            extra_today = sum(r['amount'] for r in daily_pl['revenue'] if r['type'] == 'income_other')
+            extra_month = sum(r['amount'] for r in month_pl['revenue'] if r['type'] == 'income_other')
+            summary['todayNetProfit'] = figures.get('gross_profit', 0.0) + extra_today - daily_pl['total_expenses']
+            summary['monthNetProfit'] = sum(s.get('gross_profit', 0.0) for s in snapshots) + extra_month - month_pl['total_expenses']
+        return summary
 
     @api.model
     def _attention(self, env, company, day):
@@ -183,7 +230,7 @@ class OrsquareReportsService(models.AbstractModel):
         for acc, (d, c) in grouped.items():
             t = acc.account_type
             if t in REVENUE_TYPES:
-                sections['revenue'].append({'code': acc.code, 'name': acc.name, 'amount': c - d})
+                sections['revenue'].append({'code': acc.code, 'name': acc.name, 'amount': c - d, 'type': t})
             elif t in COGS_TYPES:
                 sections['cogs'].append({'code': acc.code, 'name': acc.name, 'amount': d - c})
             elif t in EXPENSE_TYPES:
@@ -192,7 +239,7 @@ class OrsquareReportsService(models.AbstractModel):
         cogs = sum(r['amount'] for r in sections['cogs'])
         expenses = sum(r['amount'] for r in sections['expenses'])
         res = {'revenue': sections['revenue'], 'total_revenue': revenue, 'expenses': sections['expenses'],
-               'total_expenses': expenses}
+               'total_expenses': expenses, 'total_operating_cost': expenses + cogs if self._valuation() else None}
         if self._valuation():
             res.update({'cogs': sections['cogs'], 'total_cogs': cogs, 'gross_profit': revenue - cogs,
                         'net_profit': revenue - cogs - expenses})
@@ -226,6 +273,7 @@ class OrsquareReportsService(models.AbstractModel):
         total_e = sum(r['amount'] for r in equity)
         return {'assets': assets, 'liabilities': liabilities, 'equity': equity,
                 'total_assets': total_a, 'total_liabilities': total_l, 'total_equity': total_e,
+                'total_liabilities_and_equity': total_l + total_e,
                 'balanced': round(total_a - total_l - total_e, 2) == 0.0 or not self._valuation()}
 
     @api.model

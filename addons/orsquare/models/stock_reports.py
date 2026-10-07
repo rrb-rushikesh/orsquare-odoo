@@ -171,6 +171,7 @@ class OrsquareStockReports(models.AbstractModel):
                 res['counter'] += value
             elif q.location_id.location_id == wh.orsquare_opened_id:
                 res['opened'] += value
+        res['total'] = sum(res.values())
         return {k: float_round(v, precision_rounding=company.currency_id.rounding) for k, v in res.items()}
 
     # ------------------------------------------------------------------ history
