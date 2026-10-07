@@ -10,6 +10,8 @@ lines = [
     "> **Generated** from the live API registry (`addons/orsquare/api_registry.py`) by `scripts/gen_api_docs.sh`. "
     "Do not edit by hand: change the code (signatures/docstrings) and regenerate.",
     "",
+    "> **Scope:** Generated shop API availability does not imply restored UI support. See [current status](../STATUS.md).",
+    "",
     "Every call is `POST /api/call` with a JSON body `{\"service\": <name>, \"method\": <name>, \"params\": {...}}` "
     "(see *HTTP endpoints* in `docs/backend-architecture.md`). `params` are the keyword arguments below. "
     "Only the methods listed here are reachable; each re-checks the caller's role, and money/valuation "
@@ -17,8 +19,14 @@ lines = [
     "",
 ]
 count = 0
+service_count = 0
+unavailable = []
 for service in sorted(API_REGISTRY):
     model, methods = API_REGISTRY[service]
+    if model not in env.registry:
+        unavailable.append(service)
+        continue
+    service_count += 1
     lines += ["## `%s`" % service, "", "Model: `%s`" % model, ""]
     cls = type(env[model])
     for name in sorted(methods):
@@ -37,6 +45,9 @@ for service in sorted(API_REGISTRY):
             lines.append("")
         count += 1
 lines.append("---")
-lines.append("*%d methods across %d services.*" % (count, len(API_REGISTRY)))
+lines.append("*%d methods across %d installed services.*" % (count, service_count))
+if unavailable:
+    lines += ["", "Optional services absent from this database and omitted: %s. "
+              "Generate against their installed database for their signatures." % ", ".join(unavailable)]
 open('/tmp/backend-api-reference.md', 'w', encoding='utf-8').write("\n".join(lines) + "\n")
 print('GENERATED %d methods' % count)

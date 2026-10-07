@@ -2,6 +2,8 @@
 
 > **Generated** from the live API registry (`addons/orsquare/api_registry.py`) by `scripts/gen_api_docs.sh`. Do not edit by hand: change the code (signatures/docstrings) and regenerate.
 
+> **Scope:** Generated shop API availability does not imply restored UI support. See [current status](../STATUS.md).
+
 Every call is `POST /api/call` with a JSON body `{"service": <name>, "method": <name>, "params": {...}}` (see *HTTP endpoints* in `docs/backend-architecture.md`). `params` are the keyword arguments below. Only the methods listed here are reachable; each re-checks the caller's role, and money/valuation figures are masked for users without `can_see_money` / `can_see_valuation`.
 
 ## `accounts`
@@ -127,7 +129,7 @@ Model: `orsquare.api.facade`
 
 Everything a return/reprint needs: lines with what can still be returned.
 
-### `day.bill_lookup(search=None, limit=30)`
+### `day.bill_lookup(search=None, limit=30, date_from=None, date_to=None)`
 
 Search counter bills, invoices and returns by number, customer or amount.
 
@@ -165,6 +167,14 @@ Preview for the cashier: what would this code take off a bill of ``bill_total``?
 
 Model: `orsquare.purchase.service`
 
+### `purchases.bill_detail(bill_id)`
+
+One bill with its stock lines and how much of each can still be returned.
+
+### `purchases.list_bills(search=None, date_from=None, date_to=None, supplier_id=None, limit=50, offset=0)`
+
+Posted vendor bills and credit notes, newest first (Bill Finder + purchase register).
+
 ### `purchases.preview_bill(payload)`
 
 Bi-directional rate engine + TCS suggestion for the Advanced Bill drawer (read-only).
@@ -174,6 +184,10 @@ Bi-directional rate engine + TCS suggestion for the Advanced Bill drawer (read-o
 ### `purchases.return_to_supplier(payload)`
 
 Vendor Credit Note + Godown->Vendor return picking; optional paired replacement bill.
+
+### `purchases.summary(date_from=None, date_to=None)`
+
+Uncapped purchase cards from posted vendor documents.
 
 ## `realtime`
 
@@ -322,4 +336,6 @@ Step 1: what will be cleared and what is preserved (counts from the live databas
 ### `wipe.wipe_shop(confirm_name, password)`
 
 ---
-*87 methods across 16 services.*
+*90 methods across 16 installed services.*
+
+Optional services absent from this database and omitted: platform. Generate against their installed database for their signatures.
