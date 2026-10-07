@@ -60,7 +60,7 @@ export interface AuthApi {
   can: (perm: Perm) => boolean;
   featureOn: (key: string) => boolean;
   sessionError: string | null;
-  signIn: (shop: string, login: string, password: string) => Promise<Me>;
+  signIn: (login: string, password: string, shop?: string) => Promise<Me>;
   refreshUserProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -84,9 +84,10 @@ function readCached(): { shop: string; me: Me } | null {
 const ALWAYS_ON = new Set(['discount', 'quick_discount', 'custom_rate', 'khata_credit', 'today_sales_checkout']);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [me, setMe] = useState<Me | null>(null);
-  const [shopCode, setShopCode] = useState('');
-  const [ready, setReady] = useState(false);
+  const initial = useMemo(() => readCached(), []);
+  const [me, setMe] = useState<Me | null>(() => initial?.me ?? null);
+  const [shopCode, setShopCode] = useState(() => initial?.shop ?? '');
+  const [ready, setReady] = useState(() => !!initial?.me);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const adopt = useCallback((m: Me, shop: string) => {
@@ -113,6 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     const hydrate = async () => {
       const cached = readCached();
+      if (cached?.me && cached?.shop) {
+        void startStore(cached.shop, cached.me);
+      }
       try {
         const m = await session.me();
         if (alive) adopt(m, cached?.shop || '');
@@ -137,9 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; window.removeEventListener('or2:unauthorized', onUnauthorized); window.removeEventListener('online', onOnline); };
   }, [adopt, drop]);
 
-  const signIn = useCallback(async (shop: string, login: string, password: string) => {
-    const m = await session.login(shop.trim(), login.trim(), password);
-    adopt(m, shop.trim());
+  const signIn = useCallback(async (login: string, password: string, shop?: string) => {
+    const cachedShop = shop || localStorage.getItem(SHOP_KEY) || '';
+    const m = await session.login(login.trim(), password, cachedShop || undefined);
+    const resolvedShop = m.shop || cachedShop || (m.company ? `orsquare_shop${m.company.id}` : '');
+    adopt(m, resolvedShop);
     return m;
   }, [adopt]);
 

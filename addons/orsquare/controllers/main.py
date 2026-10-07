@@ -114,14 +114,70 @@ class OrsquareApi(http.Controller):
     SHOP_CODE = re.compile(r'^orsquare_[a-z0-9_]{1,50}$')
 
     def _resolve_db(self, body):
-        """Database for this login: the one the host/session already pins (single-shop or db-filtered
-        deployments), otherwise the shop code from the sign-in form (shared app host)."""
+        """Resolve the tenant database dynamically without requiring manual user input.
+
+        Tier 1: Request already has db pinned (dbfilter, session, or subdomain).
+        Tier 2: Cached shop code passed silently in background from client device.
+        Tier 3: Central platform registry lookup by login/phone in orsquare_platform.
+        Tier 4: Single active shop fallback (dev or single-terminal deployment).
+        Tier 5: Direct user lookup across registered shop databases.
+        """
         if request.db:
             return request.db
-        code = str(body.get('shop', ''))
-        if self.SHOP_CODE.match(code) and code in http.db_list(force=True):
+
+        all_dbs = http.db_list(force=True)
+
+        # Tier 1: Host subdomain (e.g. <slug>.orsquare.com)
+        host = (request.httprequest.host or '').split(':')[0].lower()
+        parts = host.split('.')
+        if len(parts) >= 3 and parts[0] not in ('app', 'www', 'dev', 'api', 'rt', 'localhost'):
+            candidate = f"orsquare_{parts[0]}"
+            if candidate in all_dbs:
+                return candidate
+            candidate_shop = f"orsquare_shop_{parts[0]}"
+            if candidate_shop in all_dbs:
+                return candidate_shop
+
+        # Tier 2: Background cached shop from client device (silent localStorage)
+        code = str(body.get('shop', '')).strip()
+        if code and self.SHOP_CODE.match(code) and code in all_dbs:
             return code
+
+        login = str(body.get('login', '')).strip()
+
+        # Tier 3: Central platform directory lookup in orsquare_platform
+        if login and 'orsquare_platform' in all_dbs:
+            try:
+                with odoo.registry('orsquare_platform').cursor() as cr:
+                    cr.execute("""
+                        SELECT code FROM orsquare_platform_shop 
+                        WHERE (owner_login = %s OR phone = %s OR code = %s) AND status != 'deleted'
+                        LIMIT 1
+                    """, (login, login, login))
+                    row = cr.fetchone()
+                    if row and row[0] in all_dbs:
+                        return row[0]
+            except Exception:
+                _logger.warning("Dynamic platform shop lookup skipped due to lookup error")
+
+        # Tier 4: Single active shop fallback (dev / standalone shop)
+        shop_dbs = [d for d in all_dbs if d.startswith('orsquare_shop')]
+        if len(shop_dbs) == 1:
+            return shop_dbs[0]
+
+        # Tier 5: Direct scan across registered shop databases
+        if login and shop_dbs:
+            for sdb in shop_dbs:
+                try:
+                    with odoo.registry(sdb).cursor() as cr:
+                        cr.execute("SELECT 1 FROM res_users WHERE login = %s AND active = true LIMIT 1", (login,))
+                        if cr.fetchone():
+                            return sdb
+                except Exception:
+                    continue
+
         return None
+
 
     @http.route('/api/session/login', type='http', auth='none', methods=['POST'], csrf=False, readonly=False)
     def login(self, **kw):
@@ -165,7 +221,9 @@ class OrsquareApi(http.Controller):
                     http.root.session_store.save(session)
                 request.future_response.set_cookie(
                     'session_id', session.sid, max_age=http.get_session_max_inactivity(env), httponly=True)
-                return _ok(env[self._me_model(env)].me())
+                user_info = env[self._me_model(env)].me()
+                user_info['shop'] = db
+                return _ok(user_info)
         except AccessDenied:
             return _err(401, 'bad_credentials', 'Wrong shop, login or password.')
         except UserError as exc:

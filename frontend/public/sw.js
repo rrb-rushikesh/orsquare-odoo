@@ -52,7 +52,10 @@ self.addEventListener('fetch', (event) => {
     path.startsWith('/api/') ||
     path.startsWith('/admin/') ||
     path.startsWith('/static/') ||
-    path === '/healthz'
+    path === '/healthz' ||
+    path.startsWith('/@') ||
+    path.startsWith('/src/') ||
+    path.startsWith('/node_modules/')
   ) {
     return; // always live network; the app handles its own offline queue
   }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { BRAND_CONFIG } from '@/config/brand'
 import { BrandLogo } from '@/components/Logo'
@@ -7,10 +7,14 @@ import { Btn, Field } from '@/components/ui'
 import { ApiError } from '@/lib/api'
 
 export default function LoginPage() {
-  const { signIn } = useAuth()
+  const { signIn, me } = useAuth()
   const navigate = useNavigate()
+
+  if (me) {
+    return <Navigate to="/" replace />
+  }
+
   const [email, setEmail] = useState('')
-  const [shop, setShop] = useState(() => localStorage.getItem('or2_shop') || '')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [suspendedMsg, setSuspendedMsg] = useState<string | null>(null)
@@ -22,7 +26,7 @@ export default function LoginPage() {
     setSuspendedMsg(null)
     setBusy(true)
     try {
-      const me = await signIn(shop, email.trim(), pw)
+      const me = await signIn(email.trim(), pw)
       {
         const tabGrants = me.tabs
         const hasDashboard = tabGrants.includes('dashboard')
@@ -92,10 +96,7 @@ export default function LoginPage() {
           {suspendedMsg && <div className="alert" role="alert">{suspendedMsg}</div>}
 
           <form onSubmit={submit} className="stack" style={{ gap: 16 }}>
-            <Field label="Shop code">
-              <input className="field-control" value={shop} onChange={e => setShop(e.target.value)} autoComplete="organization" required />
-            </Field>
-            <Field label="Login">
+            <Field label="Login ID / Mobile / Email">
               <input
                 className="field-control"
                 type="text"
@@ -103,7 +104,7 @@ export default function LoginPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@shop.in"
+                placeholder="e.g. mobile number, email, or username"
                 required
               />
             </Field>

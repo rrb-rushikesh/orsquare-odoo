@@ -28,11 +28,11 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 )
 
-// Offline app shell (production only): hashed /assets are cache-first, the
+// Offline app shell: hashed /assets are cache-first, the
 // HTML shell is network-first with a cache fallback, and /api/* is always
 // passed straight to the network: business data offline behaviour stays
 // entirely with the Dexie queue (lib/sync.ts).
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && (import.meta.env.PROD || window.location.search.includes('sw=1'))) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {
       /* offline shell unavailable: the app still works online */

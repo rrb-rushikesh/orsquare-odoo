@@ -17,6 +17,7 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const ComingSoon = lazy(() => import('@/pages/ComingSoon'));
 const LedgerPage = lazy(() => import('@/pages/LedgerPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const DevApp = lazy(() => import('@/features/dev/DevApp'));
 
 /** Shown while the session is being restored. Never redirects: a refresh on /sales must stay on /sales. */
 function Splash() {
@@ -37,6 +38,40 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const { me, ready } = useAuth();
   if (!ready) return <Splash />;
   if (!me) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+/** An authenticated user must NEVER see /login: immediately routes them into their workspace. */
+function RedirectIfAuth({ children }: { children: ReactNode }) {
+  const { me, ready } = useAuth();
+  if (me) return <Navigate to="/" replace />;
+  if (!ready) return <Splash />;
+  return <>{children}</>;
+}
+
+/** Guard for the Platform Developer Console (strictly platform developers only).
+ * Retail shop staff (owners, cashiers, stockkeepers) must NEVER see this console:
+ * they are immediately redirected to their retailer shop.
+ * Unauthenticated guests are redirected to /login.
+ */
+function DevGuard({ children }: { children: ReactNode }) {
+  const { me, ready } = useAuth();
+  if (!ready) return <Splash />;
+  if (!me) return <Navigate to="/login" replace />;
+
+  // Retail shop staff (owners, cashiers, stockkeepers) or any user attached to a shop
+  // must NEVER access the developer console. Redirect immediately to their retailer shop!
+  const isRetailStaff = me.roles.includes('owner') || me.roles.includes('cashier') || me.roles.includes('stockkeeper') || Boolean(me.company);
+  if (isRetailStaff) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Only verified platform developers (surface: 'dev' or developer role) are allowed
+  const isPlatformDev = (me as any).surface === 'dev' || (me as any).roles?.includes('developer');
+  if (!isPlatformDev) {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -64,7 +99,8 @@ export default function App() {
       <ToastProvider>
         <Suspense fallback={<Splash />}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+            <Route path="/dev/*" element={<DevGuard><DevApp /></DevGuard>} />
             <Route path="/" element={<RequireAuth><DataProvider><AppShell /></DataProvider></RequireAuth>}>
               <Route index element={<Home />} />
               <Route path="sales" element={<Guard perm="sales" what="Sales"><SalesPage /></Guard>} />
