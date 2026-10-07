@@ -96,4 +96,28 @@ Cleanup is committed locally in three groups: unused frontend code/dependencies,
 - **Guardrail Rule 14 Enshrined:** Added Rule 14 (Receivable & Payable Retail Terminology) to `AGENTS.md` and `CLAUDE.md`.
 - **Validation:** `npm run typecheck` passed (0 errors); `npm test` passed (107 passed, 1 skipped).
 
+## Developer Console Hardening, Auth Standardization & Session Fix (2026-10-07)
+
+- **Session Database Isolation Fixed (Screenshot 2026-10-07 230811.png):**
+  - Resolved session database leakage where a browser previously accessing the retail counter (`orsquare_shop1`) carried `request.db = 'orsquare_shop1'` into the developer console, causing `AccessDenied` on `orsquare_platform`.
+  - In `addons/orsquare/controllers/main.py`, `_resolve_db` now prioritizes developer logins, explicit `surface='dev'`, and developer email addresses over stale session cookies.
+- **Application Error Crash Fixed (Screenshot 2026-10-07 231554.png):**
+  - Resolved `Cannot read properties of undefined (reading 'name')` crash in `frontend/src/auth/AuthContext.tsx`.
+  - Updated `me()` in `addons/orsquare_platform/models/platform.py` to return the complete standardized user envelope (`company`, `flags`, `roles: ['developer']`, `tabs: []`, `shop: 'orsquare_platform'`).
+  - Added safe optional chaining in `AuthContext.tsx` (`me.company?.name ?? 'ORSquare Platform'`, `me.features`) and guarded IndexedDB synchronization (`startStore`) to run only for retail shop accounts, preventing developer accounts from executing shop sync loops.
+- **Login Standardization for All Users:**
+  - **Developer:** Standardized strictly to **Email** (`dev@orsquare.com` or `admin@orsquare.com`) and **Password** (`Dev#Admin2026`).
+  - **Shop Owner:** Standardized to **Email** (`owner@krishnawines.com`) or **Phone** (`9876543210`) and **Password** (`Krishna#Owner2026`).
+  - **Cashier:** Standardized to **Email** (`cashier@krishnawines.com`) or **Phone** (`9876543211`) and **Password** (`Krishna#Owner2026`).
+- **Canonical Partner Resolution in Backend Odoo:**
+  - In `addons/orsquare/controllers/main.py`, SQL authentication queries now join `res_users` with `res_partner` (`p.email`, `p.phone`, `p.mobile`), allowing users across all roles to authenticate seamlessly with their email, phone number, or internal username.
+- **Dedicated Developer Login Screen:**
+  - Visiting `http://localhost:5173/dev` unauthenticated presents the dedicated Developer Console sign-in screen with fields for Developer Email and Password.
+  - Retail shop staff visiting `/dev` are unconditionally redirected to `/` in 0ms.
+- **Validation:**
+  - `npm run typecheck`: Passed (0 errors).
+  - `npm test`: **107 passed, 1 physical-printer test skipped**.
+  - Verified authentication across all roles via automated API tests (Developer email/username, Owner email/phone, Cashier email/phone, Stale shop cookie override).
+
+
 
