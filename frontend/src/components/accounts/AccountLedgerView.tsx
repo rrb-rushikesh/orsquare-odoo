@@ -240,12 +240,9 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
   const currentBalNum = Number.isFinite(closingBalNum) ? closingBalNum : parseFloat(account.balance);
   const isSupplier = account.type === 'Supplier';
 
-  const serverSide = data.side;
   const serverRole = data.role;
   const isReceivable = data.is_receivable ?? false;
   const isPayable = data.is_payable ?? false;
-  const isDr = serverSide === 'Dr';
-  const isCr = serverSide === 'Cr';
 
   const currentStatusText = serverRole
     ?? (currentBalNum === 0
@@ -338,11 +335,8 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.4px' }}>
             Current Balance
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }} className="num">
+          <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }} className="num">
             <span style={{ color: currentStatusColor, whiteSpace: 'nowrap' }}>{money(Math.abs(currentBalNum))}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: isDr ? 'var(--blue)' : isCr ? 'var(--ink)' : 'inherit', whiteSpace: 'nowrap' }}>
-              {isDr ? 'Dr' : isCr ? 'Cr' : ''}
-            </span>
             <span style={{ fontSize: 11, fontWeight: 600, color: currentStatusColor, whiteSpace: 'nowrap' }}>
               · {currentStatusText}
             </span>
@@ -353,30 +347,30 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.4px' }}>
             Opening Balance
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700 }} className="num">
+          <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }} className="num">
             <span style={{ color: parseFloat(account.opening) === 0 ? 'var(--fin-zero)' : (isSupplier ? 'var(--fin-pay)' : 'var(--fin-rec)'), whiteSpace: 'nowrap' }}>
               {money(Math.abs(parseFloat(account.opening)))}
             </span>
-            <span style={{ fontSize: 11, marginLeft: 4, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-              {parseFloat(account.opening) > 0 ? (isSupplier ? 'Cr' : 'Dr') : '—'}
+            <span style={{ fontSize: 11, color: parseFloat(account.opening) === 0 ? 'var(--muted)' : (isSupplier ? 'var(--pay-fg, #8a2e2e)' : 'var(--rec-fg, #235c35)'), fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {parseFloat(account.opening) > 0 ? (isSupplier ? '· Payable' : '· Receivable') : '· Settled'}
             </span>
           </div>
         </div>
 
         <div style={{ padding: '8px 14px', borderRight: compact ? 'none' : '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.4px' }}>
-            Period Debit (+)
+            Period Receivable (+)
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fin-rec)', whiteSpace: 'nowrap' }} className="num">
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fin-rec, #235c35)', whiteSpace: 'nowrap' }} className="num">
             {money(parseFloat(total_debit))}
           </div>
         </div>
 
         <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.4px' }}>
-            Period Credit (-)
+            Period Payable (-)
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: isSupplier ? 'var(--fin-pay)' : 'var(--ink)', whiteSpace: 'nowrap' }} className="num">
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fin-pay, #8a2e2e)', whiteSpace: 'nowrap' }} className="num">
             {money(parseFloat(total_credit))}
           </div>
         </div>
@@ -423,11 +417,11 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
               <th style={{ padding: '9px 12px', fontWeight: 600, width: 115, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>Voucher</th>
               <th style={{ padding: '9px 12px', fontWeight: 600, width: 105, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>Type</th>
               <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>Remarks / Against</th>
-              <th style={{ padding: '9px 12px', fontWeight: 600, textAlign: 'right', width: 135, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>
-                Debit (You Gave)
+              <th style={{ padding: '9px 12px', fontWeight: 600, textAlign: 'right', width: 135, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--rec-fg, #235c35)' }}>
+                Receivable (+)
               </th>
-              <th style={{ padding: '9px 12px', fontWeight: 600, textAlign: 'right', width: 135, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>
-                Credit (You Got)
+              <th style={{ padding: '9px 12px', fontWeight: 600, textAlign: 'right', width: 135, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--pay-fg, #8a2e2e)' }}>
+                Payable (-)
               </th>
               <th style={{ padding: '9px 12px', fontWeight: 600, textAlign: 'right', width: 135, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--muted)' }}>Balance</th>
             </tr>
@@ -448,7 +442,7 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
                     {money(Math.abs(parseFloat(initial_balance)))}
                   </span>{' '}
                   <span style={{ color: 'var(--muted)', fontSize: 11 }}>
-                    {data.opening_side === 'Flat' ? '' : data.opening_side}
+                    {data.opening_side === 'Flat' ? '' : data.opening_side === 'Dr' ? '· Receivable' : data.opening_side === 'Cr' ? '· Payable' : data.opening_side}
                   </span>
                 </td>
               </tr>
@@ -529,7 +523,7 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'right' }} className="num">
                       <div style={{ fontWeight: 600, color: rowStatusColor }}>
-                        {money(Math.abs(balNum))} {balNum === 0 ? '' : (e.side ?? '')}
+                        {money(Math.abs(balNum))}
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: rowStatusColor, marginTop: 1 }}>
                         · {rowStatusText}
@@ -545,15 +539,15 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
               <td style={{ padding: '10px 12px' }} colSpan={4}>
                 Closing Balance c/d
               </td>
-              <td style={{ padding: '10px 12px', textAlign: 'right', background: parseFloat(total_debit) > 0 ? 'rgba(218, 30, 40, 0.04)' : 'transparent' }} className="num">
-                <span style={{ color: 'var(--err, #da1e28)', fontWeight: 600 }}>{money(parseFloat(total_debit))}</span>
+              <td style={{ padding: '10px 12px', textAlign: 'right', background: parseFloat(total_debit) > 0 ? 'rgba(35, 92, 53, 0.06)' : 'transparent' }} className="num">
+                <span style={{ color: 'var(--ok, #198038)', fontWeight: 600 }}>{money(parseFloat(total_debit))}</span>
               </td>
-              <td style={{ padding: '10px 12px', textAlign: 'right', background: parseFloat(total_credit) > 0 ? 'rgba(25, 128, 56, 0.04)' : 'transparent' }} className="num">
-                <span style={{ color: 'var(--ok, #198038)', fontWeight: 600 }}>{money(parseFloat(total_credit))}</span>
+              <td style={{ padding: '10px 12px', textAlign: 'right', background: parseFloat(total_credit) > 0 ? 'rgba(218, 30, 40, 0.06)' : 'transparent' }} className="num">
+                <span style={{ color: 'var(--err, #da1e28)', fontWeight: 600 }}>{money(parseFloat(total_credit))}</span>
               </td>
               <td style={{ padding: '10px 12px', textAlign: 'right' }} className="num">
                 <div style={{ fontWeight: 600, color: currentStatusColor }}>
-                  {money(Math.abs(closingBalNum))} {serverSide === 'Flat' ? '' : serverSide}
+                  {money(Math.abs(closingBalNum))}
                 </div>
                 <div style={{ fontSize: 11, color: currentStatusColor, marginTop: 2, fontWeight: 600 }}>
                   · {currentStatusText}
@@ -708,14 +702,14 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, padding: 12 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Debit (Dr)</div>
-                  <div className="num" style={{ fontSize: 16, fontWeight: 600, color: 'var(--blue)', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--rec-fg, #235c35)', fontWeight: 600, textTransform: 'uppercase' }}>Receivable</div>
+                  <div className="num" style={{ fontSize: 16, fontWeight: 600, color: 'var(--rec-fg, #235c35)', marginTop: 4 }}>
                     {money(parseFloat(selectedEntry.debit))}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase' }}>Credit (Cr)</div>
-                  <div className="num" style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--pay-fg, #8a2e2e)', fontWeight: 600, textTransform: 'uppercase' }}>Payable</div>
+                  <div className="num" style={{ fontSize: 16, fontWeight: 600, color: 'var(--pay-fg, #8a2e2e)', marginTop: 4 }}>
                     {money(parseFloat(selectedEntry.credit))}
                   </div>
                 </div>
@@ -728,10 +722,10 @@ export function AccountLedgerView({ shopId, accountId, onEdit, compact = false }
                         fontSize: 12,
                         marginLeft: 6,
                         fontWeight: 600,
-                        color: selectedEntry.side === 'Flat' ? 'var(--muted)' : selectedEntry.side === 'Cr' ? 'var(--mild-red, #a03b3b)' : 'var(--mild-green, #2d6b3f)',
+                        color: selectedEntry.role === 'Settled' ? 'var(--muted)' : selectedEntry.role === 'Payable' ? 'var(--pay-fg, #8a2e2e)' : 'var(--rec-fg, #235c35)',
                       }}
                     >
-                      {selectedEntry.side === 'Flat' ? '· Settled' : `${selectedEntry.side} · ${selectedEntry.role}`}
+                      {selectedEntry.role === 'Settled' ? '· Settled' : `· ${selectedEntry.role}`}
                     </span>
                   </div>
                 </div>

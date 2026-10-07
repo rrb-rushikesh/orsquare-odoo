@@ -10,6 +10,9 @@ import { ACCOUNT_TYPES, OWNER_ACCOUNT_TYPES, type AccountType } from '@/types'
 import {
   NoAccess,
   Btn,
+  IconButton,
+  SearchField,
+  ToolbarSelect,
   ConfirmDialog,
   Drawer,
   EmptyState,
@@ -23,7 +26,7 @@ import {
 import { DataTable, type DTCol } from '@/components/DataTable'
 import { PhoneInput } from '@/components/PhoneInput'
 import { DEFAULT_DIAL, isValidNational } from '@/lib/phone'
-import { IconRupee } from '@/components/icons'
+import { IconRupee, IconPlus } from '@/components/icons'
 import { AccountLedgerView } from '@/components/accounts/AccountLedgerView'
 import { AccountPaymentModal } from '@/components/accounts/AccountPaymentModal'
 
@@ -229,7 +232,7 @@ function AccountsPage() {
             : a.isAdvance
             ? 'var(--adv-fg, #0f62fe)'
             : 'var(--fin-zero, var(--muted))'
-          const statusText = a.isReceivable ? "You'll Get" : a.isPayable ? "You'll Give" : a.role ?? 'Settled'
+          const statusText = a.isReceivable ? 'Receivable' : a.isPayable ? 'Payable' : a.isAdvance ? 'Advance' : a.role ?? 'Settled'
           const pillBg = a.isReceivable
             ? 'var(--rec-bg, #edf6f0)'
             : a.isPayable
@@ -240,7 +243,7 @@ function AccountsPage() {
           return (
             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', whiteSpace: 'nowrap' }}>
               <span className="num" style={{ fontWeight: 700, fontSize: 13, color }}>
-                {`${money(Math.abs(a.balance))} ${a.side ?? ''}`}
+                {money(Math.abs(a.balance))}
               </span>
               <span
                 style={{
@@ -390,11 +393,11 @@ function AccountsPage() {
     <>
 
       <div className={`tiles ${isMultiShopOwner ? 'tiles-5' : 'tiles-4'}`}>
-        <Tile label="Customers" value={summary.byType.Customer} note="Debtor accounts" />
+        <Tile label="Customers" value={summary.byType.Customer} note="Receivable accounts" />
         {isMultiShopOwner && (
           <Tile label="Retailers" value={summary.byType.Retailer || 0} note="Connected shops" />
         )}
-        <Tile label="Suppliers" value={summary.byType.Supplier} note="Creditor accounts" />
+        <Tile label="Suppliers" value={summary.byType.Supplier} note="Payable accounts" />
         <Tile label="Receivables (You'll Get)" value={<span style={{ color: 'var(--ok, #198038)' }}>{money(summary.debtors)}</span>} note="Owed to this shop" />
         <Tile label="Payables (You'll Give)" value={<span style={{ color: 'var(--err, #da1e28)' }}>{money(summary.creditors)}</span>} note="Owed to suppliers" />
       </div>
@@ -406,52 +409,51 @@ function AccountsPage() {
             <span className="t-caption">{filtered.length} shown</span>
           </div>
           <div className="panel-actions">
-            <div className="toolbar-grow search-box">
-              <input
-                className="field-control"
-                placeholder="Search by name or mobile…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <select className="field-control" style={{ width: 130 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
+            <SearchField
+              placeholder="Search by name or mobile…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+            />
+            <ToolbarSelect width="sm" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} title="Filter by account type">
               <option value="All">All types</option>
               {accountTypes.map((t) => (
                 <option key={t}>{t}</option>
               ))}
-            </select>
-            <select
-              className="field-control"
-              style={{ width: 130 }}
+            </ToolbarSelect>
+            <ToolbarSelect
+              width="sm"
               value={positionFilter}
               onChange={(e) => setPositionFilter(e.target.value as any)}
+              title="Filter by position"
             >
               <option value="all">All positions</option>
               <option value="receivable">Receivable</option>
               <option value="payable">Payable</option>
               <option value="settled">Settled</option>
-            </select>
+            </ToolbarSelect>
             {isMultiShopOwner && connectedShops.length > 0 && (
               <Btn variant="secondary" onClick={provisionConnectedRetailers} title="Create accounts for any unconfigured retailer shops in this enterprise">
                 + Provision shops
               </Btn>
             )}
-            <Btn
+            <IconButton
               variant="secondary"
-              className="btn-icon"
-              style={{ width: 34, height: 34, padding: 0, fontWeight: 700 }}
+              label="Record payment or receipt"
+              tooltip="Record payment or receipt"
               onClick={() => {
                 setPaymentTargetId(null)
                 setPaymentModalOpen(true)
               }}
-              title="Record payment or receipt"
-            >
-              <IconRupee size={16} />
-            </Btn>
+              icon={<IconRupee size={16} />}
+            />
             <Btn variant="primary" onClick={() => {
               setSelectedShopId('')
               setEditing(blank())
-            }}>+ Add</Btn>
+            }}>
+              <IconPlus size={14} style={{ marginRight: 5, verticalAlign: '-1px' }} />
+              Add Account
+            </Btn>
           </div>
         </div>
 
@@ -607,14 +609,14 @@ function AccountsPage() {
                       onChange={(n) => setEditing({ ...editing, opening: n })}
                     />
                   </Field>
-                  <Field label="Balance type" help="Customers are normally Debit (Dr); Suppliers are Credit (Cr).">
+                  <Field label="Opening position" help="Receivable (customer owes shop); Payable (shop owes supplier).">
                     <select
                       className="field-control"
                       value={editing.openingType || 'Debit'}
                       onChange={(e) => setEditing({ ...editing, openingType: e.target.value as 'Debit' | 'Credit' })}
                     >
-                      <option value="Debit">Debit (Dr) — Receivable / Asset</option>
-                      <option value="Credit">Credit (Cr) — Payable / Liability</option>
+                      <option value="Debit">Receivable (Owed to Shop)</option>
+                      <option value="Credit">Payable (Owed to Supplier)</option>
                     </select>
                   </Field>
                   <Field label="Opening date" help="Cut-off date for opening ledger entry.">

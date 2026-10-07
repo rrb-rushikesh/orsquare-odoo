@@ -56,21 +56,14 @@
   --fin-neutral: var(--ink);
   --fin-zero: var(--muted);
 
-  /* Debit / Credit side tokens.
-     ONE definition, used by every ledger surface. The same Dr figure was
-     rendered in --err (red) by the account statement drawer and in --fin-rec
-     (green) by the trial balance tab, on adjacent tabs of the same group, so
-     the colour of a number depended on which tab you were looking at.
-
-     Dr and Cr are not "bad" and "good" - that axis is asset/liability, which
-     is a different question. These are deliberately the SAME hue family in
-     two weights so the two columns read as a pair rather than as good/bad,
-     and the semantic direction is carried by the column header and the
-     sign, which is what actually means Dr from Cr. */
-  --dr-fg: #8a2e2e;
-  --dr-bg: #faebeb;
-  --cr-fg: #235c35;
-  --cr-bg: #edf6f0;
+  /* Receivable (Dr) / Payable (Cr) semantic tokens.
+     Retail accounting rule:
+     - Receivable (money owed to shop by customers) = Green
+     - Payable (money owed by shop to suppliers) = Red */
+  --dr-fg: #235c35;
+  --dr-bg: #edf6f0;
+  --cr-fg: #8a2e2e;
+  --cr-bg: #faebeb;
   --adv-fg: #0f62fe;
   --adv-bg: #edf5ff;
 
