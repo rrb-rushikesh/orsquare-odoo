@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { BrandLogo } from '@/components/Logo';
 import { Btn, IconButton, SearchField, Segmented } from '@/components/ui';
-import { IconHistory, IconGear, IconLayers, IconPlus, IconRefresh, IconArrowRight } from '@/components/icons';
+import { IconHistory, IconGear, IconLayers, IconPlus, IconRefresh } from '@/components/icons';
 import { platformApi } from './api';
 import { NewShopModal } from './NewShopModal';
 import { ShopDrawer } from './ShopDrawer';
@@ -11,12 +11,123 @@ import type { PlatformAuditRow, PlatformFleetResponse, PlatformShopRow, Platform
 
 type DevTab = 'fleet' | 'audit' | 'system';
 
-export default function DevApp() {
-  const { me } = useAuth();
-  const navigate = useNavigate();
+function DevLogin() {
+  const { signIn } = useAuth();
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  // Defense-in-depth: Immediately redirect any retail user or unauthenticated visitor away
-  if (!me) return <Navigate to="/login" replace />;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await signIn(login.trim().toLowerCase(), password, 'orsquare_platform', 'dev');
+    } catch (ex: any) {
+      setError(ex?.message || 'Developer sign-in failed. Please verify credentials.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--canvas)',
+      padding: '24px'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 380,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={28} />
+        </div>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--ink)' }}>Developer Console</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>Restricted platform surface. Every action is recorded.</p>
+        </div>
+        {error && (
+          <div style={{
+            border: '1px solid var(--err)',
+            borderLeft: '4px solid var(--err)',
+            background: 'var(--layer)',
+            padding: '10px 14px',
+            fontSize: 13,
+            color: 'var(--err)'
+          }} role="alert">
+            {error}
+          </div>
+        )}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Developer Email</label>
+            <input
+              autoFocus
+              type="text"
+              autoComplete="email"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              placeholder="dev@orsquare.com"
+              required
+              style={{
+                height: 38,
+                padding: '0 12px',
+                border: '1px solid var(--line)',
+                background: 'var(--layer)',
+                color: 'var(--ink)',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{
+                height: 38,
+                padding: '0 12px',
+                border: '1px solid var(--line)',
+                background: 'var(--layer)',
+                color: 'var(--ink)',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+          <Btn variant="primary" type="submit" disabled={busy} style={{ width: '100%', height: 38 }}>
+            {busy ? 'Authenticating...' : 'Sign in to Console'}
+          </Btn>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function DevApp() {
+  const { me, signOut } = useAuth();
+
+  // If unauthenticated, show the dedicated Developer Console login screen
+  if (!me) {
+    return <DevLogin />;
+  }
+
+  // Retail shop staff (owners, cashiers, stockkeepers) or any user attached to a shop
+  // must NEVER access the developer console. Redirect immediately to their retailer shop!
   const isRetailStaff = me.roles.includes('owner') || me.roles.includes('cashier') || me.roles.includes('stockkeeper') || Boolean(me.company);
   const isPlatformDev = (me as any).surface === 'dev' || (me as any).roles?.includes('developer');
   if (isRetailStaff || !isPlatformDev) {
@@ -157,8 +268,8 @@ export default function DevApp() {
         {/* Right side status */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>Operator: <strong>{me?.login || 'admin'}</strong></span>
-          <Btn variant="secondary" size="sm" onClick={() => navigate('/')}>
-            Back to Shop <IconArrowRight size={12} style={{ marginLeft: 4 }} />
+          <Btn variant="secondary" size="sm" onClick={() => void signOut()}>
+            Sign out
           </Btn>
         </div>
       </header>

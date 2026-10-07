@@ -38,13 +38,21 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const { me, ready } = useAuth();
   if (!ready) return <Splash />;
   if (!me) return <Navigate to="/login" replace />;
+  if ((me as any).surface === 'dev' || (me as any).roles?.includes('developer')) {
+    return <Navigate to="/dev" replace />;
+  }
   return <>{children}</>;
 }
 
 /** An authenticated user must NEVER see /login: immediately routes them into their workspace. */
 function RedirectIfAuth({ children }: { children: ReactNode }) {
   const { me, ready } = useAuth();
-  if (me) return <Navigate to="/" replace />;
+  if (me) {
+    if ((me as any).surface === 'dev' || (me as any).roles?.includes('developer')) {
+      return <Navigate to="/dev" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
   if (!ready) return <Splash />;
   return <>{children}</>;
 }
@@ -57,19 +65,18 @@ function RedirectIfAuth({ children }: { children: ReactNode }) {
 function DevGuard({ children }: { children: ReactNode }) {
   const { me, ready } = useAuth();
   if (!ready) return <Splash />;
-  if (!me) return <Navigate to="/login" replace />;
 
   // Retail shop staff (owners, cashiers, stockkeepers) or any user attached to a shop
   // must NEVER access the developer console. Redirect immediately to their retailer shop!
-  const isRetailStaff = me.roles.includes('owner') || me.roles.includes('cashier') || me.roles.includes('stockkeeper') || Boolean(me.company);
-  if (isRetailStaff) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Only verified platform developers (surface: 'dev' or developer role) are allowed
-  const isPlatformDev = (me as any).surface === 'dev' || (me as any).roles?.includes('developer');
-  if (!isPlatformDev) {
-    return <Navigate to="/" replace />;
+  if (me) {
+    const isRetailStaff = me.roles.includes('owner') || me.roles.includes('cashier') || me.roles.includes('stockkeeper') || Boolean(me.company);
+    if (isRetailStaff) {
+      return <Navigate to="/" replace />;
+    }
+    const isPlatformDev = (me as any).surface === 'dev' || (me as any).roles?.includes('developer');
+    if (!isPlatformDev) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <>{children}</>;

@@ -75,8 +75,8 @@ export function call<T = any>(service: string, method: string, params: Record<st
 }
 
 export const session = {
-  login: (login: string, password: string, shop?: string) =>
-    request<Me>('POST', '/api/session/login', { login, password, ...(shop ? { shop } : {}) }),
+  login: (login: string, password: string, shop?: string, surface?: string) =>
+    request<Me>('POST', '/api/session/login', { login, password, ...(shop ? { shop } : {}), ...(surface ? { surface } : {}) }),
   me: () => request<Me>('GET', '/api/session/me'),
   logout: () => request<null>('POST', '/api/session/logout', {}),
 };
@@ -94,8 +94,9 @@ export interface Me {
   id: number;
   name: string;
   login: string;
+  surface?: string;
   shop?: string;
-  roles: ('owner' | 'cashier' | 'stockkeeper')[];
+  roles: ('owner' | 'cashier' | 'stockkeeper' | 'developer')[];
   flags: { can_see_money: boolean; can_see_valuation: boolean; can_manage_returns: boolean };
   tabs: string[];
   company: { id: number; name: string; currency: string; tz: string; gstin: string; business_date: string };

@@ -60,7 +60,7 @@ export interface AuthApi {
   can: (perm: Perm) => boolean;
   featureOn: (key: string) => boolean;
   sessionError: string | null;
-  signIn: (login: string, password: string, shop?: string) => Promise<Me>;
+  signIn: (login: string, password: string, shop?: string, surface?: string) => Promise<Me>;
   refreshUserProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -99,7 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(SHOP_KEY, shop);
       localStorage.setItem(ME_KEY, JSON.stringify(m));
     } catch { /* private mode */ }
-    void startStore(shop, m);
+    if ((m as any).surface !== 'dev' && !m.roles?.includes('developer')) {
+      void startStore(shop, m);
+    }
   }, []);
 
   const drop = useCallback(() => {
@@ -141,9 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; window.removeEventListener('or2:unauthorized', onUnauthorized); window.removeEventListener('online', onOnline); };
   }, [adopt, drop]);
 
-  const signIn = useCallback(async (login: string, password: string, shop?: string) => {
-    const cachedShop = shop || localStorage.getItem(SHOP_KEY) || '';
-    const m = await session.login(login.trim(), password, cachedShop || undefined);
+  const signIn = useCallback(async (login: string, password: string, shop?: string, surface?: string) => {
+    const cachedShop = shop || (surface === 'dev' ? 'orsquare_platform' : localStorage.getItem(SHOP_KEY) || '');
+    const m = await session.login(login.trim(), password, cachedShop || undefined, surface);
     const resolvedShop = m.shop || cachedShop || (m.company ? `orsquare_shop${m.company.id}` : '');
     adopt(m, resolvedShop);
     return m;
@@ -168,15 +170,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const tabs = new Set<string>(me?.tabs ?? []);
     const role = me ? (isOwner ? 'owner' : me.roles[0] || '') : '';
     const activeShop: ShopInfo | null = me
-      ? { id: shopCode || String(me.company.id), name: me.company.name, code: shopCode, role, lockInTime: undefined }
+      ? {
+          id: shopCode || String(me.company?.id ?? ''),
+          name: me.company?.name ?? 'ORSquare Platform',
+          code: shopCode,
+          role,
+          lockInTime: undefined
+        }
       : null;
     const user: AppUser | null = me
-      ? { id: String(me.id), name: me.name, login: me.login, email: me.login, role, isStaff: false, me,
-          shops: activeShop ? [activeShop] : [], tabs: me.tabs.map(key => ({ key, label: key })) }
+      ? {
+          id: String(me.id),
+          name: me.name,
+          login: me.login,
+          email: me.login,
+          role,
+          isStaff: false,
+          me,
+          shops: activeShop ? [activeShop] : [],
+          tabs: (me.tabs ?? []).map(key => ({ key, label: key }))
+        }
       : null;
     const featureKey = (key: string) => ({ continuousScanning: 'continuous_scanning', autoGodownTransfer: 'auto_godown_transfer' }[key] || key);
     const featureOn = (key: string) => {
-      if (!me) return false;
+      if (!me || !me.features) return false;
       const mapped = featureKey(key);
       if (mapped in me.features) return !!(me.features as Record<string, unknown>)[mapped];
       return ALWAYS_ON.has(mapped);

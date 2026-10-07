@@ -11,6 +11,9 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   if (me) {
+    if ((me as any).surface === 'dev' || (me as any).roles?.includes('developer')) {
+      return <Navigate to="/dev" replace />
+    }
     return <Navigate to="/" replace />
   }
 
@@ -27,7 +30,10 @@ export default function LoginPage() {
     setBusy(true)
     try {
       const me = await signIn(email.trim(), pw)
-      {
+      if ((me as any).surface === 'dev' || (me as any).roles?.includes('developer')) {
+        navigate('/dev')
+        return
+      }
         const tabGrants = me.tabs
         const hasDashboard = tabGrants.includes('dashboard')
 
@@ -48,8 +54,7 @@ export default function LoginPage() {
           const target = tabGrants.map((t) => tabToRoute[t]).find(Boolean) || '/sales'
           navigate(target)
         }
-      }
-    } catch (ex: any) {
+      } catch (ex: any) {
       const isSuspended =
         (ex instanceof ApiError && (ex.code === 'account_suspended' || ex.data?.code === 'account_suspended' || ex.data?.detail?.code === 'account_suspended')) ||
         (ex?.message && typeof ex.message === 'string' && ex.message.toLowerCase().includes('suspended'));
@@ -96,7 +101,7 @@ export default function LoginPage() {
           {suspendedMsg && <div className="alert" role="alert">{suspendedMsg}</div>}
 
           <form onSubmit={submit} className="stack" style={{ gap: 16 }}>
-            <Field label="Login ID / Mobile / Email">
+            <Field label="Email or Mobile">
               <input
                 className="field-control"
                 type="text"
@@ -104,7 +109,7 @@ export default function LoginPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. mobile number, email, or username"
+                placeholder="owner@krishnawines.com or 9876543210"
                 required
               />
             </Field>
