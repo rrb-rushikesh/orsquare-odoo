@@ -136,7 +136,7 @@ export interface Delta {
 }
 
 export interface OutboxMutation {
-  id: string; device_id: string; device_seq: number; kind: 'sale' | 'purchase'; created_at: string;
+  id: string; device_id: string; device_seq: number; kind: 'sale' | 'purchase' | 'stock_transfer'; created_at: string;
   payload: Record<string, unknown>;
 }
 

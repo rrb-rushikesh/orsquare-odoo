@@ -14,7 +14,7 @@ export interface OutboxRow {
   /** Idempotency key: also the bill's `client_ref`. Replays are answered, never re-executed. */
   id: string;
   device_seq: number;
-  kind: 'sale' | 'purchase';
+  kind: 'sale' | 'purchase' | 'stock_transfer';
   payload: Record<string, unknown>;
   created_at: string;
   status: 'queued' | 'rejected';

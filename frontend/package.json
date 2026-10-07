@@ -17,6 +17,7 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@point-of-sale/receipt-printer-encoder": "^3.0.0",
     "@react-pdf/renderer": "^4.9.0",
+    "centrifuge": "^5.7.4",
     "dexie": "^4.4.5",
     "qz-tray": "^2.3.0",
     "react": "^19.2.8",

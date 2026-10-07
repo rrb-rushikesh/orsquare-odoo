@@ -160,6 +160,9 @@ class TestSync(OrsquareCase):
         self.assertEqual([r['status'] for r in res['results']], ['ok'] * 4, res)
         self.assertEqual(self.qty_at(whisky, self.godown), 2)
         self.assertEqual(res['results'][1]['result']['label'], 'SW #01')
+        # the queued transfer tells every other device to refresh stock
+        types = [e['type'] for e in self.env['orsquare.event'].since(self.company, 0, limit=500)]
+        self.assertIn('stock_changed', types)
 
     def test_13_unknown_user_rights_are_enforced_in_flush(self):
         nobody = self.env['res.users'].create({'name': 'Nobody', 'login': 'nobody_sync',

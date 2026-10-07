@@ -10,6 +10,7 @@
  */
 import { call, sync, ApiError, type Bootstrap, type Me, type WireCustomer, type WireProduct, type WireStock } from './api';
 import { closeShopDb, deviceId, openShopDb, type OutboxRow } from './db';
+import { isRealtimeLive, startRealtime, stopRealtime } from './realtime';
 
 export interface Snapshot {
   status: 'loading' | 'ready' | 'error';
@@ -241,6 +242,33 @@ export async function submitMutation(kind: 'sale' | 'purchase', payload: Record<
 /** Bill a sale: straight to Odoo when online, otherwise into the durable outbox. */
 export const submitSale = (payload: Record<string, unknown> & { client_ref: string }) => submitMutation('sale', payload);
 
+/**
+ * Queue-first mutation for actions with no natural idempotency key of their own (stock transfers).
+ * The action is written to the durable outbox FIRST and then flushed: the server remembers the mutation id, so a
+ * lost response followed by a retry can never move the stock twice.  Returns `queued: true` when the device is
+ * offline (it will be applied on reconnect); a refusal by Odoo is thrown to the caller with the server's reason.
+ */
+export async function submitQueued(kind: 'stock_transfer', payload: Record<string, unknown>): Promise<SettleResult> {
+  if (!db) throw new ApiError('The shop is not ready yet.', 'state');
+  const id = crypto.randomUUID();
+  await db.outbox.put({ id, device_seq: await nextDeviceSeq(), kind, payload, created_at: new Date().toISOString(), status: 'queued' });
+  await refreshOutboxCounts();
+  try {
+    await flushOutbox();
+  } catch (e) {
+    if (e instanceof ApiError && e.network) { set({ online: false }); return { queued: true }; }
+    throw e;
+  }
+  const row = await db.outbox.get(id);
+  if (!row) { void refreshNow(); return { queued: false } }
+  if (row.status === 'rejected') {
+    await db.outbox.delete(id);
+    await refreshOutboxCounts();
+    throw new ApiError(row.error || 'Odoo refused this action.', 'rejected');
+  }
+  return { queued: true };   // out-of-order or still waiting: stays queued
+}
+
 export async function discardRejected(id: string) {
   await db?.outbox.delete(id);
   await refreshOutboxCounts();
@@ -249,6 +277,7 @@ export async function discardRejected(id: string) {
 // ------------------------------------------------------------------------------------------------ lifecycle
 
 const POLL_VISIBLE = 15_000;
+const POLL_VISIBLE_WITH_PUSH = 60_000;   // a live socket tells us about changes; the poll is only a safety net
 const POLL_HIDDEN = 60_000;
 
 function schedule() {
@@ -256,7 +285,7 @@ function schedule() {
   timer = window.setTimeout(async () => {
     await refreshNow();
     schedule();
-  }, document.hidden ? POLL_HIDDEN : POLL_VISIBLE);
+  }, document.hidden ? POLL_HIDDEN : isRealtimeLive() ? POLL_VISIBLE_WITH_PUSH : POLL_VISIBLE);
 }
 
 export async function startStore(shop: string, me: Me) {
@@ -273,9 +302,11 @@ export async function startStore(shop: string, me: Me) {
   }
   await refreshNow();
   schedule();
+  void startRealtime(() => void refreshNow());
 }
 
 export function stopStore() {
+  stopRealtime();
   if (timer) window.clearTimeout(timer);
   timer = null;
   closeShopDb();

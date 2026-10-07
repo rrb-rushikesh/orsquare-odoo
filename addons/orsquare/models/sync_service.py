@@ -224,6 +224,7 @@ class OrsquareSyncService(models.AbstractModel):
             picking = env['orsquare.stock.service'].manual_transfer(
                 wh, payload['direction'], {int(k): float(v) for k, v in payload['quantities'].items()},
                 origin=payload.get('origin'))
+            env['orsquare.event'].publish(env.company, 'stock_changed', {'products': [int(k) for k in payload['quantities']]})
             return {'picking': picking.name}
         if method == 'open_bottle_api':
             product = env['product.product'].browse(int(payload['product_id']))

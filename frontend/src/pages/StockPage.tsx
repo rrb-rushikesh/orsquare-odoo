@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { useWorkspace, type CounterProduct } from '@/data/workspace'
 import { call } from '@/lib/api'
-import { refreshNow } from '@/lib/sync'
+import { refreshNow, submitQueued } from '@/lib/sync'
 import { searchProducts } from '@/lib/search'
 import { downloadCsv, money, num } from '@/lib/utils'
 import { Btn, Drawer, EmptyState, NumInput, Panel, Tag, Tile, useToast } from '@/components/ui'
@@ -223,8 +223,8 @@ function TransferDrawer({ open, product, products, onClose, onDone }: {
     if (!chosen || qty <= 0) return
     setBusy(true)
     try {
-      await call('day', 'transfer', { direction, quantities: { [chosen.productId]: qty } })
-      toast(`Moved ${qty} × ${chosen.name}`, 'ok')
+      const res = await submitQueued('stock_transfer', { direction, quantities: { [chosen.productId]: qty } })
+      toast(res.queued ? 'Saved on this device. The stock will move when the connection returns.' : `Moved ${qty} × ${chosen.name}`, res.queued ? 'info' : 'ok')
       onDone()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not move the stock.', 'err')
