@@ -44,17 +44,25 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 * **Mobile:** Not a scaled-down desktop UI; features a dedicated bottom navigation bar, touch-friendly $\ge 44$px targets, full-screen camera barcode scanning, and thumb steppers.
 
 ### D. Open Bottles (Peg & Portion Sales)
-* **Product Feature:** Allows selling portion sizes (e.g. 30ml, 60ml, 90ml, 120ml, 150ml) from opened bottles (750ml, 375ml, 180ml).
+* **Status:** Locked Decision (Alternative B: Fractional UoM with 6-Decimal Precision).
+* **Product Feature:** Allows selling portion sizes (e.g. 30ml, 60ml, 90ml, 120ml, 150ml) from opened bottles (750ml, 700ml, 650ml, 375ml, 180ml, 1000ml).
+* **Strict UI Presentation Boundary:** Cashiers and store owners interact purely in physical milliliters (`ml`); fractional bottles (e.g. `0.085714`) are strictly internal backend quantities and are never exposed in the user interface.
 * **UI Implementation:** 
   - Persistent **Open Bottles Tray** carousel along the bottom of the Sales screen with visual bottle fill levels (Green >50%, Amber 25-50%, Red <25%).
   - Slide-out **Open Bottle Drawer** for choosing peg size, source bottle, and selling rate.
   - References: [`C:\Users\rushi\Desktop\ref\01.png`](file:///C:/Users/rushi/Desktop/ref/01.png) and [`C:\Users\rushi\Desktop\ref\02.png`](file:///C:/Users/rushi/Desktop/ref/02.png).
-* **Inventory & Accounting Mechanics:**
-  - Dedicated model `orsquare.opened_bottle`.
-  - Opening a bottle transfers 1 unit from `WH/Stock/Counter` to `WH/Stock/Opened`.
-  - Portion sales deduct milliliters from the bottle and recognize Cost of Goods Sold (COGS) proportionally:
-    $$\text{Portion COGS} = \left(\frac{\text{Portion ml}}{\text{Bottle ml}}\right) \times \text{Bottle Standard Cost}$$
-  - Un-sellable residuals or breakage are written off via `stock.scrap` to a Spillage/Loss expense account.
+* **Inventory Authority & Accounting Mechanics:**
+  - **Single Inventory Authority Invariant:** Odoo stock quantities (`stock.quant`), stock moves (`stock.move`), stock valuation layers (`stock.valuation.layer`), and double-entry accounting ledgers are the **sole authoritative truth** for stock and valuation. The operational model `orsquare.opened_bottle` is strictly a tracking and UI presentation record that references underlying stock items/moves and derives or validates remaining physical volume; it **must never become a parallel inventory or valuation ledger**.
+  - **Opening a Bottle:** Uncorking transfers 1 unit from `WH/Stock/Counter` to `WH/Stock/Opened`.
+  - **Odoo-Native Fractional Stock Movement for Portion Dispensing:** Portion sales execute native stock moves using the bottle UoM configured with 6-decimal precision:
+    $$\text{Portion Quantity (bottles)} = \frac{\text{Portion ml}}{\text{Bottle Capacity ml}}$$
+    Odoo's native AVCO stock valuation layers calculate and post exact Cost of Goods Sold (COGS) without any custom costing engine:
+    $$\text{Portion COGS} = \text{Portion Quantity} \times \text{Bottle Unit Cost}$$
+  - **Precision Specification & Invariant Qualification:**
+    > **ORSquare uses 6-decimal precision for the bottle UoM as the validated minimum for the tested bottle/portion combinations. This is an implementation requirement backed by automated regression tests, not a universal mathematical guarantee for every possible future bottle size or portion. Any new supported bottle/portion configuration must pass the same valuation/conservation tests.**
+  - **Container-Level Verification Mandate:** The runtime behavior of `decimal.precision` (`Product Unit of Measure` = 6) and `uom.uom.rounding` (`0.000001`) must be verified against the exact Odoo 18 Community container build used in production.
+  - **Residual Wastage & Zeroing Invariant:** Un-sellable residuals or breakage are cleared via `stock.scrap` evaluated against the exact stored remaining quant (`scrap_qty = remaining_quant`). This cleanly zeroes out the physical quant to `0.000000` and flushes the residual asset value to `₹0.00`, preventing phantom quant dust or stranded pennies.
+  - **Permanent Automated Regression Suite:** The 5-bottle empirical multi-step conservation tests (750ml, 700ml, 650ml, 375ml, 1000ml) are preserved as permanent automated regression tests inside the `orsquare` test suite.
 
 ### E. Real-Time Event Stream: Centrifugo (Go) + Redis (C)
 * **Status:** Locked Decision (pending final benchmark validation).
@@ -107,6 +115,17 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
   - **Commercial Discounts vs. Concessions:** Explicit user classification between Trade Discounts (pre-tax base reduction), Statutory Round-off (Sec 170 CGST Act to nearest rupee), and Collection/Settlement Concessions (post-tax cash difference).
   - **Bill Finder:** High-speed client-side indexed search ("recognition over recall") targeting <10ms local lookups.
   - **Category Size Margin Pricing Rules:** Optional price-setting assistance rules attached to categories/pricing configs (`orsquare.margin_rule`), decoupled from physical `uom.uom`.
+* **Milestone 1 Scope (Backend Engine Foundation):**
+  - Thin custom module `orsquare` with minimal validated dependencies (`point_of_sale`, `stock_account`, `purchase_stock`, `stock_landed_costs`).
+  - Tenant bootstrap with validated 6-decimal bottle UoM precision (`0.000001`).
+  - Multi-location topology: `WH/Stock/Godown`, `WH/Stock/Counter`, and `WH/Stock/Opened`.
+  - Operational Open Bottle tracking record (`orsquare.opened_bottle`) referencing stock quants/moves without acting as a parallel ledger.
+  - Operational business date cutoff attribution (`orsquare_business_date`), strictly separated from statutory accounting lock dates.
+  - **Permanent Automated Invariant Regression Suite:**
+    1. Multi-step Open Bottle conservation and zero-residual test across 5 bottle sizes (750ml, 700ml, 650ml, 375ml, 1000ml).
+    2. Headless POS concurrency & negative stock / serialization test (from Milestone 0 Spike 1).
+    3. Operational business date cutoff attribution invariants.
+    4. Tenant bootstrap & decimal precision invariants.
 * **Postponed (Future Scope):** Closing Stock Audit & Reconciliation Engine, and Indian Wine Shop Sheet Register & WineStock Matrix.
 * **Skipped:** Product Master Library & Fuzzy Spreadsheet Importer. See [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md).
 

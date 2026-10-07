@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!-- ================================================================= -->
+        <!-- TIER 1: STANDARD PLATFORM BASE UNITS                              -->
+        <!-- ================================================================= -->
+
+        <!-- 1. Volume: ml (Milliliter) -->
+        <record id="uom_base_ml" model="uom.uom">
+            <field name="name">ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1000.0</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 2. Volume: L (Liter - Reference Unit) -->
+        <record id="uom.product_uom_litre" model="uom.uom">
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 3. Unit: Piece / Units (Reference Unit) -->
+        <record id="uom.product_uom_unit" model="uom.uom">
+            <field name="name">Piece</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 4. Unit: Pack -->
+        <record id="uom_base_pack" model="uom.uom">
+            <field name="name">Pack</field>
+            <field name="category_id" ref="uom.product_uom_categ_unit"/>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.0</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 5. Kitchen Unit: Plate -->
+        <record id="uom_base_plate" model="uom.uom">
+            <field name="name">Plate</field>
+            <field name="category_id" ref="uom.product_uom_categ_unit"/>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.0</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 6. Kitchen Unit: Bowl -->
+        <record id="uom_base_bowl" model="uom.uom">
+            <field name="name">Bowl</field>
+            <field name="category_id" ref="uom.product_uom_categ_unit"/>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.0</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 7. Weight: kg (Kilogram - Reference Unit) -->
+        <record id="uom.product_uom_kgm" model="uom.uom">
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+            <field name="rounding">0.000001</field>
+        </record>
+
+        <!-- 8. Weight: gm (Gram) -->
+        <record id="uom.product_uom_gram" model="uom.uom">
+            <field name="name">gm</field>
+            <field name="is_platform_base" eval="True"/>
+            <field name="is_shop_visible" eval="True"/>
+            <field name="rounding">0.000001</field>
+        </record>
+
+        <!-- ================================================================= -->
+        <!-- TIER 2: STANDARD PRE-SEEDED SHOP BOTTLE UNITS (Derived from ml)   -->
+        <!-- ================================================================= -->
+
+        <!-- 180 ml Bottle -->
+        <record id="uom_shop_180ml" model="uom.uom">
+            <field name="name">180 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">180.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">5.555555555556</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 375 ml Pint -->
+        <record id="uom_shop_375ml" model="uom.uom">
+            <field name="name">375 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">375.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">2.666666666667</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 650 ml Beer Bottle -->
+        <record id="uom_shop_650ml" model="uom.uom">
+            <field name="name">650 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">650.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.538461538462</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 700 ml European Bottle -->
+        <record id="uom_shop_700ml" model="uom.uom">
+            <field name="name">700 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">700.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.428571428571</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 750 ml Standard Bottle -->
+        <record id="uom_shop_750ml" model="uom.uom">
+            <field name="name">750 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">750.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.333333333333</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+
+        <!-- 1000 ml Liter Bottle -->
+        <record id="uom_shop_1000ml" model="uom.uom">
+            <field name="name">1000 ml</field>
+            <field name="category_id" ref="uom.product_uom_categ_vol"/>
+            <field name="orsquare_base_unit_id" ref="uom_base_ml"/>
+            <field name="orsquare_ratio">1000.0</field>
+            <field name="uom_type">smaller</field>
+            <field name="factor">1.0</field>
+            <field name="rounding">0.000001</field>
+            <field name="is_shop_visible" eval="True"/>
+        </record>
+    </data>
+</odoo>

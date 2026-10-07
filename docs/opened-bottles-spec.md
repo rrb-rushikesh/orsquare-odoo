@@ -64,70 +64,98 @@ graph TD
 
 ## 2. Inventory & Accounting Architecture in Odoo 18
 
-A common pitfall is storing opened bottles as a simple custom quantity field on the product. This corrupts stock valuation, breaks double-entry ledgers, and causes stock discrepancies.
+A critical failure mode in previous iterations was treating custom models or volume fields as an independent inventory ledger. This caused calculation drift, race conditions, and corrupted financial valuations.
 
-ORSquare models opened bottles with **full accounting and inventory rigor**:
+In ORSquare, **Odoo stock quantities (`stock.quant`), stock moves (`stock.move`), stock valuation layers (`stock.valuation.layer`), and double-entry accounting ledgers are the sole authoritative truth for stock and valuation.**
 
-### A. Data Modeling in `orsquare` Module
+### A. The Single Inventory Authority Invariant
+* The operational model `orsquare.opened_bottle` is strictly an operational tracking and UI presentation record.
+* It references the underlying stock item and location, facilitating UI display (active bottle cards, visual fill level, ml remaining).
+* **`remaining_volume_ml` must never become a second inventory authority.** Physical volume remaining is derived directly from (or validated against) the authoritative stock quant in the Opened location (`WH/Stock/Opened`).
+* No parallel stock, costing, or valuation ledger is maintained.
+
+---
+
+### B. Core Architectural Model: Alternative B (Fractional UoM with 6-Decimal Precision)
+
+ORSquare uses standard Odoo stock moves with fractional bottle quantities to record portion sales directly against the opened stock quant:
+
+$$\text{Portion Move Quantity (bottles)} = \frac{\text{Portion Volume (ml)}}{\text{Bottle Total Capacity (ml)}}$$
+
+* **Example (750 ml Bottle):** Selling a 60 ml peg executes a stock move of $\frac{60}{750} = 0.080000$ bottle from `WH/Stock/Opened` to `Partner Locations/Customers`.
+* **Example (700 ml Bottle):** Selling a 60 ml peg executes a stock move of $\frac{60}{700} = 0.085714$ bottle.
+* **Cost Recognition:** Odoo's native AVCO stock valuation layers calculate and post exact Cost of Goods Sold (COGS) without any custom costing engine:
+  $$\text{Portion COGS} = \text{Portion Move Quantity} \times \text{Bottle Unit Cost}$$
+
+---
+
+### C. Precision Specification & Invariant Qualification
+
+> [!IMPORTANT]
+> **Precision Invariant Qualification:**  
+> **ORSquare uses 6-decimal precision for the bottle UoM as the validated minimum for the tested bottle/portion combinations. This is an implementation requirement backed by automated regression tests, not a universal mathematical guarantee for every possible future bottle size or portion. Any new supported bottle/portion configuration must pass the same valuation/conservation tests.**
+
+* **Minimum Safe Configuration:**
+  - `decimal.precision` for `'Product Unit of Measure'` = **6 digits**.
+  - Bottle Unit of Measure (`uom.uom`) `rounding` = **`0.000001`**.
+* **Container-Level Verification Mandate:** The runtime behavior of `decimal.precision` and `uom.uom.rounding` must be verified against the exact Odoo 18 Community container build used in production, as UoM precision behavior and rounding interactions can vary across environments.
+* **Strict UI Boundary:** Cashiers and store owners interact purely in physical milliliters (`ml`); fractional bottles (e.g. `0.085714`) are strictly internal backend quantities and are never exposed in the user interface.
+
+---
+
+### D. Inventory Movement Lifecycle
 
 ```mermaid
-erDiagram
-    PRODUCT_PRODUCT ||--o{ ORSQUARE_OPENED_BOTTLE : "has open instances"
-    ORSQUARE_OPENED_BOTTLE ||--o{ ORSQUARE_PORTION_SALE_LINE : "dispenses"
-    STOCK_LOCATION ||--o{ ORSQUARE_OPENED_BOTTLE : "resides in"
-
-    ORSQUARE_OPENED_BOTTLE {
-        string bottle_code "e.g. RC-01"
-        many2one product_id "Sealed SKU (e.g. RC 180ml)"
-        float initial_volume_ml "180.0"
-        float current_volume_ml "120.0"
-        many2one location_id "WH/Stock/Counter or Opened"
-        selection state "active, empty, wasted"
-        datetime opened_at
-        many2one opened_by
-    }
+sequenceDiagram
+    autonumber
+    actor Cashier
+    participant UI as React UI (ml Display)
+    participant Model as orsquare.opened_bottle (UI State)
+    participant OdooStock as Odoo Stock & Valuation Core
+    
+    Note over Cashier,OdooStock: 1. Uncorking / Opening Bottle
+    Cashier->>UI: Click "Open New Bottle"
+    UI->>OdooStock: Internal Transfer 1.0 Unit (WH/Stock/Counter -> WH/Stock/Opened)
+    OdooStock-->>Model: Create active tracking record (RC-01, Capacity 750ml)
+    
+    Note over Cashier,OdooStock: 2. Dispensing Peg (60 ml)
+    Cashier->>UI: Select 60ml Peg from RC-01
+    UI->>OdooStock: Native Stock Move: Qty = 60 / 750 = 0.080000 bottle
+    OdooStock->>OdooStock: Post SVL: Qty = -0.080000, COGS = -₹120.00
+    OdooStock-->>Model: Refresh UI Remaining ML (690 ml, 92%)
+    
+    Note over Cashier,OdooStock: 3. Depletion / Scrap (Residual 30 ml)
+    Cashier->>UI: Click "Finish Bottle / Scrap Dregs"
+    UI->>OdooStock: stock.scrap: Qty = Exact Remaining Quant (0.040000 bottle)
+    OdooStock->>OdooStock: Post Scrap SVL: Zeroes Asset to ₹0.00
+    OdooStock-->>Model: Mark bottle status = 'empty', archive card
 ```
 
-### B. Inventory Movement Lifecycle
-
 1. **Opening a New Bottle:**
-   * When Bottle #RC-01 is opened, the system moves **1 unit** of `product.product` (Royal Challenge 180ml) from `WH/Stock/Counter` into a designated sub-location: `WH/Stock/Opened` (or marks it as opened via `orsquare.opened_bottle`).
-   * The sealed Counter stock decreases by 1 unit; the opened bottle registry gains an active record with `current_volume_ml = 180.0`.
-2. **Dispensing Portions:**
-   * Selling a 60ml portion deducts `60.0` from `current_volume_ml` on Bottle #RC-01.
-   * Sealed bottle inventory is **not** touched again because the physical bottle was already accounted for upon opening.
-3. **Emptying the Bottle:**
-   * When `current_volume_ml` reaches `0.0`, the bottle status automatically transitions to `empty`. It drops off the active Open Bottles Tray and archives cleanly.
+   * Moves **1.0 unit** of `product.product` from `WH/Stock/Counter` into `WH/Stock/Opened`.
+   * Sealed Counter stock decreases by 1 unit; Opened location gains 1 unit.
+   * `orsquare.opened_bottle` creates an active tracking record referencing the product, lot/serial (if tracked), and location.
+2. **Odoo-Native Fractional Stock Movement for Portion Dispensing:**
+   * Dispensing a portion executes an Odoo-native stock move from `WH/Stock/Opened` to the customer location with quantity $=\frac{\text{ml}}{\text{Capacity ml}}$ (to 6 decimals).
+   * Odoo quant in `WH/Stock/Opened` decrements by the exact fraction.
+   * Odoo native AVCO valuation generates the exact SVL and posts COGS journal entries automatically.
+3. **Residual Wastage & Zeroing Invariant:**
+   * When the bottle is empty or the remaining liquid is scrapped (e.g. 15–40 ml spillage/dregs), the write-off executes an Odoo `stock.scrap` evaluated against the **exact stored remaining quant** (`scrap_qty = remaining_quant`).
+   * This cleanly zeroes out the physical quant in `WH/Stock/Opened` to **`0.000000`** and flushes the residual Balance Sheet asset value to **`₹0.00`**, leaving zero phantom stock dust or stranded accounting pennies in the database.
+   * The tracking record transitions to `empty` or `wasted` and archives cleanly from the active tray.
 
 ---
 
-### C. Financial & Cost of Goods Sold (COGS) Accounting
+### E. Permanent Automated Invariant Regression Suite
 
-Double-entry accounting requires that revenue and cost match accurately per portion:
+The 5-bottle empirical multi-step conservation tests proven during Milestone 0 are preserved as permanent automated regression tests inside the `orsquare` test suite (`orsquare/tests/test_opened_bottles.py`):
+1. **750 ml Bottle:** ₹1,500 cost, multi-step pegs (60, 60, 90, 120, 60, 90, 180, 60 ml) + 30 ml scrap $\rightarrow$ 0.0 paise drift.
+2. **700 ml Bottle:** ₹2,100 cost, non-terminating fractions ($60/700 = 3/35$) $\rightarrow$ 0.0 paise drift.
+3. **650 ml Bottle:** ₹260 cost, non-terminating fractions ($200/650 = 4/13$) $\rightarrow$ 0.0 paise drift.
+4. **375 ml Bottle:** ₹900 cost, pint fractions $\rightarrow$ 0.0 paise drift.
+5. **1,000 ml Bottle:** ₹2,500 cost, 1-liter fractions $\rightarrow$ 0.0 paise drift.
 
-* **Revenue Recognition:** The portion sale is billed at its configured peg rate (e.g. ₹120 for 60ml) with appropriate GST taxes (`l10n_in`).
-* **Proportional COGS Recognition:**
-  When a portion is sold, Odoo recognizes Cost of Goods Sold proportional to the dispensed volume:
-  $$\text{Portion COGS} = \left(\frac{\text{Portion ml}}{\text{Initial Bottle ml}}\right) \times \text{Bottle Cost Price}$$
-  * *Example:* If a 180ml bottle has a purchase cost of ₹150, a 60ml portion incurs:
-    $$\text{COGS} = \left(\frac{60}{180}\right) \times ₹150 = \frac{1}{3} \times ₹150 = ₹50.00$$
-  * Gross Profit on that peg = ₹120.00 (selling price) - ₹50.00 (COGS) = **₹70.00**.
-
----
-
-### D. Wastage, Spillage & Breakage
-
-If an opened bottle drops, spoils, or has an un-sellable residual (e.g. 15 ml remaining that cannot make a full peg):
-* The salesperson or manager clicks **"Write-off Remaining Volume"** from the bottle card.
-* Enters reason: *Spillage*, *Breakage*, or *Evaporation / Residual*.
-* The system writes off the remaining volume and posts an Odoo inventory scrap entry (`stock.scrap`) charging the remaining cost to the **Wastage / Spillage Expense Account**.
-* The bottle transitions to `wasted` state, keeping physical counts 100% auditable.
-
----
-
-### E. Daybook Stock Reconciliation
-
-During the end-of-day Daybook closing ritual:
-* The Sheet and Daybook list all active opened bottles.
-* The closing staff physically verifies the bottles against the tray.
-* Any unrecorded volume shortage (e.g., bottle expected 120ml but contains 60ml) is flagged by the Daybook audit reconciler as an **unscanned peg sale** or **unrecorded spillage**, allowing the owner to post the correct document.
+Every test rigorously asserts:
+* Stored quant at completion $== 0.000000$.
+* Remaining Balance Sheet asset value $== ₹0.00$.
+* Cumulative COGS + Scrap Loss $== \text{Initial Bottle Purchase Cost}$.
