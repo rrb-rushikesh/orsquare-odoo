@@ -4,3 +4,10 @@ from . import res_company
 from . import stock_warehouse
 from . import stock_service
 from . import shop_bootstrap
+from . import product
+from . import business_date
+from . import business_day
+from . import event
+from . import opened_bottle
+from . import pos_extensions
+from . import sale_service

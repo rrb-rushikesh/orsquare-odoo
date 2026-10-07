@@ -1,0 +1,15 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_brand_user,orsquare.brand user,model_orsquare_brand,base.group_user,1,0,0,0
+access_brand_stockkeeper,orsquare.brand stockkeeper,model_orsquare_brand,group_orsquare_stockkeeper,1,1,1,1
+access_peg_size_user,orsquare.peg_size user,model_orsquare_peg_size,base.group_user,1,0,0,0
+access_peg_size_stockkeeper,orsquare.peg_size stockkeeper,model_orsquare_peg_size,group_orsquare_stockkeeper,1,1,1,1
+access_margin_rule_valuation,orsquare.margin_rule valuation,model_orsquare_margin_rule,group_orsquare_can_see_valuation,1,0,0,0
+access_margin_rule_owner,orsquare.margin_rule owner,model_orsquare_margin_rule,group_orsquare_owner,1,1,1,1
+access_business_day_cashier,orsquare.business_day cashier,model_orsquare_business_day,group_orsquare_cashier,1,0,0,0
+access_business_day_owner,orsquare.business_day owner,model_orsquare_business_day,group_orsquare_owner,1,1,1,1
+access_day_audit_log_owner,orsquare.day_audit_log owner,model_orsquare_day_audit_log,group_orsquare_owner,1,0,0,0
+access_event_user,orsquare.event user,model_orsquare_event,base.group_user,1,0,0,0
+access_stock_discrepancy_stockkeeper,orsquare.stock_discrepancy stockkeeper,model_orsquare_stock_discrepancy,group_orsquare_stockkeeper,1,1,0,0
+access_stock_discrepancy_cashier,orsquare.stock_discrepancy cashier,model_orsquare_stock_discrepancy,group_orsquare_cashier,1,0,0,0
+access_opened_bottle_cashier,orsquare.opened_bottle cashier,model_orsquare_opened_bottle,group_orsquare_cashier,1,0,0,0
+access_opened_bottle_stockkeeper,orsquare.opened_bottle stockkeeper,model_orsquare_opened_bottle,group_orsquare_stockkeeper,1,1,0,0

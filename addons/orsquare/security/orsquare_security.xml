@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ORSquare roles are thin wrappers over native Odoo groups: Staff Access assigns users to these
+         groups and nothing else. No parallel employee-governance system. -->
+    <record id="module_category_orsquare" model="ir.module.category">
+        <field name="name">ORSquare</field>
+        <field name="sequence">5</field>
+    </record>
+
+    <record id="group_orsquare_cashier" model="res.groups">
+        <field name="name">Cashier</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('point_of_sale.group_pos_user'))]"/>
+    </record>
+
+    <record id="group_orsquare_stockkeeper" model="res.groups">
+        <field name="name">Stockkeeper</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('stock.group_stock_user')), (4, ref('purchase.group_purchase_user'))]"/>
+    </record>
+
+    <!-- Data-masking switches (owner toggles per employee) -->
+    <record id="group_orsquare_can_see_money" model="res.groups">
+        <field name="name">Can see money (drawer cash, daily revenue)</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+    </record>
+    <record id="group_orsquare_can_see_valuation" model="res.groups">
+        <field name="name">Can see valuation (purchase rates, margins, stock value)</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+    </record>
+    <record id="group_orsquare_can_manage_returns" model="res.groups">
+        <field name="name">Can manage returns (refunds, credit notes)</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+    </record>
+
+    <record id="group_orsquare_owner" model="res.groups">
+        <field name="name">Shop Owner</field>
+        <field name="category_id" ref="module_category_orsquare"/>
+        <field name="implied_ids" eval="[
+            (4, ref('group_orsquare_cashier')),
+            (4, ref('group_orsquare_stockkeeper')),
+            (4, ref('group_orsquare_can_see_money')),
+            (4, ref('group_orsquare_can_see_valuation')),
+            (4, ref('group_orsquare_can_manage_returns')),
+            (4, ref('point_of_sale.group_pos_manager')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('purchase.group_purchase_manager')),
+            (4, ref('account.group_account_manager')),
+            (4, ref('hr.group_hr_user')),
+        ]"/>
+    </record>
+</odoo>

@@ -86,6 +86,92 @@ class OrsquareShopBootstrap(models.AbstractModel):
             categ.write(values)
         company.anglo_saxon_accounting = True
 
+    # ------------------------------------------------------------------ POS: journals, tenders, config
+    @api.model
+    def _xmlid_record(self, name, model, company, create_vals):
+        xmlid = 'orsquare.%s_%s' % (name, company.id)
+        rec = self.env.ref(xmlid, raise_if_not_found=False)
+        if rec and rec.exists():
+            return rec
+        rec = self.env[model].with_company(company).create(create_vals)
+        self.env['ir.model.data'].sudo().create({
+            'module': 'orsquare', 'name': '%s_%s' % (name, company.id),
+            'model': model, 'res_id': rec.id, 'noupdate': True})
+        return rec
+
+    @api.model
+    def journal(self, key, company):
+        vals = {
+            'upi': {'name': 'UPI', 'type': 'bank', 'code': 'UPI', 'company_id': company.id},
+        }[key]
+        existing = self.env['account.journal'].search(
+            [('company_id', '=', company.id), ('code', '=', vals['code'])], limit=1)
+        if existing:
+            return existing
+        return self._xmlid_record('journal_%s' % key, 'account.journal', company, vals)
+
+    @api.model
+    def payment_method(self, key, company=None):
+        company = company or self.env.company
+        PM = self.env['pos.payment.method'].with_company(company)
+        found = PM.search([('orsquare_key', '=', key), ('company_id', '=', company.id)], limit=1)
+        if found:
+            return found
+        # Adopt a pre-existing equivalent method instead of creating a conflicting duplicate.
+        adopt_domain = {
+            'cash': [('is_cash_count', '=', True)],
+            'upi': [('journal_id.code', '=', 'UPI')],
+            'khata': [('journal_id', '=', False), ('receivable_account_id.code', '!=', '210704')],
+            'concession': [('journal_id', '=', False), ('receivable_account_id.code', '=', '210704')],
+        }[key]
+        adopted = PM.search([('company_id', '=', company.id), ('orsquare_key', '=', False)] + adopt_domain, limit=1)
+        if adopted:
+            adopted.orsquare_key = key
+            return adopted
+        cash = self.env['account.journal'].search([('company_id', '=', company.id), ('type', '=', 'cash')], limit=1)
+        vals = {
+            'cash': {'name': 'Cash', 'journal_id': cash.id, 'is_cash_count': True},
+            'upi': {'name': 'UPI', 'journal_id': self.journal('upi', company).id},
+            'khata': {'name': 'Khata', 'split_transactions': True},
+            'concession': {'name': 'Settlement Concession',
+                           'receivable_account_id': self.account('cash_settlement_loss', company).id},
+        }[key]
+        vals.update({'orsquare_key': key, 'company_id': company.id})
+        return self._xmlid_record('pm_%s' % key, 'pos.payment.method', company, vals)
+
+    @api.model
+    def pos_config(self, company=None):
+        """The single counter register (one shop = one cash drawer = one POS config)."""
+        company = company or self.env.company
+        config = self.env['pos.config'].search([('company_id', '=', company.id)], order='id', limit=1)
+        wh = self.env['stock.warehouse'].orsquare_main_warehouse(company)
+        methods = self.env['pos.payment.method']
+        for key in ('cash', 'upi', 'khata', 'concession'):
+            methods |= self.payment_method(key, company)
+        if not config:
+            config = self.env['pos.config'].with_company(company).create({
+                'name': 'ORSquare Counter', 'company_id': company.id,
+                'picking_type_id': wh.pos_type_id.id,
+                'payment_method_ids': [(6, 0, methods.ids)],
+            })
+        else:
+            missing = methods - config.payment_method_ids
+            if missing and not config.session_ids.filtered(lambda s: s.state != 'closed'):
+                config.payment_method_ids = [(4, m.id) for m in missing]
+            if config.picking_type_id != wh.pos_type_id and not config.session_ids.filtered(lambda s: s.state != 'closed'):
+                config.picking_type_id = wh.pos_type_id
+        return config
+
+    @api.model
+    def scrap_location(self, company):
+        loc = self.env['stock.location'].search([
+            ('scrap_location', '=', True), ('company_id', 'in', (False, company.id))], limit=1)
+        if loc:
+            acc = self.account('stock_adjustment', company)
+            if loc.valuation_in_account_id != acc or loc.valuation_out_account_id != acc:
+                loc.sudo().write({'valuation_in_account_id': acc.id, 'valuation_out_account_id': acc.id})
+        return loc
+
     # ------------------------------------------------------------------ entry point
     @api.model
     def bootstrap_company(self, company):
@@ -93,4 +179,8 @@ class OrsquareShopBootstrap(models.AbstractModel):
         self.ensure_accounts(company)
         self.env['stock.warehouse'].search([('company_id', '=', company.id)])._orsquare_ensure_topology()
         self.apply_valuation_policy(company)
+        # Real-time stock: the Counter quant must drop at the moment of sale (not at session close).
+        company.point_of_sale_update_stock_quantities = 'real'
+        self.scrap_location(company)
+        self.pos_config(company)
         return True

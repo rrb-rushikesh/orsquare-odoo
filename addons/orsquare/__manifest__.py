@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ORSquare Retail Core',
-    'version': '18.0.1.1.0',
+    'version': '18.0.1.2.0',
     'category': 'Point of Sale/Retail',
     'summary': 'High-speed retail operations engine for counter and beverage operations',
     'description': """
@@ -27,6 +27,8 @@ Thin backend module providing authoritative retail operations:
         'hr',
     ],
     'data': [
+        'security/orsquare_security.xml',
+        'security/ir.model.access.csv',
         'data/precision_data.xml',
         'data/uom_data.xml',
         'views/uom_views.xml',
