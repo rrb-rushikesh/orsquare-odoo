@@ -141,7 +141,25 @@ class PlatformService(models.AbstractModel):
     def me(self):
         self._require_dev()
         user = self.env.user
-        return {'id': user.id, 'name': user.name, 'login': user.login, 'surface': 'dev', 'roles': ['developer']}
+        return {
+            'id': user.id,
+            'name': user.name,
+            'login': user.login,
+            'surface': 'dev',
+            'roles': ['developer'],
+            'flags': {'can_see_money': True, 'can_see_valuation': True, 'can_manage_returns': True},
+            'tabs': [],
+            'company': {
+                'id': user.company_id.id if user.company_id else 0,
+                'name': user.company_id.name if user.company_id else 'ORSquare Platform',
+                'currency': 'INR',
+                'tz': user.tz or 'Asia/Kolkata',
+                'gstin': '',
+                'business_date': str(fields.Date.context_today(self)),
+            },
+            'features': {},
+            'shop': 'orsquare_platform',
+        }
 
     # ------------------------------------------------------------------ fleet
     @api.model

@@ -122,13 +122,33 @@ class OrsquareApi(http.Controller):
         Tier 4: Single active shop fallback (dev or single-terminal deployment).
         Tier 5: Direct user lookup across registered shop databases.
         """
-        if request.db:
-            return request.db
-
         all_dbs = http.db_list(force=True)
 
-        # Tier 1: Host subdomain (e.g. <slug>.orsquare.com)
+        # Tier 0: Developer Console explicit surface, dev subdomain, or platform db
+        surface = str(body.get('surface', '')).strip()
         host = (request.httprequest.host or '').split(':')[0].lower()
+        shop_code = str(body.get('shop', '')).strip()
+        if (surface == 'dev' or host.startswith('dev.') or shop_code == 'orsquare_platform') and 'orsquare_platform' in all_dbs:
+            return 'orsquare_platform'
+
+        login = str(body.get('login', '')).strip().lower()
+
+        # Tier 1: Check if login belongs to a developer in orsquare_platform
+        if login and 'orsquare_platform' in all_dbs:
+            try:
+                with odoo.registry('orsquare_platform').cursor() as cr:
+                    cr.execute("""
+                        SELECT 1 FROM res_users u
+                        JOIN res_partner p ON p.id = u.partner_id
+                        WHERE (u.login = %s OR p.email = %s) AND u.active = true LIMIT 1
+                    """, (login, login))
+                    if cr.fetchone():
+                        if surface == 'dev' or login in ('dev_ops', 'admin', 'dev@orsquare.com', 'admin@orsquare.com'):
+                            return 'orsquare_platform'
+            except Exception:
+                pass
+
+        # Tier 2: Host subdomain (e.g. <slug>.orsquare.com)
         parts = host.split('.')
         if len(parts) >= 3 and parts[0] not in ('app', 'www', 'dev', 'api', 'rt', 'localhost'):
             candidate = f"orsquare_{parts[0]}"
@@ -138,14 +158,11 @@ class OrsquareApi(http.Controller):
             if candidate_shop in all_dbs:
                 return candidate_shop
 
-        # Tier 2: Background cached shop from client device (silent localStorage)
-        code = str(body.get('shop', '')).strip()
-        if code and self.SHOP_CODE.match(code) and code in all_dbs:
-            return code
+        # Tier 3: Explicit shop code
+        if shop_code and self.SHOP_CODE.match(shop_code) and shop_code in all_dbs:
+            return shop_code
 
-        login = str(body.get('login', '')).strip()
-
-        # Tier 3: Central platform directory lookup in orsquare_platform
+        # Tier 4: Central platform directory lookup in orsquare_platform
         if login and 'orsquare_platform' in all_dbs:
             try:
                 with odoo.registry('orsquare_platform').cursor() as cr:
@@ -160,21 +177,29 @@ class OrsquareApi(http.Controller):
             except Exception:
                 _logger.warning("Dynamic platform shop lookup skipped due to lookup error")
 
-        # Tier 4: Single active shop fallback (dev / standalone shop)
+        # Tier 5: Direct user lookup by email, phone, or login across all shop databases
         shop_dbs = [d for d in all_dbs if d.startswith('orsquare_shop')]
-        if len(shop_dbs) == 1:
-            return shop_dbs[0]
-
-        # Tier 5: Direct scan across registered shop databases
         if login and shop_dbs:
             for sdb in shop_dbs:
                 try:
                     with odoo.registry(sdb).cursor() as cr:
-                        cr.execute("SELECT 1 FROM res_users WHERE login = %s AND active = true LIMIT 1", (login,))
+                        cr.execute("""
+                            SELECT 1 FROM res_users u
+                            JOIN res_partner p ON p.id = u.partner_id
+                            WHERE (u.login = %s OR p.email = %s OR p.phone = %s OR p.mobile = %s) AND u.active = true 
+                            LIMIT 1
+                        """, (login, login, login, login))
                         if cr.fetchone():
                             return sdb
                 except Exception:
                     continue
+
+        # Tier 6: Single active shop fallback
+        if len(shop_dbs) == 1:
+            return shop_dbs[0]
+
+        if request.db:
+            return request.db
 
         return None
 
@@ -185,29 +210,47 @@ class OrsquareApi(http.Controller):
             body = self._json_body()
             db = self._resolve_db(body)
             if not db:
-                return _err(401, 'bad_credentials', 'Wrong shop, login or password.')   # no shop oracle
+                return _err(401, 'bad_credentials', 'Wrong shop, login or password.')
             origin = request.httprequest.headers.get('Origin')
             if origin and not self._origin_allowed(db, origin):
                 return _err(403, 'untrusted_origin', 'Origin not allowed.')
-            login = str(body.get('login', ''))
+            login = str(body.get('login', '')).strip().lower()
             ip = request.httprequest.remote_addr
             registry = odoo.registry(db)
+
+            # Resolve canonical login (supports email, phone, or username)
+            with registry.cursor() as cr:
+                cr.execute("""
+                    SELECT u.login FROM res_users u
+                    JOIN res_partner p ON p.id = u.partner_id
+                    WHERE (u.login = %s OR p.email = %s OR p.phone = %s OR p.mobile = %s) AND u.active = true 
+                    ORDER BY (u.login = %s) DESC, u.id ASC LIMIT 1
+                """, (login, login, login, login, login))
+                row = cr.fetchone()
+                auth_login = row[0] if row else login
+
             with registry.cursor() as cr:
                 if self._suspended(api.Environment(cr, SUPERUSER_ID, {})):
                     return _err(403, 'account_suspended', 'This shop is suspended. Please contact ORSquare support.')
             with registry.cursor() as cr:
-                throttle = api.Environment(cr, SUPERUSER_ID, {})['orsquare.login_throttle']
-                if throttle.is_blocked(login, ip):
-                    return _err(429, 'too_many_attempts', 'Too many failed sign-ins. Try again in a few minutes.')
+                env_su = api.Environment(cr, SUPERUSER_ID, {})
+                if 'orsquare.login_throttle' in env_su:
+                    throttle = env_su['orsquare.login_throttle']
+                    if throttle.is_blocked(auth_login, ip):
+                        return _err(429, 'too_many_attempts', 'Too many failed sign-ins. Try again in a few minutes.')
             try:
                 request.session.authenticate(db, {
-                    'type': 'password', 'login': login, 'password': body.get('password', '')})
+                    'type': 'password', 'login': auth_login, 'password': body.get('password', '')})
             except AccessDenied:
                 with registry.cursor() as cr:
-                    api.Environment(cr, SUPERUSER_ID, {})['orsquare.login_throttle'].record_failure(login, ip)
+                    env_su = api.Environment(cr, SUPERUSER_ID, {})
+                    if 'orsquare.login_throttle' in env_su:
+                        env_su['orsquare.login_throttle'].record_failure(auth_login, ip)
                 raise
             with registry.cursor() as cr:
-                api.Environment(cr, SUPERUSER_ID, {})['orsquare.login_throttle'].clear(login, ip)
+                env_su = api.Environment(cr, SUPERUSER_ID, {})
+                if 'orsquare.login_throttle' in env_su:
+                    env_su['orsquare.login_throttle'].clear(login, ip)
             # This request is served without a database context (a guest has none yet), so build the
             # response from an explicit registry cursor rather than request.env.
             with registry.cursor() as cr:
