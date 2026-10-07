@@ -121,18 +121,20 @@ class OrsquareStockReports(models.AbstractModel):
         domain = [('company_id', '=', company.id), ('location_id', 'child_of', wh.lot_stock_id.id)]
         if product_ids:
             domain.append(('product_id', 'in', product_ids))
-        quants = env['stock.quant'].with_context(active_test=False).search(domain)
+        # One grouped query instead of loading every quant record.
         by_prod = defaultdict(lambda: {'godown': 0.0, 'counter': 0.0, 'opened_bottles': 0.0, 'other': 0.0})
-        for q in quants:
-            row = by_prod[q.product_id.id]
-            if q.location_id == wh.orsquare_godown_id:
-                row['godown'] += q.quantity
-            elif q.location_id == wh.orsquare_counter_id:
-                row['counter'] += q.quantity
-            elif q.location_id.location_id == wh.orsquare_opened_id or q.location_id == wh.orsquare_opened_id:
-                row['opened_bottles'] += q.quantity
+        opened = wh.orsquare_opened_id
+        for product, location, qty in env['stock.quant'].with_context(active_test=False)._read_group(
+                domain, ['product_id', 'location_id'], ['quantity:sum']):
+            row = by_prod[product.id]
+            if location == wh.orsquare_godown_id:
+                row['godown'] += qty
+            elif location == wh.orsquare_counter_id:
+                row['counter'] += qty
+            elif location.location_id == opened or location == opened:
+                row['opened_bottles'] += qty
             else:
-                row['other'] += q.quantity
+                row['other'] += qty
         see_value = self._can_see_valuation()
         out = []
         for product in env['product.product'].browse(list(by_prod)):

@@ -105,10 +105,16 @@ class ProductTemplate(models.Model):
 
     @api.depends('standard_price', 'categ_id', 'uom_id')
     def _compute_suggested_price(self):
-        Rule = self.env['orsquare.margin_rule']
+        # One query for all rules, then walk each category's parent chain in memory (no per-product search).
+        rules = {(r.categ_id.id, r.uom_id.id): r.margin_amount
+                 for r in self.env['orsquare.margin_rule'].search([])}
         for tmpl in self:
-            rule = tmpl._orsquare_find_margin_rule(Rule)
-            tmpl.orsquare_suggested_price = tmpl.standard_price + rule.margin_amount if rule else 0.0
+            margin = None
+            categ = tmpl.categ_id
+            while categ and margin is None:
+                margin = rules.get((categ.id, tmpl.uom_id.id))
+                categ = categ.parent_id
+            tmpl.orsquare_suggested_price = tmpl.standard_price + margin if margin is not None else 0.0
 
     def _orsquare_find_margin_rule(self, Rule=None):
         self.ensure_one()
