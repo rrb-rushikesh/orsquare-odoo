@@ -1,0 +1,222 @@
+---
+/**
+ * "One workspace, every part of the day": a list of five jobs on the left and a
+ * drawn preview of the matching screen on the right. It works with CSS only: the
+ * list is a radio group (arrow keys move between items, focus is visible) and the
+ * previews are all present in the HTML, so crawlers and screen readers read every
+ * description even though one preview shows at a time. All figures are sample data.
+ */
+const items = [
+  {
+    id: 'sales',
+    title: 'Counter sales',
+    body: 'Scan or search, add lines, take cash, UPI or khata. Built so billing can continue without a connection.',
+  },
+  {
+    id: 'register',
+    title: 'Stock register',
+    body: 'Opening, inward, closing and sold for every product in one daily or range register, with rate and amount worked out.',
+  },
+  {
+    id: 'stock',
+    title: 'Two-location stock',
+    body: 'Godown and counter are counted apart. Move goods forward and see the result before you confirm.',
+  },
+  {
+    id: 'cash',
+    title: 'Cash flow register',
+    body: 'Sales, supplier payments, income and expenses in one register, with pending vouchers kept apart.',
+  },
+  {
+    id: 'daybook',
+    title: 'Day book',
+    body: 'Open the day, count stock and cash, review any difference and close. Closed days become a fixed record.',
+  },
+]
+
+const bill = [
+  { name: 'Basmati rice 5 kg', qty: 2, rate: '400', amt: '800' },
+  { name: 'Tea leaf 250 g', qty: 1, rate: '190', amt: '190' },
+  { name: 'Sunflower oil 1 L', qty: 3, rate: '150', amt: '450' },
+  { name: 'Toor dal 1 kg', qty: 2, rate: '140', amt: '280' },
+  { name: 'Sugar 1 kg', qty: 1, rate: '46', amt: '46' },
+]
+
+// Opening + inward - sold = closing, and sold x rate = amount, on every row.
+const sheetRows = [
+  { name: 'Basmati rice 5 kg', opn: 24, inw: 12, sld: 8, cls: 28, amt: '3,200' },
+  { name: 'Sunflower oil 1 L', opn: 40, inw: 0, sld: 9, cls: 31, amt: '1,350' },
+  { name: 'Tea leaf 250 g', opn: 2, inw: 20, sld: 14, cls: 8, amt: '2,660' },
+  { name: 'Wheat flour 10 kg', opn: 15, inw: 0, sld: 4, cls: 11, amt: '1,960' },
+  { name: 'Toor dal 1 kg', opn: 36, inw: 24, sld: 19, cls: 41, amt: '2,660' },
+  { name: 'Sugar 1 kg', opn: 52, inw: 0, sld: 8, cls: 44, amt: '368' },
+  { name: 'Salt 1 kg', opn: 60, inw: 0, sld: 12, cls: 48, amt: '264' },
+  { name: 'Poha 500 g', opn: 30, inw: 10, sld: 14, cls: 26, amt: '770' },
+]
+const sheetTotal = { opn: 259, inw: 66, sld: 88, cls: 237, amt: '13,232' }
+
+// The counter figure is the register's closing figure for the same product.
+const stockRows = [
+  { name: 'Basmati rice 5 kg', god: 64, cnt: 28 },
+  { name: 'Sunflower oil 1 L', god: 40, cnt: 31 },
+  { name: 'Tea leaf 250 g', god: 22, cnt: 8 },
+  { name: 'Wheat flour 10 kg', god: 30, cnt: 11 },
+  { name: 'Toor dal 1 kg', god: 55, cnt: 41 },
+]
+const STOCK_MAX = 70
+
+const cashRows = [
+  { name: 'Counter sales', v: '₹ 21,400', kind: 'in', tag: 'In' },
+  { name: 'Customer payments (khata)', v: '₹ 3,200', kind: 'in', tag: 'In' },
+  { name: 'Other income', v: '₹ 500', kind: 'in', tag: 'In' },
+  { name: 'Supplier payment', v: '₹ 12,000', kind: 'out', tag: 'Out' },
+  { name: 'Electricity bill', v: '₹ 2,400', kind: 'out', tag: 'Out' },
+  { name: 'Shop expenses', v: '₹ 1,850', kind: 'out', tag: 'Out' },
+  { name: 'Voucher awaiting approval', v: '₹ 3,000', kind: 'pending', tag: 'Pending' },
+]
+
+const close = [
+  { label: 'Day opened with opening cash', done: true },
+  { label: 'Stock counted', done: true },
+  { label: 'Physical cash entered', done: true },
+  { label: 'Differences reviewed', done: false },
+  { label: 'Day closed', done: false },
+]
+
+const counted = [
+  { name: 'Tea leaf 250 g', exp: 8, got: 8 },
+  { name: 'Sugar 1 kg', exp: 44, got: 43 },
+  { name: 'Salt 1 kg', exp: 48, got: 48 },
+]
+---
+
+<div class="explorer">
+  {
+    items.map((item, i) => (
+      <input
+        class="explorer__radio"
+        type="radio"
+        name="explorer"
+        id={`ex-${item.id}`}
+        checked={i === 0}
+        aria-label={item.title}
+      />
+    ))
+  }
+
+  <div class="explorer__list">
+    {
+      items.map((item) => (
+        <label class="explorer__item" for={`ex-${item.id}`}>
+          <strong>{item.title}</strong>
+          <span>{item.body}</span>
+        </label>
+      ))
+    }
+  </div>
+
+  <div class="explorer__stage" aria-hidden="true">
+    <div class="stage__tag">Sample data</div>
+
+    <div class="pane pane--sales">
+      <div class="bill__search">Scan a barcode or search a product</div>
+      <div class="bill__customer"><span>Customer</span><strong>Not linked (khata needs one)</strong></div>
+      <table class="mini-table">
+        <thead>
+          <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+        </thead>
+        <tbody>
+          {bill.map((l) => <tr><td>{l.name}</td><td class="num">{l.qty}</td><td class="num">{l.rate}</td><td class="num">{l.amt}</td></tr>)}
+        </tbody>
+      </table>
+      <div class="bill__total"><span>Total · 5 items, 9 pieces</span><span class="num">₹ 1,766</span></div>
+      <div class="chips">
+        <span class="chip chip--on">Cash</span>
+        <span class="chip">UPI</span>
+        <span class="chip">Khata</span>
+        <span class="chip chip--go">Confirm and settle</span>
+      </div>
+    </div>
+
+    <div class="pane pane--register">
+      <div class="chips chips--bar">
+        <span class="chip">1 Oct 2026</span>
+        <span class="chip">All brands</span>
+        <span class="chip chip--right">Print</span>
+        <span class="chip">Export</span>
+      </div>
+      <table class="mini-table">
+        <thead>
+          <tr><th>Product</th><th class="num">Opn</th><th class="num">Inw</th><th class="num">Sld</th><th class="num">Cls</th><th class="num">Amount</th></tr>
+        </thead>
+        <tbody>
+          {sheetRows.map((r) => <tr><td>{r.name}</td><td class="num">{r.opn}</td><td class="num">{r.inw}</td><td class="num">{r.sld}</td><td class="num">{r.cls}</td><td class="num">{r.amt}</td></tr>)}
+        </tbody>
+        <tfoot>
+          <tr><td>Total</td><td class="num">{sheetTotal.opn}</td><td class="num">{sheetTotal.inw}</td><td class="num">{sheetTotal.sld}</td><td class="num">{sheetTotal.cls}</td><td class="num">{sheetTotal.amt}</td></tr>
+        </tfoot>
+      </table>
+      <div class="tiles3 tiles3--foot">
+        <div><span>Units sold</span><strong class="num">88</strong></div>
+        <div><span>Register sales</span><strong class="num">₹ 13,232</strong></div>
+        <div><span>Day summary</span><strong>Reconciled</strong></div>
+      </div>
+    </div>
+
+    <div class="pane pane--stock">
+      <div class="loc-key">
+        <span><i class="key key--godown" />Godown</span>
+        <span><i class="key key--counter" />Counter</span>
+      </div>
+      {
+        stockRows.map((r) => (
+          <div class="loc-row">
+            <div class="loc-row__name">{r.name}</div>
+            <div class="loc-row__nums num">{r.god} / {r.cnt}</div>
+            <div class="bar"><span class="bar__fill bar__fill--godown" style={`width:${(r.god / STOCK_MAX) * 100}%`} /></div>
+            <div class="bar"><span class="bar__fill bar__fill--counter" style={`width:${(r.cnt / STOCK_MAX) * 100}%`} /></div>
+          </div>
+        ))
+      }
+      <div class="move">
+        <div class="move__row"><span>Move</span><strong>12 × Tea leaf 250 g</strong><span>Godown → Counter</span></div>
+        <div class="preview-line">After moving: godown 10, counter 20. Total stays 30.</div>
+      </div>
+    </div>
+
+    <div class="pane pane--cash">
+      <div class="cash-total">
+        <span class="cash-total__label">Running balance</span>
+        <span class="cash-total__value num">₹ 48,620</span>
+      </div>
+      <div class="tiles3">
+        <div><span>Cash in</span><strong class="num fin-in">₹ 25,100</strong></div>
+        <div><span>Cash out</span><strong class="num fin-out">₹ 16,250</strong></div>
+        <div><span>Pending</span><strong class="num">₹ 3,000</strong></div>
+      </div>
+      <ul class="cash-list">
+        {cashRows.map((r) => <li><span>{r.name}</span><span class:list={['num', { 'fin-in': r.kind === 'in', 'fin-out': r.kind === 'out' }]}>{r.v} · {r.tag}</span></li>)}
+      </ul>
+      <div class="preview-line preview-line--foot">Pending vouchers are kept apart, so the running balance is cash you hold.</div>
+    </div>
+
+    <div class="pane pane--daybook">
+      <ol class="close-steps">
+        {close.map((c) => <li class:list={[{ 'is-done': c.done }]}><span class="close-steps__mark">{c.done ? '✓' : ''}</span>{c.label}</li>)}
+      </ol>
+      <div class="audit">
+        <div><span>Expected in drawer</span><span class="num">₹ 48,620</span></div>
+        <div><span>Counted at close</span><span class="num">₹ 48,520</span></div>
+        <div class="audit__diff"><span>Difference</span><span class="num fin-out">₹ 100 · Short</span></div>
+      </div>
+      <table class="mini-table mini-table--count">
+        <thead>
+          <tr><th>Stock count</th><th class="num">Expected</th><th class="num">Counted</th><th class="num">Difference</th></tr>
+        </thead>
+        <tbody>
+          {counted.map((c) => <tr><td>{c.name}</td><td class="num">{c.exp}</td><td class="num">{c.got}</td><td class:list={['num', { 'fin-out': c.got !== c.exp }]}>{c.got === c.exp ? '0' : `${c.got - c.exp} · Short`}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

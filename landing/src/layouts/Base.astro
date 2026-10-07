@@ -1,0 +1,43 @@
+---
+/**
+ * The only page shell. It renders the head (SEO, Open Graph, JSON-LD), the shared
+ * chrome, and one inline no-dependency script that marks the document as scripted
+ * so CSS and the FAQ list can behave correctly with and without JavaScript.
+ */
+import '../styles/global.css'
+import '../styles/home.css'
+import Footer from '../components/Footer.astro'
+import Header from '../components/Header.astro'
+import Seo from '../components/Seo.astro'
+
+interface Props {
+  path: string
+  title?: string
+  description?: string
+  extraLd?: Record<string, unknown>[]
+  /** Placeholder pages (the signup page) must stay out of the index. */
+  noindex?: boolean
+}
+
+const { path, title, description, extraLd, noindex } = Astro.props
+---
+
+<!doctype html>
+<html lang="en-IN" class="no-js">
+  <head>
+    <Seo path={path} title={title} description={description} extraLd={extraLd} noindex={noindex} />
+    <script is:inline>
+      // Replace the no-js class as early as possible: with scripting the FAQ
+      // answers become collapsible, without it they stay open and readable.
+      document.documentElement.classList.remove('no-js');
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

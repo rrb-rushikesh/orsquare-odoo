@@ -1,0 +1,137 @@
+---
+/**
+ * Reports and calendar, explained by showing them. The calendar marks days that
+ * have been closed and locked (a sealed day is a fixed record) and a chosen day
+ * opens a report: total collection, the cash / UPI / khata split, bills, average
+ * bill, GST collected and the day's cash count (expected, counted, difference).
+ * The calendar deliberately shows no money per cell and no ranking of products:
+ * the product documents (docs/tabs/CALENDAR.md) do not back those yet. Voids are
+ * excluded and returns net out. Figures shown are sample data.
+ *
+ * Layout: three equal drawn panels across (calendar, day report, cash count) and
+ * three text blocks beneath, so nothing is left hanging beside a taller column.
+ */
+const monthOffset = 1 // September 2026 starts on a Tuesday; the grid starts on Monday.
+const monthDays = 30
+const selected = 30
+const noRecord = [6, 13, 20, 27] // Sundays: the shop did not trade.
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+const answers = [
+  { q: 'How much came in on a day, and how?', a: 'Open a day to see the total collection split into cash, UPI and khata, with the bill count, average bill and GST collected.' },
+  { q: 'Did the cash match?', a: 'The day’s cash count sets the expected drawer cash beside what was counted at close, with the difference.' },
+  { q: 'Is a past day final?', a: 'A closed day is locked and does not change. A day still open shows live figures that can change.' },
+]
+
+const reports = [
+  'Ledger statements',
+  'Trial balance',
+  'Profit and loss',
+  'Balance sheet',
+  'Receivables',
+  'Payables',
+  'Cash flow',
+]
+---
+
+<section class="section" aria-labelledby="reports-h">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="reports-h">Reports that build themselves</h2>
+      <p>
+        Every sale, purchase and payment you record feeds the reports. There is nothing to
+        compile at month end.
+      </p>
+    </div>
+
+    <div class="reports__view" aria-hidden="true">
+      <div class="stage__tag">Sample data</div>
+      <div class="reports__grid">
+        <div class="rcal rpanel">
+          <div class="cal-title">September 2026</div>
+          <div class="cal">
+            {weekdays.map((d) => <span class="cal__dow">{d}</span>)}
+            {Array.from({ length: monthOffset }).map(() => <span />)}
+            {
+              Array.from({ length: monthDays }, (_, i) => i + 1).map((d) => (
+                <span
+                  class:list={[
+                    'cal__day',
+                    noRecord.includes(d) ? 'cal__day--none' : 'cal__day--locked',
+                    { 'cal__day--today': d === selected },
+                  ]}
+                >
+                  {d}
+                </span>
+              ))
+            }
+          </div>
+          <div class="cal-legend">
+            <span><i class="cal__day cal__day--locked" />Closed and locked</span>
+            <span><i class="cal__day cal__day--none" />No record</span>
+          </div>
+        </div>
+
+        <div class="rday rpanel">
+          <div class="rday__head">
+            <strong>30 September</strong>
+            <span class="rday__state">Closed · Locked</span>
+          </div>
+          <div class="rday__kpis">
+            <div><span>Total collection</span><strong class="num">₹ 21,400</strong></div>
+            <div><span>Bills</span><strong class="num">46</strong></div>
+            <div><span>Average bill</span><strong class="num">₹ 465</strong></div>
+          </div>
+          <div class="rday__sub">Collected by</div>
+          <div class="split-bar">
+            <span class="split-bar__seg split-bar__seg--cash" style="width:52%" />
+            <span class="split-bar__seg split-bar__seg--upi" style="width:33%" />
+            <span class="split-bar__seg split-bar__seg--khata" style="width:15%" />
+          </div>
+          <div class="split-key split-key--figures">
+            <span><i class="key key--cash" />Cash <b class="num">11,200</b></span>
+            <span><i class="key key--upi" />UPI <b class="num">7,100</b></span>
+            <span><i class="key key--khata" />Khata <b class="num">3,100</b></span>
+          </div>
+          <div class="rday__sub">GST collected</div>
+          <div class="rday__single num">₹ 1,630</div>
+        </div>
+
+        <div class="rcash rpanel">
+          <div class="rday__head">
+            <strong>Cash count</strong>
+            <span class="rday__state">Balanced</span>
+          </div>
+          <ul class="wlist">
+            <li><span>Opening cash</span><span class="num">₹ 40,500</span></li>
+            <li><span>Expected in drawer</span><span class="num">₹ 48,620</span></li>
+            <li><span>Counted at close</span><span class="num">₹ 48,620</span></li>
+            <li><span>Difference</span><span class="num">₹ 0</span></li>
+          </ul>
+          <p class="rcash__note">Expected comes from the cash account’s own balance. A difference is shown beside both figures and recorded, not hidden.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="reports__text">
+      <div>
+        <h3>Questions it answers</h3>
+        <dl class="answers">
+          {answers.map((a) => <div><dt>{a.q}</dt><dd>{a.a}</dd></div>)}
+        </dl>
+      </div>
+      <div>
+        <h3>Financial reports included</h3>
+        <ul class="tags">
+          {reports.map((r) => <li>{r}</li>)}
+        </ul>
+        <p class="reports__note">
+          Voided bills are left out, and returns reduce the period they belong to. Every figure
+          comes from the entries you made at the counter, so the reports and the registers always
+          agree.
+        </p>
+        <a class="btn btn--tertiary" href="/modules#insights">See the reporting modules</a>
+      </div>
+    </div>
+  </div>
+</section>

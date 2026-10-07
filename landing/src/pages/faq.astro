@@ -1,0 +1,239 @@
+---
+/**
+ * FAQ. Every question and answer is rendered statically and stays visible in the
+ * page itself (no collapsed panels), so readers, search engines and AI assistants
+ * all get the full text without running a script. One small inline script adds a
+ * search box that filters the list; nothing is fetched from anywhere.
+ */
+import Base from '../layouts/Base.astro'
+import { BRAND, reviewedLabel } from '../config/site'
+import { FAQ, FAQ_CATEGORIES } from '../data/faq'
+import { breadcrumbLd, faqPageLd } from '../lib/ld'
+
+const groups = FAQ_CATEGORIES.map((category) => ({
+  category,
+  items: FAQ.filter((entry) => entry.category === category),
+})).filter((group) => group.items.length > 0)
+
+const total = FAQ.length
+---
+
+<Base path="/faq" extraLd={[breadcrumbLd([{ name: 'FAQ', path: '/faq' }]), faqPageLd()]}>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Frequently asked questions</h1>
+      <p>
+        {total} direct answers about {BRAND.name}: billing, stock, khata, cash and the day book,
+        reports, data and access. Each answer says what the product does, and says so when it does
+        not.
+      </p>
+      <p class="page-hero__meta">Last reviewed {reviewedLabel()}</p>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="faq-search">
+      <label class="faq-search__label" for="faq-search">Search the questions</label>
+      <input
+        class="faq-search__input"
+        id="faq-search"
+        type="search"
+        name="q"
+        autocomplete="off"
+        placeholder="billing, khata, GST, stock, cash, export…"
+        aria-describedby="faq-search-status"
+      />
+      <p class="faq-search__status" id="faq-search-status" role="status">
+        Showing all {total} questions.
+      </p>
+    </div>
+
+    <ul class="jump" aria-label="Jump to a topic">
+      {
+        groups.map((group) => (
+          <li>
+            <a href={`#faq-${group.category.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{group.category}</a>
+          </li>
+        ))
+      }
+    </ul>
+
+    {
+      groups.map((group) => (
+        <section class="faq-group" data-faq-group={group.category}>
+          <h2 id={`faq-${group.category.toLowerCase().replace(/[^a-z]+/g, '-')}`}>
+            {group.category}
+          </h2>
+          <ul class="faq-list">
+            {group.items.map((item) => (
+              <li class="faq-item" id={item.id} data-faq-item data-question={item.q.toLowerCase()} data-answer={item.a.toLowerCase()}>
+                <h3 class="faq-item__q">
+                  {item.q}
+                  <a class="faq-item__link" href={`#${item.id}`} aria-label={`Link to this question: ${item.q}`}>#</a>
+                </h3>
+                <p class="faq-item__a">{item.a}</p>
+                {item.see && <p class="faq-item__see"><a href={item.see.href}>{item.see.label}</a></p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+
+  <script is:inline>
+    (function () {
+      var input = document.getElementById('faq-search')
+      var status = document.getElementById('faq-search-status')
+      var items = Array.prototype.slice.call(document.querySelectorAll('[data-faq-item]'))
+      var groups = Array.prototype.slice.call(document.querySelectorAll('[data-faq-group]'))
+      var jump = document.querySelector('.jump')
+      var total = items.length
+      if (!input || !status) return
+
+      // Where every item lives; re-appending in the original order restores the page exactly.
+      var home = items.map(function (item) {
+        return { item: item, parent: item.parentNode }
+      })
+      var results = document.createElement('ul')
+      results.className = 'faq-list faq-results'
+      results.hidden = true
+      groups[0].parentNode.insertBefore(results, groups[0])
+
+      // Words people use for the same thing. A search term also matches these.
+      var SYNONYMS = {
+        udhaar: ['khata', 'credit'], udhar: ['khata', 'credit'], credit: ['khata'], ledger: ['khata', 'account'],
+        warehouse: ['godown'], store: ['godown', 'counter'], shop: ['counter'],
+        pos: ['billing', 'counter'], invoice: ['bill'], receipt: ['bill', 'print'], sale: ['bill', 'billing'],
+        inventory: ['stock'], vendor: ['supplier'], purchase: ['supplier'], payable: ['supplier'],
+        sheet: ['register'], 'stock-sheet': ['register'], excel: ['export', 'csv'], download: ['export'],
+        refund: ['return'], exchange: ['return'], tax: ['gst'], gstin: ['gst'],
+        offline: ['internet', 'connection'], wifi: ['internet', 'connection'], network: ['internet', 'connection'],
+        staff: ['cashier', 'team'], employee: ['cashier', 'team'], user: ['team', 'access'], login: ['access', 'sign'],
+        backup: ['export'], safe: ['security', 'encrypted'], price: ['cost', 'pricing'], fee: ['cost', 'pricing'],
+        phone: ['mobile'], tablet: ['mobile'], thermal: ['printer', 'print'], printer: ['print'],
+        day: ['day'], close: ['seal'], closing: ['seal']
+      }
+      function words(text) {
+        return text.toLowerCase().split(/[^a-z0-9²]+/).filter(function (w) { return w.length > 1 })
+      }
+      // Light stemming: "bills" matches "bill", "reconciling" matches "reconcile".
+      function stem(w) {
+        return w.length <= 4 ? w : w.replace(/(ing|ed|es|s)$/, '')
+      }
+      // Edit distance, stopping early once it passes `max`.
+      function distance(a, b, max) {
+        if (Math.abs(a.length - b.length) > max) return max + 1
+        var prev = []
+        for (var j = 0; j <= b.length; j++) prev[j] = j
+        for (var i = 1; i <= a.length; i++) {
+          var cur = [i]
+          var rowMin = i
+          for (var k = 1; k <= b.length; k++) {
+            var cost = a.charAt(i - 1) === b.charAt(k - 1) ? 0 : 1
+            var v = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + cost)
+            // A swapped pair of letters ("recnocile") costs one edit, not two.
+            if (i > 1 && k > 1 && a.charAt(i - 1) === b.charAt(k - 2) && a.charAt(i - 2) === b.charAt(k - 1)) {
+              v = Math.min(v, prevPrev[k - 2] + 1)
+            }
+            cur[k] = v
+            if (v < rowMin) rowMin = v
+          }
+          if (rowMin > max) return max + 1
+          prevPrev = prev
+          prev = cur
+        }
+        return prev[b.length]
+      }
+      var prevPrev = []
+
+      // How many typos to forgive: none for one or two letters, one for short, two for long.
+      function allowed(len) { return len <= 2 ? 0 : len <= 6 ? 1 : 2 }
+
+      // 2 = exact or the start of a word (typing in progress), 1 = a near miss, 0 = no match.
+      function match(list, s, partial) {
+        var best = 0
+        for (var n = 0; n < list.length; n++) {
+          var w = list[n]
+          if (w === s) return 2
+          if (s.length >= (partial ? 3 : 5) && w.indexOf(s) === 0) return 2
+          var t = allowed(s.length)
+          if (t && best < 1 && distance(w, s, t) <= t) best = 1
+        }
+        return best
+      }
+
+      function score(item, terms, phrase) {
+        var q = item.dataset.question || ''
+        var a = item.dataset.answer || ''
+        var qWords = words(q).map(stem)
+        var aWords = words(a).map(stem)
+        var total = 0
+        var matched = 0
+        terms.forEach(function (t, index) {
+          var own = stem(t)
+          var partial = index === terms.length - 1
+          var syn = (SYNONYMS[t] || []).map(stem)
+          var q1 = match(qWords, own, partial)
+          var a1 = match(aWords, own, partial)
+          var qs = syn.some(function (s) { return match(qWords, s, false) === 2 }) ? 2 : 0
+          var as = syn.some(function (s) { return match(aWords, s, false) === 2 }) ? 2 : 0
+          // The searcher's own spelling counts for more than a synonym or a near miss.
+          if (q1 === 2) { total += 5; matched += 1 }
+          else if (qs) { total += 4; matched += 1 }
+          else if (q1 === 1) { total += 3; matched += 1 }
+          else if (a1 === 2 || as) { total += 1; matched += 1 }
+          else if (a1 === 1) { total += 0.5; matched += 1 }
+        })
+        if (!matched) return 0
+        if (matched === terms.length) total += 10
+        if (q.indexOf(phrase) !== -1) total += 8
+        else if (a.indexOf(phrase) !== -1) total += 3
+        return total
+      }
+
+      function restore() {
+        results.hidden = true
+        results.innerHTML = ''
+        home.forEach(function (h) {
+          h.item.hidden = false
+          h.parent.appendChild(h.item)
+        })
+        groups.forEach(function (g) { g.hidden = false })
+        if (jump) jump.hidden = false
+      }
+
+      function run() {
+        var raw = input.value.trim()
+        var terms = words(raw)
+        if (!terms.length) {
+          restore()
+          status.textContent = 'Showing all ' + total + ' questions.'
+          return
+        }
+        var phrase = raw.toLowerCase()
+        var ranked = items
+          .map(function (item) { return { item: item, score: score(item, terms, phrase) } })
+          .filter(function (r) { return r.score > 0 })
+          .sort(function (x, y) { return y.score - x.score })
+
+        restore()
+        groups.forEach(function (g) { g.hidden = true })
+        if (jump) jump.hidden = true
+        items.forEach(function (item) { item.hidden = true })
+        ranked.forEach(function (r) {
+          r.item.hidden = false
+          results.appendChild(r.item)
+        })
+        results.hidden = ranked.length === 0
+
+        status.textContent = ranked.length === 0
+          ? 'No question matches “' + raw + '”. Try fewer or simpler words, or see the contact page.'
+          : ranked.length + ' of ' + total + ' questions for “' + raw + '”, best match first.'
+      }
+
+      input.addEventListener('input', run)
+      input.addEventListener('search', run)
+    })()
+  </script>
+</Base>

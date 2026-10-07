@@ -1,0 +1,30 @@
+---
+/**
+ * The closing blue call-to-action banner. Left: the message and its buttons (the
+ * slot). Right: what is included in every workspace, taken from the module list so
+ * it can never describe a module the product does not have. The two columns keep
+ * the banner balanced instead of leaving its right half empty.
+ */
+import { MODULE_GROUPS } from '../data/modules'
+---
+
+<section class="band">
+  <div class="container band__grid">
+    <div class="band__main">
+      <slot />
+    </div>
+    <div class="band__included">
+      <p class="band__label">Included in every workspace</p>
+      <ul class="band__list">
+        {
+          MODULE_GROUPS.map((group) => (
+            <li>
+              <a href={`/modules#${group.id}`}>{group.heading}</a>
+              <span>{group.modules.map((m) => m.title).join(' · ')}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>

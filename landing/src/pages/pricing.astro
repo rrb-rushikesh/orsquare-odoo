@@ -1,0 +1,124 @@
+---
+/**
+ * Pricing: Basic, Pro and Custom (owner, 2026-10-04). Every plan includes every
+ * module. Basic and Pro start with a 7-day free trial; the trial is a request flow
+ * for now (no payment, set up by hand), see src/data/pricing.ts and STATUS.md.
+ */
+import Base from '../layouts/Base.astro'
+import { APP_URL, BRAND } from '../config/site'
+import { ACCESS_STEPS, PLAN_GROUPS, PLANS, PRICING_FAQ, TRIAL_DAYS, rupees } from '../data/pricing'
+import { breadcrumbLd } from '../lib/ld'
+---
+
+<Base path="/pricing" extraLd={[breadcrumbLd([{ name: 'Pricing', path: '/pricing' }])]}>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Simple plans. Every module included.</h1>
+      <p>
+        Pick a plan for your shop and try it free for {TRIAL_DAYS} days. Every {BRAND.name} plan
+        includes billing, stock, purchases, khata, cash and reports.
+      </p>
+    </div>
+  </section>
+
+  <div class="container">
+    <section class="section">
+      <h2 class="visually-hidden">Plans</h2>
+      <div class="plans">
+        {
+          PLANS.map((plan) => (
+            <div class={`plans__card${plan.id === 'pro' ? ' plans__card--accent' : ''}`}>
+              <h3 class="plans__name">{plan.name}</h3>
+              <p class="plans__price">
+                {plan.pricePerMonth !== null ? (
+                  <>
+                    <span class="plans__amount">{rupees(plan.pricePerMonth)}</span>
+                    <span class="plans__per">/month</span>
+                  </>
+                ) : (
+                  <span class="plans__amount plans__amount--text">Priced with you</span>
+                )}
+              </p>
+              <p class="plans__blurb">{plan.blurb}</p>
+              <ul class="plans__list">
+                <li>Every module included</li>
+                {plan.trial ? <li>{TRIAL_DAYS}-day free trial, no payment to start</li> : <li>Set up and onboarded with you</li>}
+              </ul>
+              <div class="plans__cta">
+                {plan.trial ? (
+                  <a class="btn btn--primary" href={`/signup?plan=${plan.id}`}>
+                    Start {TRIAL_DAYS}-day free trial
+                  </a>
+                ) : (
+                  <a class="btn btn--tertiary" href="/contact">Contact us</a>
+                )}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+      <p class="plans__note">
+        Prices in Indian rupees, per workspace per month. No payment is taken on this website yet:
+        after the trial, we confirm your plan with you before anything is billed.
+      </p>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <h2>Included in every plan</h2>
+      <div class="plan">
+        <div class="plan__groups">
+          {
+            PLAN_GROUPS.map((group) => (
+              <div class="plan__group">
+                <h3>{group.label}</h3>
+                <ul>
+                  {group.items.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <h2>How access works</h2>
+      <div class="steps">
+        {
+          ACCESS_STEPS.map((step, i) => (
+            <div class="steps__item">
+              <span class="steps__n" aria-hidden="true">{i + 1}</span>
+              <p style="margin:0;color:var(--ink-2)">{step}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <h2>Common questions</h2>
+      <div class="faq-brief">
+        {
+          PRICING_FAQ.map((item) => (
+            <div>
+              <h3>{item.q}</h3>
+              <p>{item.a}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p style="margin-top:var(--s5)">
+        <a href="/faq">See every question and answer</a>
+      </p>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="cta-row">
+        <a class="btn btn--primary" href="/signup?plan=basic">Start {TRIAL_DAYS}-day free trial</a>
+        <a class="btn btn--tertiary" href={APP_URL}>Sign in to your workspace</a>
+      </div>
+    </section>
+  </div>
+</Base>

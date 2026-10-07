@@ -1,0 +1,182 @@
+---
+/**
+ * Home. The page explains the product by showing it: a drawn dashboard under the
+ * hero, a five-job feature explorer, a reports-and-calendar section, who it is
+ * for, how to get going, trust, and a short FAQ. Copy is factual and comes from
+ * the app's own pages and tab documents: no customer names, no numbers about the
+ * business, no uptime, no prices. Drawn figures are labelled as sample data.
+ */
+import Base from '../layouts/Base.astro'
+import AppWindow from '../components/AppWindow.astro'
+import FeatureExplorer from '../components/FeatureExplorer.astro'
+import Band from '../components/Band.astro'
+import ReportsSection from '../components/ReportsSection.astro'
+import { APP_URL, BRAND, SIGNUP_URL } from '../config/site'
+import { HOME_STEPS, HOME_TRUST } from '../data/modules'
+import { FAQ, FAQ_CATEGORIES } from '../data/faq'
+
+const audiences = [
+  {
+    title: 'Shops and retailers',
+    body: 'Barcode billing, khata credit for regular customers, and godown and counter stock tracked apart.',
+  },
+  {
+    title: 'Suppliers and distributors',
+    body: 'Supplier bills land in stock and the supplier ledger together. Part-payments and dues stay current.',
+  },
+  {
+    title: 'Restaurants and cafés',
+    body: 'A live floor plan: open a table, run its tab and settle the bill, with every table showing its running amount.',
+  },
+  {
+    title: 'Any business that buys and sells',
+    body: 'The same simple workspace for stock, purchases, accounts and cash, sealed to your business.',
+  },
+]
+
+const teaser = [
+  'What is OR², and what does it do?',
+  'Can I keep billing when the internet is down?',
+  'How do I see how much cash I actually have?',
+  'Can I export my data to Excel or CSV?',
+]
+const faqPicks = teaser
+  .map((q) => FAQ.find((entry) => entry.q === q))
+  .filter((entry): entry is (typeof FAQ)[number] => Boolean(entry))
+---
+
+<Base path="/">
+  <section class="hero hero--window">
+    <div class="container">
+      <p class="hero__eyebrow">
+        Billing, stock and accounts for shops, suppliers, distributors and restaurants
+      </p>
+      <h1>Business operations, squared.</h1>
+      <p class="hero__lede">
+        {BRAND.name} keeps your billing, stock, purchases, khata and cash in one simple, isolated
+        workspace, built for shops, suppliers and restaurants.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn--primary" href={APP_URL}>Sign in to your workspace</a>
+        <a class="btn btn--tertiary" href={SIGNUP_URL}>Get started</a>
+      </div>
+      <p class="hero__caption">Works in any modern browser · Nothing to install</p>
+      <div class="hero__window">
+        <AppWindow />
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features" aria-labelledby="features-h">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="features-h">One workspace for every part of the day</h2>
+        <p>
+          Sell at the counter, keep stock straight in two locations, watch the cash and close the
+          day. Pick a job to see its screen.
+        </p>
+      </div>
+      <FeatureExplorer />
+    </div>
+  </section>
+
+  <ReportsSection />
+
+  <section class="section section--band" aria-labelledby="who-h">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="who-h">Built for every kind of counter</h2>
+        <p>One platform, set up around how your business actually runs.</p>
+      </div>
+      <div class="grid grid--4">
+        {
+          audiences.map((item) => (
+            <article class="card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="steps-h">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="steps-h">Up and running in three steps</h2>
+      </div>
+      <ol class="flow">
+        {
+          HOME_STEPS.map((step, i) => (
+            <li class="flow__item">
+              <span class="flow__n" aria-hidden="true">{i + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="section section--band" aria-labelledby="trust-h">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="trust-h">A partner you can trust</h2>
+      </div>
+      <div class="grid">
+        {
+          HOME_TRUST.map((item) => (
+            <article class="card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="faq-h">
+    <div class="container split">
+      <div>
+        <h2 id="faq-h">Questions we hear first</h2>
+        <p class="lede">The full list has direct answers to every question about what OR² does and does not do.</p>
+        <a class="btn btn--tertiary" href="/faq">Read all {FAQ.length} answers</a>
+        <p class="topics__label">Or browse by topic</p>
+        <ul class="topics">
+          {
+            FAQ_CATEGORIES.map((category) => (
+              <li>
+                <a href={`/faq#faq-${category.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{category}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <dl class="qa">
+        {
+          faqPicks.map((entry) => (
+            <div class="qa__item">
+              <dt>{entry.q}</dt>
+              <dd>{entry.a}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <Band>
+    <h2>Simple enough to learn in a minute.<br />Built to grow with your business.</h2>
+    <p>
+      Every module is included from day one on every plan, with a 7-day free trial on Basic
+      and Pro.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn--primary" href={APP_URL}>Get started</a>
+      <a class="btn btn--tertiary" href="/pricing">See plans and pricing</a>
+    </div>
+  </Band>
+</Base>

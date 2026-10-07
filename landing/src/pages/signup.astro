@@ -1,0 +1,145 @@
+---
+/**
+ * Start a free trial. The 7-day trial on Basic and Pro is a request flow for now
+ * (owner, 2026-10-04): the visitor picks a plan and fills four fields, and the form
+ * opens WhatsApp with the request written out to OR² support. No account is
+ * created here, nothing is stored and no payment is taken; OR² sets the workspace
+ * up by hand. Automatic sign-up, trial expiry and payment come later with the
+ * payment gateway (landing/STATUS.md). Marked noindex and kept out of the sitemap.
+ */
+import Base from '../layouts/Base.astro'
+import { APP_URL, BRAND, SUPPORT_PHONES, whatsappUrl } from '../config/site'
+import { PLANS, TRIAL_DAYS, rupees } from '../data/pricing'
+
+const trialPlans = PLANS.filter((plan) => plan.trial)
+const support = SUPPORT_PHONES[0]
+const waBase = `https://wa.me/${support.tel.replace('+', '')}`
+const steps = [
+  'Choose Basic or Pro and send us your details.',
+  'We set up your workspace and send you your sign-in.',
+  `Use every module free for ${TRIAL_DAYS} days. No payment to start.`,
+  'Before the trial ends, we confirm your plan with you. Nothing is billed without it.',
+]
+---
+
+<Base
+  path="/signup"
+  noindex
+  title={`Start your ${TRIAL_DAYS}-day free trial · ${BRAND.name}`}
+  description={`Start a ${TRIAL_DAYS}-day free trial of OR² on the Basic or Pro plan. Every module included, no payment to start.`}
+>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Start your {TRIAL_DAYS}-day free trial</h1>
+      <p>
+        Every module, free for {TRIAL_DAYS} days on Basic or Pro. No payment to start: tell us about
+        your shop and we set up your workspace.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container split">
+      <div>
+        <h2>Your details</h2>
+        <form class="contact-form" id="trial-form" data-wa={waBase}>
+          <fieldset class="contact-form__row trial-plans">
+            <legend>Plan</legend>
+            {
+              trialPlans.map((plan, i) => (
+                <label class="trial-plan">
+                  <input type="radio" name="plan" value={plan.id} checked={i === 0} />
+                  <span>
+                    <strong>{plan.name}</strong> · {rupees(plan.pricePerMonth ?? 0)}/month after the trial
+                  </span>
+                </label>
+              ))
+            }
+          </fieldset>
+          <div class="contact-form__row">
+            <label for="trial-name">Your name</label>
+            <input type="text" id="trial-name" name="name" autocomplete="name" required />
+          </div>
+          <div class="contact-form__row">
+            <label for="trial-business">Business name</label>
+            <input type="text" id="trial-business" name="business" autocomplete="organization" required />
+          </div>
+          <div class="contact-form__row">
+            <label for="trial-phone">Mobile number</label>
+            <input type="tel" id="trial-phone" name="phone" autocomplete="tel" inputmode="tel" required />
+          </div>
+          <div class="contact-form__row">
+            <label for="trial-city">City</label>
+            <input type="text" id="trial-city" name="city" autocomplete="address-level2" required />
+          </div>
+          <button class="btn btn--primary" type="submit">Send trial request on WhatsApp</button>
+          <p class="plans__note">
+            This opens WhatsApp with your request written out to OR² support ({support.display}).
+            Nothing is stored on this website.
+          </p>
+        </form>
+        <noscript>
+          <p>
+            Or message us directly on{' '}
+            <a href={whatsappUrl(support, `Hi OR² team, I want to start the ${TRIAL_DAYS}-day free trial. Plan: Basic or Pro. My business name is: `)}>WhatsApp</a>{' '}
+            or call <a href={`tel:${support.tel}`}>{support.display}</a>.
+          </p>
+        </noscript>
+      </div>
+      <div class="stack">
+        <div class="panel">
+          <h3>How the trial works</h3>
+          <ol class="flow flow--stack">
+            {
+              steps.map((step, index) => (
+                <li class="flow__item">
+                  <span class="flow__n" aria-hidden="true">{index + 1}</span>
+                  <p>{step}</p>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+        <div class="panel">
+          <h3>Already have a workspace?</h3>
+          <p>Sign in with the account your administrator gave you.</p>
+          <div class="cta-row">
+            <a class="btn btn--tertiary" href={APP_URL}>Sign in to your workspace</a>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Several branches or a distributor?</h3>
+          <p>The Custom plan is set up and priced with you.</p>
+          <div class="cta-row">
+            <a class="btn btn--tertiary" href="/contact">Contact us</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  // Preselect the plan named in ?plan=, and send the request as a WhatsApp message.
+  const form = document.getElementById('trial-form') as HTMLFormElement | null
+  if (form) {
+    const wanted = new URLSearchParams(window.location.search).get('plan')
+    const radio = form.querySelector<HTMLInputElement>(`input[name="plan"][value="${wanted}"]`)
+    if (radio) radio.checked = true
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      const data = new FormData(form)
+      const plan = form.querySelector<HTMLInputElement>('input[name="plan"]:checked')
+      const planLabel = plan?.closest('label')?.querySelector('strong')?.textContent ?? ''
+      const text = [
+        'Hi OR² team, I want to start the 7-day free trial.',
+        `Plan: ${planLabel}`,
+        `Name: ${data.get('name')}`,
+        `Business: ${data.get('business')}`,
+        `Mobile: ${data.get('phone')}`,
+        `City: ${data.get('city')}`,
+      ].join('\n')
+      window.open(`${form.dataset.wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+    })
+  }
+</script>

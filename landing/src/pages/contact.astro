@@ -1,0 +1,162 @@
+---
+/**
+ * Contact. There is no backend for this site and no third-party form service.
+ * While no public address is published (landing/STATUS.md) the page does not show
+ * a dead form: it routes people to their workspace administrator and tells them
+ * what to include so the request can be answered the first time. Once
+ * PUBLIC_CONTACT_EMAIL is set, a mailto: composer appears instead.
+ */
+import Base from '../layouts/Base.astro'
+import { BRAND, CONTACT_EMAIL, HAS_CONTACT_EMAIL, SUPPORT_PHONES, whatsappUrl } from '../config/site'
+import { breadcrumbLd } from '../lib/ld'
+
+const routes = [
+  {
+    title: 'Support and onboarding',
+    body: 'Call or WhatsApp support on either number, or reach the workspace administrator who arranged your onboarding.',
+    href: '/faq#faq-getting-access-pricing-and-support',
+    link: 'Support questions answered in the FAQ',
+  },
+  {
+    title: 'Privacy requests',
+    body: 'Access, correction, export and deletion requests go through your workspace administrator, who can act on your behalf.',
+    href: '/privacy',
+    link: 'Read the privacy policy',
+  },
+  {
+    title: 'Press and partnerships',
+    body: 'We answer questions about what the product does and does not do. We do not comment on other businesses or their records.',
+    href: '/about',
+    link: 'About the company',
+  },
+]
+
+const include = [
+  'Your business name and the name of your workspace.',
+  'The screen or tab you were on, for example Sales or Stock.',
+  'What you expected, and what happened instead.',
+  'The date, and the bill or product involved, if there is one.',
+]
+---
+
+<Base path="/contact" extraLd={[breadcrumbLd([{ name: 'Contact', path: '/contact' }])]}>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Contact</h1>
+      <p>
+        Call or message us on WhatsApp, or go through your workspace administrator. This site has
+        no server and no trackers, so nothing you do on this page is sent anywhere.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container contact">
+      <div class="contact__routes">
+        {
+          routes.map((route) => (
+            <article class="route">
+              <h2>{route.title}</h2>
+              <p>{route.body}</p>
+              <a href={route.href}>{route.link}</a>
+            </article>
+          ))
+        }
+      </div>
+
+      <div class="stack">
+      <div class="panel panel--phones">
+        <h2>Call or WhatsApp</h2>
+        <p>Reach support directly on either number. Both take calls and WhatsApp messages.</p>
+        <ul class="phones">
+          {
+            SUPPORT_PHONES.map((phone) => (
+              <li class="phones__row">
+                <strong class="num">{phone.display}</strong>
+                <span class="phones__actions">
+                  <a class="btn btn--primary" href={`tel:${phone.tel}`} aria-label={`Call ${phone.display}`}>Call</a>
+                  <a class="btn btn--tertiary" href={whatsappUrl(phone)} rel="noopener" aria-label={`Message ${phone.display} on WhatsApp`}>WhatsApp</a>
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="panel">
+        {
+          HAS_CONTACT_EMAIL ? (
+            <>
+              <h2>Write to us</h2>
+              <p>
+                Email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>, or use the form: it
+                opens your own email app with the message written out. Nothing is submitted from
+                this page.
+              </p>
+              <form class="contact-form" id="contact-form" method="get" action={`mailto:${CONTACT_EMAIL}`}>
+                <div class="contact-form__row">
+                  <label for="contact-name">Your name</label>
+                  <input type="text" id="contact-name" name="name" autocomplete="name" required />
+                </div>
+                <div class="contact-form__row">
+                  <label for="contact-email">Your email</label>
+                  <input type="email" id="contact-email" name="email" autocomplete="email" required />
+                </div>
+                <div class="contact-form__row">
+                  <label for="contact-subject">What is it about?</label>
+                  <input type="text" id="contact-subject" name="subject" required />
+                </div>
+                <div class="contact-form__row">
+                  <label for="contact-message">Your message</label>
+                  <textarea id="contact-message" name="message" required />
+                </div>
+                <button class="btn btn--primary" type="submit">Open in your email app</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2>Before you get in touch</h2>
+              <p>
+                {BRAND.legalName} has not published a public email address yet, so there is no form
+                here to fill in. Call or WhatsApp us, or go through your workspace administrator,
+                and include:
+              </p>
+              <ul class="checks">
+                {include.map((item) => <li>{item}</li>)}
+              </ul>
+              <p class="panel__foot">
+                Many questions are already answered: <a href="/faq">browse the FAQ</a>.
+              </p>
+            </>
+          )
+        }
+      </div>
+      </div>
+    </div>
+  </section>
+
+  {
+    HAS_CONTACT_EMAIL && (
+      <script is:inline>
+        (function () {
+          // A mailto: composer, not a submission: the page reads the fields, builds a
+          // mailto: URL and hands the message to the visitor's own email app.
+          var form = document.getElementById('contact-form')
+          if (!form) return
+          form.addEventListener('submit', function (event) {
+            event.preventDefault()
+            var data = new FormData(form)
+            var subject = String(data.get('subject') || 'Enquiry')
+            var body = [
+              'Name: ' + String(data.get('name') || ''),
+              'Email: ' + String(data.get('email') || ''),
+              '',
+              String(data.get('message') || ''),
+            ].join('\n')
+            window.location.href = form.getAttribute('action') + '?subject=' +
+              encodeURIComponent(subject) + '&body=' + encodeURIComponent(body)
+          })
+        })()
+      </script>
+    )
+  }
+</Base>

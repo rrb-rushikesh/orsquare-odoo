@@ -1,0 +1,155 @@
+---
+/**
+ * Terms of service. Draft, for the same reason as the privacy policy: the app's
+ * own terms text, with the entity, jurisdiction and fee questions still open
+ * (landing/STATUS.md).
+ */
+import Base from '../layouts/Base.astro'
+import DocLayout from '../components/DocLayout.astro'
+import { BRAND } from '../config/site'
+import { breadcrumbLd } from '../lib/ld'
+---
+
+<Base path="/terms" extraLd={[breadcrumbLd([{ name: 'Terms', path: '/terms' }])]}>
+  <DocLayout path="/terms" title="Terms of service" lead="The terms for using an OR² workspace, in plain language." meta={`Effective date to be confirmed · ${BRAND.legalName}`}>
+    <div class="notice" slot="notice">
+      <p>
+        <strong>Draft — needs owner and legal review before it is relied on.</strong> The clauses
+        below follow the structure {BRAND.name} already publishes. The registered entity, its
+        address, the fee and cancellation terms, and the dispute forum are still to be confirmed
+        by {BRAND.legalName} and by a lawyer.
+      </p>
+    </div>
+
+
+    <h2>1. Agreement</h2>
+    <p>
+      These terms govern the use of {BRAND.name}, the business-operations platform operated by{' '}
+      {BRAND.legalName}. By using the service, your business agrees to these terms.
+    </p>
+
+    <h2>2. Eligibility</h2>
+    <p>
+      The service is provided to registered businesses. Your workspace administrator provisions
+      accounts for the people in your business who need access.
+    </p>
+    <ul>
+      <li>Accounts are provisioned by your administrator, not by individual sign-up.</li>
+      <li>Keep your credentials confidential.</li>
+      <li>Activity carried out under your account is treated as your business's activity.</li>
+    </ul>
+
+    <h2>3. The service</h2>
+    <p>
+      {BRAND.name} is a business-operations platform. It lets a business track stock, record
+      purchases and sales, manage payments, keep ledgers, monitor cash flow and produce reports,
+      all within a single workspace that is isolated to that business.
+    </p>
+
+    <h2>4. Acceptable use</h2>
+    <ul>
+      <li>Use the service for lawful business purposes only.</li>
+      <li>Do not interfere with, overload or attempt to disrupt the service.</li>
+      <li>Do not attempt to access another business's workspace or data.</li>
+      <li>Do not misuse data that belongs to another business or another person.</li>
+    </ul>
+
+    <h2>5. Your data and ownership</h2>
+    <p>
+      Your business owns its records. Everything you and your team enter, from products and bills
+      to payments, ledgers and reports, belongs to your business.
+    </p>
+    <p>
+      {BRAND.legalName} owns the platform: the service, its software and its trademarks. These
+      terms grant your business the right to use the service; they do not transfer any ownership of
+      the platform to you.
+    </p>
+
+    <h2>6. Service availability</h2>
+    <p>
+      We operate the service on a best-effort basis and work to keep it continuously available. The
+      counter is designed to keep billing offline; offline bills stay provisional until confirmed, and
+      you should test this on your own devices and network.
+      Planned maintenance is scheduled to avoid disrupting trading hours wherever possible.
+    </p>
+    <p>
+      The service is not offered with a specific uptime guarantee, and we do not claim one. No
+      availability figure is published on this site.
+    </p>
+
+    <h2>7. Fees and access</h2>
+    <p>
+      Plan prices are listed on the <a href="/pricing">pricing page</a> (Basic and Pro monthly, with a
+      7-day free trial; Custom priced with you). No payment is taken on this website yet; how
+      payment is collected will be added to these terms before billing starts.
+    </p>
+    <p>
+      The billing period, the payment terms, any advance paid and the treatment of an advance on
+      cancellation are terms of your service agreement. They are to be set out by {BRAND.legalName}
+      before these terms take effect, and are summarised at{' '}
+      <a href="/refund-cancellation">cancellations and refunds</a>.
+    </p>
+
+    <h2>8. Confidentiality and security</h2>
+    <p>
+      Each workspace is isolated to its business, and business records are never visible to, or
+      shared with, another business. We protect data with encryption in transit, controlled access
+      and least-privilege administration.
+    </p>
+    <p>
+      You are responsible for keeping your credentials confidential and for the accuracy of the
+      records entered in your workspace.
+    </p>
+
+    <h2>9. Disclaimers</h2>
+    <p>
+      To the extent permitted by law, the service is provided "as is" and "as available", without
+      warranties of any kind, whether express or implied, including any implied warranties of
+      merchantability or fitness for a particular purpose.
+    </p>
+
+    <h2>10. Limitation of liability</h2>
+    <p>
+      To the maximum extent permitted by law, {BRAND.legalName} will not be liable for indirect,
+      incidental, special or consequential losses, or for loss of profits or data arising from use
+      of the service. Nothing in these terms limits liability that cannot be limited by law.
+    </p>
+
+    <h2>11. Suspension and termination</h2>
+    <p>
+      Your workspace administrator may manage, suspend or remove user accounts within your
+      business's workspace.
+    </p>
+    <p>
+      When a business's use of the service ends, its business data is returned or deleted at the
+      administrator's instruction. Deletion is complete, with no history and no footprints.
+    </p>
+
+    <h2>12. Changes to these terms</h2>
+    <p>
+      If we change these terms, we will give reasonable advance notice through the service before
+      the changes take effect. Continued use of the service after changes take effect constitutes
+      acceptance of the updated terms.
+    </p>
+
+    <h2>13. Governing law</h2>
+    <p>
+      These terms are governed by the laws of India. The exclusive forum for disputes, and the
+      place of arbitration if any, are to be confirmed by {BRAND.legalName} before these terms
+      take effect.
+    </p>
+
+    <h2>14. Contact</h2>
+    <p>Questions about these terms are handled through your workspace administrator.</p>
+
+    <h2>15. Schedule to be completed by {BRAND.legalName}</h2>
+    <ul>
+      <li>Registered entity name, registered address and jurisdiction.</li>
+      <li>Governing law forum and any dispute resolution mechanism.</li>
+      <li>Fee, billing period, payment terms and the treatment of an advance.</li>
+      <li>Notice period for ending an access arrangement.</li>
+      <li>Effective date.</li>
+    </ul>
+
+  </DocLayout>
+</Base>

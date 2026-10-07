@@ -1,0 +1,118 @@
+---
+/**
+ * Page head: title, description, canonical, Open Graph, Twitter card, icons and
+ * the JSON-LD graph for the page. No third-party origin appears in any tag: the
+ * fonts are self-hosted and the social card is our own /og/<page>.png.
+ *
+ * The JSON-LD types are Organization, WebSite, SoftwareApplication, a typed page
+ * node and (on the FAQ page) FAQPage, wrapped in one @graph so a page emits one
+ * script tag.
+ */
+import { BRAND, SITE_ORIGIN, SUPPORT_PHONES, absoluteUrl, ogCard, pageMeta } from '../config/site'
+import { MODULE_GROUPS } from '../data/modules'
+import { webPageLd, webSiteLd } from '../lib/ld'
+
+interface Props {
+  /** Site-relative path, used for the canonical URL and the default title. */
+  path: string
+  title?: string
+  description?: string
+  /** Extra JSON-LD nodes for this page, appended to the shared graph. */
+  extraLd?: Record<string, unknown>[]
+  /** Placeholder pages (the signup page) must stay out of the index. */
+  noindex?: boolean
+}
+
+const { path, title, description, extraLd = [], noindex = false } = Astro.props
+
+const meta = pageMeta(path)
+const pageTitle = title ?? meta?.title ?? `${BRAND.name} · ${BRAND.shortTagline}`
+const pageDescription = description ?? meta?.description ?? BRAND.tagline
+const canonical = absoluteUrl(path)
+const ogImage = absoluteUrl(`/og/${ogCard(path)}.png`)
+
+const organization = {
+  '@type': 'Organization',
+  '@id': `${SITE_ORIGIN}/#organization`,
+  name: BRAND.name,
+  alternateName: ['ORSQUARE', 'OR2'],
+  url: `${SITE_ORIGIN}/`,
+  logo: {
+    '@type': 'ImageObject',
+    url: absoluteUrl('/logo.png'),
+    width: 512,
+    height: 512,
+  },
+  slogan: BRAND.tagline,
+  contactPoint: SUPPORT_PHONES.map((phone) => ({
+    '@type': 'ContactPoint',
+    contactType: 'customer support',
+    telephone: phone.tel,
+    areaServed: 'IN',
+    availableLanguage: ['en', 'hi', 'mr'],
+  })),
+  description: `${BRAND.name} (ORSQUARE) is a business-operations platform for shops, suppliers, distributors and restaurants.`,
+}
+
+// No price is published anywhere on this site, so no Offer node is emitted. See
+// landing/STATUS.md: the owner has to supply pricing before one can be added.
+const softwareApplication = {
+  '@type': 'SoftwareApplication',
+  '@id': `${SITE_ORIGIN}/#software`,
+  name: BRAND.name,
+  alternateName: ['ORSQUARE', 'OR2'],
+  applicationCategory: 'BusinessApplication',
+  applicationSubCategory: 'Point of sale, inventory and accounting',
+  operatingSystem: 'Any modern web browser',
+  description:
+    'OR² is a web-based business-operations platform: counter billing, two-location stock, purchases and supplier dues, customer khata, cash flow, day book and reports in one isolated workspace per business.',
+  featureList: MODULE_GROUPS.flatMap((group) => group.modules.map((module) => module.title)),
+  url: `${SITE_ORIGIN}/`,
+  publisher: { '@id': `${SITE_ORIGIN}/#organization` },
+  inLanguage: 'en-IN',
+}
+
+const graph = [
+  organization,
+  webSiteLd(),
+  softwareApplication,
+  ...(noindex ? [] : [webPageLd({ path, name: pageTitle, description: pageDescription })]),
+  ...extraLd,
+]
+const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{pageTitle}</title>
+<meta name="description" content={pageDescription} />
+<meta name="author" content={BRAND.name} />
+<meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+<link rel="canonical" href={canonical} />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={BRAND.name} />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:url" content={canonical} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={pageDescription} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={`${BRAND.name} (ORSQUARE): billing, stock and accounts in one workspace`} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={pageDescription} />
+<meta name="twitter:image" content={ogImage} />
+
+<meta name="theme-color" content="#0f62fe" />
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+{/* Self-hosted fonts: preloading the two weights the first screen uses. */}
+<link rel="preload" href="/fonts/ibm-plex-sans-latin-300-normal.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+
+<script type="application/ld+json" set:html={jsonLd} is:inline />

@@ -1,0 +1,145 @@
+---
+/**
+ * Privacy policy. Draft: the standard structure is filled in with the app's own
+ * privacy text, but the owner has not had it reviewed and the registered address
+ * and jurisdiction are still open questions (landing/STATUS.md).
+ */
+import Base from '../layouts/Base.astro'
+import DocLayout from '../components/DocLayout.astro'
+import { BRAND, CONTACT_EMAIL, HAS_CONTACT_EMAIL } from '../config/site'
+import { breadcrumbLd } from '../lib/ld'
+---
+
+<Base path="/privacy" extraLd={[breadcrumbLd([{ name: 'Privacy', path: '/privacy' }])]}>
+  <DocLayout path="/privacy" title="Privacy policy" lead="How OR² handles information, and the controls you keep over your records." meta={`Effective date to be confirmed · ${BRAND.legalName}`}>
+    <div class="notice" slot="notice">
+      <p>
+        <strong>Draft — needs owner and legal review before it is relied on.</strong> The
+        structure and the substance come from {BRAND.name}'s own privacy text. The registered
+        entity, its address, the contact route for data requests and the supervisory authority
+        are still to be confirmed by {BRAND.legalName}.
+      </p>
+    </div>
+
+
+    <h2>Who we are</h2>
+    <p>
+      {BRAND.legalName} operates {BRAND.name}, a business-operations platform provided to
+      registered businesses on an invite-only basis. Businesses use {BRAND.name} to manage stock,
+      purchases, sales, accounts and cash flow within their own isolated workspace. The registered
+      entity name, registered address and jurisdiction are set out in the schedule at the end of
+      this policy, which is to be completed by {BRAND.legalName} before this policy takes effect.
+    </p>
+    <p>This policy explains how information is handled across the service.</p>
+
+    <h2>The information in {BRAND.name}</h2>
+    <p>Information in the service falls into two kinds:</p>
+    <ul>
+      <li>
+        <strong>Account information.</strong> Details your workspace administrator provides when
+        provisioning your account, such as your name, email address, role, and your business's
+        details.
+      </li>
+      <li>
+        <strong>Business records.</strong> The records you and your team create in the course of
+        running your business: products, bills, payments, ledgers and reports.
+      </li>
+    </ul>
+
+    <h2>What we do not collect</h2>
+    <p>The service carries no advertising machinery and no analytics machinery.</p>
+    <ul>
+      <li>No advertising trackers.</li>
+      <li>No third-party analytics.</li>
+      <li>No profiling of you or your business.</li>
+      <li>Nothing is collected beyond what the service needs to run.</li>
+    </ul>
+    <p>
+      This website carries no analytics script, no advertising script and no third-party embed. The
+      fonts it uses are served from this site's own origin.
+    </p>
+
+    <h2>Your workspace is yours alone</h2>
+    <p>
+      Every business on {BRAND.name} gets an isolated workspace. Your records are never visible
+      to, or shared with, another business.
+    </p>
+    <p>
+      Even {BRAND.legalName} platform staff have no routine view of your business records. Access
+      is restricted to the narrow operational needs of running the service.
+    </p>
+
+    <h2>How data is protected</h2>
+    <ul>
+      <li>Data is encrypted in transit.</li>
+      <li>Access to systems is controlled and limited.</li>
+      <li>Administration follows least-privilege principles.</li>
+      <li>Workspaces are isolated from one another by design.</li>
+    </ul>
+
+    <h2>Retention and deletion</h2>
+    <p>
+      You stay in control of your business records. You can export, correct or delete your data at
+      any time.
+    </p>
+    <p>
+      When data is deleted, it is removed with no history and no footprints. Deletion in
+      {BRAND.name} is complete. The retention period for a workspace that is ended is to be
+      confirmed by {BRAND.legalName}.
+    </p>
+
+    <h2>Sharing</h2>
+    <p>We do not sell, rent or share business data.</p>
+    <p>
+      The service's infrastructure is hosted by our service providers, who process it under
+      obligations that protect it and only on our instructions. Those providers, the categories of
+      data they process and the locations they process it in are to be listed by {BRAND.legalName}
+      before this policy takes effect.
+    </p>
+
+    <h2>Your rights</h2>
+    <p>You can exercise the following rights over your account and business records:</p>
+    <ul>
+      <li>Access: see the information held in your workspace.</li>
+      <li>Correction: fix records that are wrong.</li>
+      <li>Export: take your records out of the service.</li>
+      <li>Deletion: have records removed with no history and no footprints.</li>
+    </ul>
+    <p>
+      These rights are exercised through your workspace administrator.
+      {
+        HAS_CONTACT_EMAIL ? (
+          <span>
+            {' '}
+            You can also write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+          </span>
+        ) : (
+          <span>
+            {' '}
+            A public address for data requests has not been published yet; it appears here once{' '}
+            {BRAND.legalName} confirms it.
+          </span>
+        )
+      }
+    </p>
+
+    <h2>Changes to this policy</h2>
+    <p>
+      If we make material changes to this policy, we will communicate them in advance through the
+      service. The effective date at the top of this page reflects the current version.
+    </p>
+
+    <h2>Contact</h2>
+    <p>Questions about privacy are handled through your workspace administrator.</p>
+
+    <h2>Schedule to be completed by {BRAND.legalName}</h2>
+    <ul>
+      <li>Registered entity name, registered address and jurisdiction.</li>
+      <li>Public email address for data requests.</li>
+      <li>List of infrastructure providers and the data they process.</li>
+      <li>Retention period for an ended workspace.</li>
+      <li>Effective date.</li>
+    </ul>
+
+  </DocLayout>
+</Base>

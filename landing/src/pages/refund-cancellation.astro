@@ -1,0 +1,93 @@
+---
+/**
+ * Cancellations and refunds. This page exists because a service agreement may
+ * imply payment. It states only what is true today: fees are agreed in a service
+ * agreement, no money moves through this website, and the commercial terms are
+ * still the owner's to set. No refund window, cooling-off period or penalty is
+ * invented here.
+ */
+import Base from '../layouts/Base.astro'
+import DocLayout from '../components/DocLayout.astro'
+import { BRAND } from '../config/site'
+import { breadcrumbLd } from '../lib/ld'
+---
+
+<Base path="/refund-cancellation" extraLd={[breadcrumbLd([{ name: 'Cancellations and refunds', path: '/refund-cancellation' }])]}>
+  <DocLayout path="/refund-cancellation" title="Cancellations and refunds" lead="No payment is taken on this website yet. Plan prices are on the pricing page; notice and refunds will be set before billing starts." meta={`Effective date to be confirmed · ${BRAND.legalName}`}>
+    <div class="notice" slot="notice">
+      <p>
+        <strong>Draft — needs owner and legal review, and the commercial terms, before it is
+        relied on.</strong> The commercial terms below are placeholders. {BRAND.legalName} has not
+        yet set a fee, a billing period, a notice period or a refund policy, so none is stated
+        here. This page must be completed from the service agreement template, not from this
+        draft.
+      </p>
+    </div>
+
+
+    <h2>1. No payment is taken on this website</h2>
+    <p>
+      This website is a set of public pages. It has no checkout, no payment form and no card
+      handling, and it does not take money yet. Plan prices are listed on the pricing page; the
+      7-day free trial on Basic and Pro is free and needs no payment.
+    </p>
+
+    <h2>2. Where your fees are set</h2>
+    <p>
+      If fees apply to your business's use of {BRAND.name}, they are agreed directly with{' '}
+      {BRAND.legalName} in your service agreement, arranged through your business administrator.
+      The listed plan prices are on the <a href="/pricing">pricing page</a>; how they are billed,
+      renewed and refunded will be added here before billing starts.
+    </p>
+    <p>
+      The service agreement is the document that governs billing, renewal, notice and refunds for
+      your business. Where this page and your service agreement differ, your service agreement is
+      the one that applies.
+    </p>
+
+    <h2>3. Ending an access arrangement</h2>
+    <p>
+      Access to a workspace is arranged by arrangement, not by self-service subscription. To end
+      it, speak to your workspace administrator, who will follow the notice process in your
+      service agreement.
+    </p>
+    <p>
+      The notice period, and whether any fee is payable for a part-period, are terms of your
+      service agreement. They are not set on this page and are not yet set by {BRAND.legalName}.
+    </p>
+
+    <h2>4. What happens to your records</h2>
+    <p>
+      When a business's use of the service ends, its business data is returned or deleted at the
+      administrator's instruction. Deletion is complete, with no history and no footprints.
+    </p>
+    <p>
+      Export your records while you still have access. Products, ledgers, sales and registers can
+      be exported to CSV or Excel at any time, and that export is yours to keep.
+    </p>
+
+    <h2>5. Refunds</h2>
+    <p>
+      Refunds, if any, are dealt with under your service agreement. {BRAND.legalName} has not
+      published a refund policy, and this page does not state one. No cooling-off period, refund
+      window or cancellation charge is claimed here, because none has been set.
+    </p>
+
+    <h2>6. Disputes</h2>
+    <p>
+      These terms are governed by the laws of India. The forum for disputes, and any arbitration
+      mechanism, are to be confirmed by {BRAND.legalName}.
+    </p>
+
+    <h2>7. Schedule to be completed by {BRAND.legalName}</h2>
+    <ul>
+      <li>Fee, billing period, payment terms and applicable taxes.</li>
+      <li>Advance paid, and its treatment on cancellation.</li>
+      <li>Notice period required to end an access arrangement.</li>
+      <li>Refund eligibility, and how a refund is claimed and paid.</li>
+      <li>Dispute forum and any arbitration mechanism.</li>
+      <li>Effective date.</li>
+    </ul>
+
+  </DocLayout>
+</Base>

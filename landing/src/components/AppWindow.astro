@@ -1,0 +1,90 @@
+---
+/**
+ * A drawn, static view of the OR² dashboard, used under the hero so a first-time
+ * visitor sees the product immediately. It is built from HTML and CSS (no image,
+ * no script) and every figure is sample data, labelled as such. The layout follows
+ * the dashboard tab's own purpose: today's sales and payment split, weekly sales,
+ * low-stock attention, location valuation and top sellers.
+ */
+const tabs = ['Dashboard', 'Sales', 'Purchases', 'Products', 'Stock', 'Sheet', 'Cash flow', 'Day book', 'Calendar']
+
+const kpis = [
+  { label: "Today's sales", value: '₹ 18,420', note: '41 bills' },
+  { label: 'Customers owe', value: '₹ 15,400', note: 'On khata' },
+  { label: 'You owe suppliers', value: '₹ 72,300', note: '4 suppliers' },
+  { label: 'Low stock', value: '6 products', note: 'At or below reorder level' },
+]
+
+const week = [
+  { day: 'Mon', v: 62 },
+  { day: 'Tue', v: 48 },
+  { day: 'Wed', v: 71 },
+  { day: 'Thu', v: 55 },
+  { day: 'Fri', v: 84 },
+  { day: 'Sat', v: 100 },
+  { day: 'Sun', v: 78 },
+]
+
+const low = [
+  { name: 'Tea leaf 250 g', left: '8 left' },
+  { name: 'Wheat flour 10 kg', left: '11 left' },
+  { name: 'Sugar 1 kg', left: '44 left' },
+]
+---
+
+<div class="window" role="img" aria-label="A sample OR² dashboard showing today's sales, what customers owe, what you owe suppliers and low stock">
+  <div class="window__bar">
+    <span class="window__title">OR² · Dashboard</span>
+    <span class="window__tag">Sample data</span>
+  </div>
+  <div class="window__body" aria-hidden="true">
+    <ul class="window__nav">
+      {tabs.map((tab, i) => <li class:list={[{ 'is-active': i === 0 }]}>{tab}</li>)}
+    </ul>
+    <div class="window__main">
+      <div class="kpis">
+        {
+          kpis.map((k) => (
+            <div class="kpi">
+              <span class="kpi__label">{k.label}</span>
+              <span class="kpi__value num">{k.value}</span>
+              <span class="kpi__note">{k.note}</span>
+            </div>
+          ))
+        }
+      </div>
+      <div class="window__cols">
+        <div class="wpanel">
+          <div class="wpanel__head">Sales this week</div>
+          <div class="chart">
+            {
+              week.map((d) => (
+                <div class="chart__col">
+                  <span class="chart__bar" style={`height:${d.v}%`} />
+                  <span class="chart__day">{d.day}</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <div class="wpanel">
+          <div class="wpanel__head">Low stock</div>
+          <ul class="wlist">
+            {low.map((l) => <li><span>{l.name}</span><span class="num">{l.left}</span></li>)}
+          </ul>
+          <div class="wpanel__head wpanel__head--sub">Today by payment</div>
+          <div class="split-bar">
+            <span class="split-bar__seg split-bar__seg--cash" style="width:53%" />
+            <span class="split-bar__seg split-bar__seg--upi" style="width:35%" />
+            <span class="split-bar__seg split-bar__seg--khata" style="width:12%" />
+          </div>
+          <div class="split-key">
+            <span><i class="key key--cash" />Cash</span>
+            <span><i class="key key--upi" />UPI</span>
+            <span><i class="key key--khata" />Khata</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

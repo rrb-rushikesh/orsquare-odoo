@@ -1,0 +1,45 @@
+---
+/**
+ * Marketing chrome: brand, primary navigation and the sign-in call to action.
+ * Above 672px it is one row. Below it the bar becomes a compact mobile bar: menu
+ * button on the left, the logo in the middle, Sign in on the right, and the links
+ * open in a panel under the bar. The menu is a checkbox, so it needs no script and
+ * works with the keyboard (Space toggles it, focus is visible).
+ */
+import { APP_URL, BRAND, NAV } from '../config/site'
+import Logo from './Logo.astro'
+
+const current = Astro.url.pathname.replace(/\/+$/, '') || '/'
+const isCurrent = (href: string) => (href === '/' ? current === '/' : current === href)
+// "Home" appears only on the other pages; on the home page itself it would point at nothing.
+const items = current === '/' ? NAV : [{ label: 'Home', href: '/' }, ...NAV]
+---
+
+<header class="topbar">
+  <div class="container topbar__inner">
+    <input class="menu__input" type="checkbox" id="menu-toggle" aria-label="Menu" />
+    <label class="menu__button" for="menu-toggle" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+        <path class="menu__open" d="M3 6h18M3 12h18M3 18h18"></path>
+        <path class="menu__close" d="M5 5l14 14M19 5L5 19"></path>
+      </svg>
+    </label>
+    <a class="brand" href="/">
+      <Logo size={36} label={BRAND.name} />
+    </a>
+    <nav class="nav" aria-label="Primary">
+      {
+        items.map((item) => (
+          <a
+            class="nav__link"
+            href={item.href}
+            aria-current={isCurrent(item.href) ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+    <a class="btn btn--primary nav__signin" href={APP_URL}>Sign in</a>
+  </div>
+</header>

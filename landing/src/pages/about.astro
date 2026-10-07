@@ -1,0 +1,155 @@
+---
+/**
+ * About. Facts only: what OR² is, who it is for, the principles it is built on,
+ * and an explicit list of what the site does not claim. No customer counts,
+ * certifications or uptime figures appear because none can be stood behind yet.
+ */
+import Base from '../layouts/Base.astro'
+import { APP_URL, BRAND } from '../config/site'
+import { breadcrumbLd } from '../lib/ld'
+
+const facts = [
+  { label: 'Built for', value: 'Shops, suppliers, distributors, restaurants and businesses in other industries' },
+  { label: 'Workspace', value: 'One isolated workspace per business, with its own short address' },
+  { label: 'At the counter', value: 'Designed so billing can continue without a connection; offline bills stay provisional until confirmed' },
+  { label: 'Your records', value: 'Export to CSV or Excel at any time; deletion is complete' },
+  { label: 'Access', value: 'By invitation, arranged through your business administrator' },
+]
+
+const principles = [
+  {
+    title: 'Simplicity first',
+    body: 'Software that is simple enough to understand at a glance. Everything tracked, nothing overcomplicated.',
+  },
+  {
+    title: 'Your data, your control',
+    body: 'Your records belong to your business. Export, correct or delete them at any time. Deletion is complete, with no history and no footprints.',
+  },
+  {
+    title: 'Reliability over buzz',
+    body: 'We build for the counter that must keep working, not for trends. No trackers, no analytics machinery, no noise.',
+  },
+  {
+    title: 'Isolation by design',
+    body: "Every business's workspace is its own, never visible to, or shared with, another business.",
+  },
+]
+
+const day = [
+  { title: 'Sell and buy', body: 'Bill at the counter, record supplier bills, take payments.' },
+  { title: 'Stock and money follow', body: 'Godown and counter stock, supplier dues and the cash register update from the same entries.' },
+  { title: 'Close the day', body: 'Count stock and cash, review differences, seal the day. Reports build from that record.' },
+]
+---
+
+<Base path="/about" extraLd={[breadcrumbLd([{ name: 'About', path: '/about' }])]}>
+  <section class="page-hero">
+    <div class="container">
+      <h1>About {BRAND.nameFull}</h1>
+      <p>
+        {BRAND.name} is a business-operations platform that keeps stock,
+        purchases, sales, accounts and cash flow in one simple workspace.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container split">
+      <div>
+        <h2>What {BRAND.name} does</h2>
+        <p class="lede">
+          Each business gets its own isolated workspace where its team records what it buys, what
+          it sells, what it is owed and what it holds, and can see the state of the business at a
+          glance.
+        </p>
+        <p>
+          There is no separate bookkeeping step. A supplier bill lands in stock and in the supplier
+          ledger together; a sale reduces stock and updates the cash register. The counter is
+          designed to keep billing without a connection; offline bills stay provisional until they are
+          confirmed.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn--primary" href="/modules">See the modules</a>
+          <a class="btn btn--tertiary" href="/faq">Read the FAQ</a>
+        </div>
+      </div>
+      <dl class="facts" aria-label="OR² at a glance">
+        {
+          facts.map((fact) => (
+            <div class="facts__row">
+              <dt>{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <section class="section section--band">
+    <div class="container">
+      <div class="section-head">
+        <h2>How a day runs</h2>
+        <p>The same three steps, whatever the business sells.</p>
+      </div>
+      <ol class="flow">
+        {
+          day.map((step, index) => (
+            <li class="flow__item">
+              <span class="flow__n" aria-hidden="true">{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Principles</h2>
+        <p>What we hold to when we decide what to build.</p>
+      </div>
+      <div class="grid grid--4">
+        {
+          principles.map((item) => (
+            <article class="card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--band">
+    <div class="container split">
+      <div>
+        <h2>What we do not claim</h2>
+        <p class="lede">
+          We do not publish uptime percentages, customer counts, certifications or reference names,
+          because we do not yet have figures we can stand behind.
+        </p>
+        <p>
+          This site names no third-party tracker and no analytics service, and the product carries
+          no advertising machinery. When we have a figure we can prove, it will be published with
+          its source.
+        </p>
+      </div>
+      <div class="panel">
+        <h3>Getting started</h3>
+        <p>
+          {BRAND.name} is provided to registered businesses on an invite-only basis. To onboard your
+          business, speak to your workspace administrator, or write to us.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn--primary" href={APP_URL}>Sign in</a>
+          <a class="btn btn--tertiary" href="/contact">Contact us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,97 @@
+---
+import { reviewedLabel } from '../config/site'
+/**
+ * Shared shell for every long-form page (privacy, terms, cancellations and
+ * refunds, sign-up, 404). One hero, then a two-column body: a sticky "On this
+ * page" rail generated from the page's own <h2> headings, and the readable
+ * column. Everything sits inside `.container`, so these pages line up with the
+ * rest of the site (the earlier pages rendered flush against the viewport edge).
+ *
+ * A page passes its content as the default slot and, optionally, a draft notice
+ * in the `notice` slot.
+ */
+interface Props {
+  title: string
+  lead?: string
+  meta?: string
+  /** Current path, used to leave the page itself out of the related links. */
+  path: string
+}
+
+const { title, lead, meta, path } = Astro.props
+const reviewed = `Last reviewed ${reviewedLabel()}`
+
+const slug = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/<[^>]+>/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+const toc: { id: string; text: string }[] = []
+const rendered = await Astro.slots.render('default')
+const body = rendered.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/g, (_match, attrs: string, inner: string) => {
+  const text = inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+  const id = `${slug(text)}`
+  toc.push({ id, text })
+  return `<h2${attrs} id="${id}">${inner}</h2>`
+})
+
+const RELATED = [
+  { href: '/privacy', title: 'Privacy policy', body: 'What we handle and how you stay in control.' },
+  { href: '/terms', title: 'Terms of service', body: 'The rules for using an OR² workspace.' },
+  { href: '/refund-cancellation', title: 'Cancellations and refunds', body: 'Where fees, notice and refunds are set.' },
+  { href: '/contact', title: 'Contact', body: 'Support, onboarding and enquiries.' },
+]
+const related = RELATED.filter((item) => item.href !== path)
+const showToc = toc.length >= 3
+---
+
+<section class="page-hero">
+  <div class="container">
+    <h1>{title}</h1>
+    {lead && <p>{lead}</p>}
+    <p class="page-hero__meta">{meta ? `${meta} · ${reviewed}` : reviewed}</p>
+  </div>
+</section>
+
+<div class:list={['container', 'doc', { 'doc--single': !showToc }]}>
+  {
+    showToc && (
+      <aside class="doc__side">
+        <nav aria-label="On this page">
+          <p class="doc__side-title">On this page</p>
+          <ol>
+            {toc.map((item) => (
+              <li>
+                <a href={`#${item.id}`}>{item.text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </aside>
+    )
+  }
+  <article class="prose">
+    <slot name="notice" />
+    <Fragment set:html={body} />
+  </article>
+</div>
+
+{
+  related.length > 0 && (
+    <section class="section section--band">
+      <div class="container">
+        <h2>Related</h2>
+        <div class="tiles">
+          {related.map((item) => (
+            <a class="tile" href={item.href}>
+              <strong>{item.title}</strong>
+              <span>{item.body}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}

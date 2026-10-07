@@ -1,0 +1,17 @@
+{
+  "name": "orsquare-landing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OR² public marketing site (static, Astro). Separate from the logged-in retailer app.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro build && node scripts/check.mjs"
+  },
+  "dependencies": {
+    "astro": "^5.6.1"
+  }
+}

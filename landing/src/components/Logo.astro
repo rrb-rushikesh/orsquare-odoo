@@ -1,0 +1,22 @@
+---
+/**
+ * The OR² brand mark: the supplied logo image (public/logo.png, 512x512), shown
+ * square at the size asked for. Every icon and the social card are generated from
+ * the same file by scripts/make-brand-assets.mjs.
+ */
+interface Props {
+  size?: number
+  label?: string
+}
+
+const { size = 36, label = 'OR²' } = Astro.props
+---
+
+<img
+  src="/logo.png"
+  width={size}
+  height={size}
+  alt={label}
+  decoding="async"
+  style="flex-shrink:0;display:block"
+/>

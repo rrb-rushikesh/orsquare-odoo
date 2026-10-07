@@ -1,0 +1,60 @@
+---
+/**
+ * Modules. Every group and every card is the app's own modules page, so the site
+ * cannot describe a module the product does not have.
+ */
+import Base from '../layouts/Base.astro'
+import Band from '../components/Band.astro'
+import { APP_URL, BRAND } from '../config/site'
+import { MODULE_GROUPS } from '../data/modules'
+import { breadcrumbLd } from '../lib/ld'
+
+const total = MODULE_GROUPS.reduce((count, group) => count + group.modules.length, 0)
+---
+
+<Base path="/modules" extraLd={[breadcrumbLd([{ name: 'Modules', path: '/modules' }])]}>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Modules</h1>
+      <p>
+        {BRAND.name} is one platform with one complete feature set. Everything below ships with
+        every workspace. No module is held back behind a higher plan.
+      </p>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Module groups">
+    <div class="container">
+      <ul class="jump" aria-label="Jump to a group">
+        {MODULE_GROUPS.map((group) => <li><a href={`#${group.id}`}>{group.heading}</a></li>)}
+      </ul>
+      {
+        MODULE_GROUPS.map((group) => (
+          <div class="mgroup" id={group.id}>
+            <div class="mgroup__head">
+              <h2>{group.heading}</h2>
+              <p>{group.modules.length} of {total} modules</p>
+            </div>
+            <div class="grid">
+              {group.modules.map((module) => (
+                <article class="card">
+                  <h3>{module.title}</h3>
+                  <p>{module.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <Band>
+    <h2>Every module is enabled from day one.</h2>
+    <p>Every plan covers all of it. There are no add-ons to switch on.</p>
+    <div class="cta-row">
+      <a class="btn btn--primary" href="/pricing">See everything included</a>
+      <a class="btn btn--tertiary" href={APP_URL}>Sign in to your workspace</a>
+    </div>
+  </Band>
+</Base>

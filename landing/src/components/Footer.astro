@@ -1,0 +1,50 @@
+---
+/** The one dark surface on the site: the charcoal footer with the full link list. */
+import { BRAND, FOOTER_COLUMNS, FOOTER_LINE, SUPPORT_PHONES, whatsappUrl } from '../config/site'
+import Logo from './Logo.astro'
+---
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <a class="brand" href="/" style="color:var(--inverse-ink)">
+          <Logo size={36} label={BRAND.name} />
+        </a>
+        <p>{FOOTER_LINE}</p>
+      </div>
+      <div class="footer__cols">
+        {
+          FOOTER_COLUMNS.map((col) => (
+            <div class="footer__col">
+              <p class="footer__heading">{col.heading}</p>
+              <ul>
+                {col.links.map((link) => (
+                  <li>
+                    <a href={link.href}>{link.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <p class="footer__legal">
+        © {BRAND.copyrightYear} {BRAND.nameFull}. All rights reserved. Prices in Indian
+        rupees; no payment is taken on this website yet.
+      </p>
+      <ul class="footer__support" aria-label="Support">
+        {
+          SUPPORT_PHONES.map((phone) => (
+            <li>
+              <a class="footer__tel" href={`tel:${phone.tel}`}>{phone.display}</a>
+              <a class="footer__wa" href={whatsappUrl(phone)} rel="noopener" aria-label={`Message ${phone.display} on WhatsApp`}>WhatsApp</a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro'
+import { BRAND, PAGES } from '../config/site'
+
+const links = PAGES.filter((page) => page.path !== '/' && page.path !== '/signup')
+---
+
+<Base
+  path="/404"
+  noindex
+  title={`Page not found · ${BRAND.name}`}
+  description="That page does not exist on this site."
+>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Page not found</h1>
+      <p>That page does not exist on this site. Nothing has gone wrong with your workspace.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Try one of these</h2>
+      </div>
+      <div class="tiles">
+        <a class="tile" href="/">
+          <strong>Home</strong>
+          <span>What {BRAND.name} does, in one page.</span>
+        </a>
+        {
+          links.map((page) => (
+            <a class="tile" href={page.path}>
+              <strong>{page.title.replace(` · ${BRAND.name}`, '')}</strong>
+              <span>{page.description}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>
