@@ -55,7 +55,7 @@ class TestHttpApi(HttpCase):
 
     def test_03_login_logout_cycle(self):
         r = self._post('/api/session/login', {'login': 'http_owner', 'password': 'wrong'})
-        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.status_code, 401, r.text)
         self.assertEqual(r.json()['error']['code'], 'bad_credentials')
         self._login()
         me = self.url_open('/api/session/me')

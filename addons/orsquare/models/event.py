@@ -28,21 +28,27 @@ class OrsquareEvent(models.Model):
 
     company_id = fields.Many2one('res.company', required=True, index=True)
     type = fields.Char(required=True, index=True)
-    payload = fields.Json()
+    payload = fields.Json(help="Non-monetary facts: safe for every staff member.")
+    money = fields.Json(help="Amounts only: delivered to users with can_see_money.")
 
     @api.model
-    def publish(self, company, event_type, payload=None):
+    def publish(self, company, event_type, payload=None, money=None):
         """Record an event in the current transaction and push it after commit."""
         company = company or self.env.company
         self.env.cr.execute("SELECT pg_advisory_xact_lock(%s)", [EVENT_LOCK_KEY])
         event = self.sudo().create({
-            'company_id': company.id, 'type': event_type, 'payload': payload or {}})
-        message = {'seq': event.id, 'type': event_type, 'payload': payload or {}}
-        channel = 'shop:%s' % company.id
+            'company_id': company.id, 'type': event_type, 'payload': payload or {}, 'money': money or {}})
         url = self.env['ir.config_parameter'].sudo().get_param('orsquare.centrifugo_url')
         api_key = self.env['ir.config_parameter'].sudo().get_param('orsquare.centrifugo_api_key')
         if url:
-            self.env.cr.postcommit.add(lambda: self._push(url, api_key, channel, message))
+            # Two channels: 'shop:N' carries no amounts (every staff device); 'shop:N:money' carries the
+            # full event and must only be authorised by the realtime gateway for can_see_money users.
+            safe = {'seq': event.id, 'type': event_type, 'payload': payload or {}}
+            full = dict(safe, money=money or {})
+            base = 'shop:%s' % company.id
+            self.env.cr.postcommit.add(lambda: self._push(url, api_key, base, safe))
+            if money:
+                self.env.cr.postcommit.add(lambda: self._push(url, api_key, base + ':money', full))
         return event
 
     @staticmethod
@@ -57,10 +63,19 @@ class OrsquareEvent(models.Model):
             _logger.warning("ORSquare realtime push failed for %s", channel, exc_info=True)
 
     @api.model
-    def since(self, company, since_seq, limit=500):
+    def since(self, company, since_seq, limit=500, with_money=None):
+        """Events after ``since_seq``; amounts are included only for users who may see money."""
+        if with_money is None:
+            with_money = self.env.su or self.env.user.has_group('orsquare.group_orsquare_can_see_money')
         events = self.sudo().search([('company_id', '=', company.id), ('id', '>', since_seq)],
                                     order='id', limit=limit)
-        return [{'seq': e.id, 'type': e.type, 'payload': e.payload} for e in events]
+        out = []
+        for e in events:
+            row = {'seq': e.id, 'type': e.type, 'payload': e.payload}
+            if with_money and e.money:
+                row['money'] = e.money
+            out.append(row)
+        return out
 
     @api.model
     def latest_seq(self, company):

@@ -10,6 +10,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_round
 
+from .security_utils import require_staff
+
 REVENUE_TYPES = ('income', 'income_other')
 COGS_TYPES = ('expense_direct_cost',)
 EXPENSE_TYPES = ('expense', 'expense_depreciation')
@@ -34,6 +36,7 @@ class OrsquareReportsService(models.AbstractModel):
     # ------------------------------------------------------------------ dashboard
     @api.model
     def dashboard(self):
+        require_staff(self.env)
         env = self.sudo().env
         company = self.env.company
         today = company.orsquare_current_business_date()
@@ -101,6 +104,7 @@ class OrsquareReportsService(models.AbstractModel):
     @api.model
     def calendar(self, date_from, date_to):
         """Period summary from frozen snapshots (max 92 days)."""
+        require_staff(self.env)
         date_from, date_to = fields.Date.to_date(date_from), fields.Date.to_date(date_to)
         if (date_to - date_from).days > 92:
             raise UserError(_("A period can span at most 92 days."))
@@ -119,6 +123,7 @@ class OrsquareReportsService(models.AbstractModel):
 
     @api.model
     def day_detail(self, date):
+        require_staff(self.env)
         d = self.sudo().env['orsquare.business_day'].search([
             ('company_id', '=', self.env.company.id), ('date', '=', fields.Date.to_date(date))], limit=1)
         if not d:

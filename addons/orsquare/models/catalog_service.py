@@ -4,6 +4,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import float_compare
 
+from .security_utils import require_staff
+
 
 class OrsquareCatalogService(models.AbstractModel):
     _name = 'orsquare.catalog.service'
@@ -22,6 +24,7 @@ class OrsquareCatalogService(models.AbstractModel):
     @api.model
     def units(self):
         """Catalog Masters -> Units: Tier 1 base units (with the eye toggle) and Tier 2 shop units."""
+        require_staff(self.env)
         env = self.sudo().env
         base = env['uom.uom'].with_context(active_test=False).search([('is_platform_base', '=', True)], order='category_id, id')
         shop = env['uom.uom'].search([('orsquare_base_unit_id', '!=', False)], order='category_id, factor desc')
@@ -70,6 +73,7 @@ class OrsquareCatalogService(models.AbstractModel):
     # ------------------------------------------------------------------ brands / categories
     @api.model
     def brands(self):
+        require_staff(self.env)
         return [{'id': b.id, 'name': b.name} for b in self.env['orsquare.brand'].search([])]
 
     @api.model
@@ -79,6 +83,7 @@ class OrsquareCatalogService(models.AbstractModel):
 
     @api.model
     def categories(self):
+        require_staff(self.env)
         return [{'id': c.id, 'name': c.complete_name, 'regime': c.orsquare_tax_regime_id.name or ''}
                 for c in self.env['product.category'].search([])]
 
@@ -91,6 +96,7 @@ class OrsquareCatalogService(models.AbstractModel):
 
     @api.model
     def tax_regimes(self):
+        require_staff(self.env)
         return [{'id': r.id, 'name': r.name, 'kind': r.kind, 'tcs_rate': r.tcs_rate,
                  'sale_taxes': r.sale_tax_ids.mapped('name'), 'purchase_taxes': r.purchase_tax_ids.mapped('name')}
                 for r in self.env['orsquare.tax_regime'].search([])]
@@ -118,7 +124,7 @@ class OrsquareCatalogService(models.AbstractModel):
         'name': 'name', 'barcode': 'barcode', 'list_price': 'list_price', 'categ_id': 'categ_id',
         'uom_id': 'uom_id', 'brand_id': 'orsquare_brand_id', 'short_code': 'orsquare_short_code',
         'regime_id': 'orsquare_tax_regime_id', 'low_stock_qty': 'orsquare_low_stock_qty',
-        'is_kitchen': 'is_kitchen', 'default_code': 'default_code',
+        'is_kitchen': 'is_kitchen', 'default_code': 'default_code', 'mrp': 'orsquare_mrp',
     }
 
     @api.model
@@ -182,6 +188,7 @@ class OrsquareCatalogService(models.AbstractModel):
     @api.model
     def list_products(self, search=None, kind=None, limit=200, offset=0, changed_since=None):
         """Catalog listing; purchase cost only for staff with valuation rights."""
+        require_staff(self.env)
         domain = [('available_in_pos', '=', True)]
         if search:
             domain += ['|', '|', ('name', 'ilike', search), ('barcode', 'ilike', search),
@@ -199,7 +206,7 @@ class OrsquareCatalogService(models.AbstractModel):
                 domain, limit=limit, offset=offset, order='name'):
             row = {
                 'id': t.id, 'name': t.name, 'barcode': t.barcode or '', 'short_code': t.orsquare_short_code or '',
-                'price': t.list_price, 'uom': t.uom_id.name, 'capacity_ml': t.orsquare_capacity_ml,
+                'price': t.list_price, 'mrp': t.orsquare_mrp or None, 'uom': t.uom_id.name, 'capacity_ml': t.orsquare_capacity_ml,
                 'kind': 'kitchen' if t.is_kitchen else ('retail' if t.is_storable else 'consumable'),
                 'brand': t.orsquare_brand_id.name or '', 'regime': t.orsquare_tax_regime_id.name or '',
                 'can_open': t.orsquare_can_open, 'active': t.active and t.available_in_pos,
@@ -218,6 +225,7 @@ class OrsquareCatalogService(models.AbstractModel):
     # ------------------------------------------------------------------ restaurant floors & tables
     @api.model
     def floors(self):
+        require_staff(self.env)
         return [{'id': f.id, 'name': f.name, 'tables': [
             {'id': t.id, 'number': t.table_number, 'seats': t.seats} for t in f.table_ids.sorted('table_number')]}
             for f in self.env['restaurant.floor'].search([])]

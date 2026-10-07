@@ -47,7 +47,7 @@ class OrsquareCashflowService(models.AbstractModel):
             'amount': amount, 'journal_id': journal.id, 'payment_method_line_id': method_line.id,
             'destination_account_id': account.id, 'memo': description or label})
         payment.action_post()
-        env['orsquare.event'].publish(company, 'cash_entry', {'kind': kind, 'amount': amount, 'mode': mode})
+        env['orsquare.event'].publish(company, 'cash_entry', {'kind': kind, 'mode': mode}, money={'amount': amount})
         return payment.id
 
     # ------------------------------------------------------------------ register

@@ -394,8 +394,8 @@ class OrsquareSaleService(models.AbstractModel):
         flagged = self._flag_discrepancies(env, company, order, warehouse, shortages, peg_short, business_date)
 
         env['orsquare.event'].publish(company, 'sale_settled', {
-            'order_id': order.id, 'name': order.name, 'total': amount_total,
-            'business_date': str(business_date), 'flagged': bool(flagged)})
+            'order_id': order.id, 'name': order.name,
+            'business_date': str(business_date), 'flagged': bool(flagged)}, money={'total': amount_total})
         result = self._result(env, order, transfer_picking=transfer_picking, flagged=flagged)
         result['rolled_forward'] = rolled_forward
         return result

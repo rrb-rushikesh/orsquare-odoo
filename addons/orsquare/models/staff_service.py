@@ -9,6 +9,7 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .res_company import ORSQUARE_TABS
+from .security_utils import require_staff
 
 ALL_TABS = [t for t, _n in ORSQUARE_TABS]
 ROLE_GROUPS = {
@@ -100,6 +101,7 @@ class OrsquareStaffService(models.AbstractModel):
     # ------------------------------------------------------------------ session / bootstrap info
     @api.model
     def me(self):
+        require_staff(self.env)
         user = self.env.user
         company = user.company_id
         return {
@@ -208,6 +210,7 @@ class OrsquareStaffService(models.AbstractModel):
     # ------------------------------------------------------------------ settings (Business Studio)
     @api.model
     def get_settings(self):
+        require_staff(self.env)
         company = self.env.company
         out = {f: company[f] for f in SETTINGS_FIELDS}
         out['orsquare_tab_catalog'] = ORSQUARE_TABS

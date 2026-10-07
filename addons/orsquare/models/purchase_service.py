@@ -305,7 +305,7 @@ class OrsquarePurchaseService(models.AbstractModel):
 
         env['orsquare.event'].publish(company, 'purchase_recorded', {
             'order_id': order.id, 'bill_id': bill.id, 'supplier': supplier.name,
-            'total': bill.amount_total, 'business_date': str(business_date)})
+            'business_date': str(business_date)}, money={'total': bill.amount_total})
         return self._result(order, bill=bill, landed=landed)
 
     @api.model

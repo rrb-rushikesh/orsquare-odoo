@@ -15,6 +15,8 @@ from datetime import timedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, RedirectWarning, UserError, ValidationError
 
+from .security_utils import require_staff
+
 _logger = logging.getLogger(__name__)
 
 STOCK_EVENTS = {'sale_settled', 'stock_changed', 'purchase_recorded', 'purchase_returned',
@@ -65,6 +67,7 @@ class OrsquareSyncService(models.AbstractModel):
     # ------------------------------------------------------------------ bootstrap
     @api.model
     def bootstrap(self):
+        require_staff(self.env)
         env = self.env
         company = env.company
         staff = env['orsquare.staff.service']
@@ -97,6 +100,7 @@ class OrsquareSyncService(models.AbstractModel):
     # ------------------------------------------------------------------ delta
     @api.model
     def delta(self, since_seq, since_ts=None, limit=500):
+        require_staff(self.env)
         company = self.env.company
         Event = self.env['orsquare.event']
         since_seq = int(since_seq or 0)

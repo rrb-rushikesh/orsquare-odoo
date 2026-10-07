@@ -27,5 +27,6 @@ API_REGISTRY = {
     'day': ('orsquare.api.facade', {
         'day_open', 'day_current', 'day_seal', 'day_reaudit', 'transfer', 'open_bottle', 'finish_bottle',
         'discrepancies', 'bill_lookup', 'bill_detail'}),
+    'bills': ('orsquare.bill.service', {'bill_document', 'thermal_text', 'escpos'}),
     'sync': ('orsquare.sync.service', {'bootstrap', 'delta', 'flush'}),
 }

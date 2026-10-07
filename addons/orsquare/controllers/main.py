@@ -96,8 +96,17 @@ class OrsquareApi(http.Controller):
             if not self._trusted_origin():
                 return _err(403, 'untrusted_origin', 'Origin not allowed.')
             body = self._json_body()
-            request.session.authenticate(request.db, {
-                'type': 'password', 'login': body.get('login', ''), 'password': body.get('password', '')})
+            login = str(body.get('login', ''))
+            throttle = request.env['orsquare.login_throttle'].sudo()
+            if throttle.is_blocked(login, request.httprequest.remote_addr):
+                return _err(429, 'too_many_attempts', 'Too many failed sign-ins. Try again in a few minutes.')
+            try:
+                request.session.authenticate(request.db, {
+                    'type': 'password', 'login': login, 'password': body.get('password', '')})
+            except AccessDenied:
+                throttle.record_failure(login, request.httprequest.remote_addr)
+                raise
+            throttle.clear(login, request.httprequest.remote_addr)
             request.update_env(user=request.session.uid)
             return _ok(request.env['orsquare.staff.service'].me())
         except AccessDenied:
@@ -160,5 +169,10 @@ class OrsquareApi(http.Controller):
             params = body.get('params') or {}
             if not isinstance(params, dict):
                 raise UserError("params must be an object.")
-            return getattr(request.env[entry[0]], method)(**params)
+            try:
+                return getattr(request.env[entry[0]], method)(**params)
+            except TypeError as exc:      # wrong/missing parameter names -> the caller's mistake, not a crash
+                if 'argument' in str(exc):
+                    raise UserError("Invalid parameters for %s.%s" % (body.get('service'), method))
+                raise
         return self._guard(handler, mutating=True)

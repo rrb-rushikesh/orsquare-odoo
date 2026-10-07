@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'ORSquare Retail Core',
-    'version': '18.0.1.7.0',
+    'version': '18.0.1.9.0',
     'category': 'Point of Sale/Retail',
     'summary': 'High-speed retail operations engine for counter and beverage operations',
     'description': """

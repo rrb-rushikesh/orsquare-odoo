@@ -10,3 +10,5 @@ from . import test_back_office
 from . import test_admin
 from . import test_sync
 from . import test_http
+from . import test_bills
+from . import test_security

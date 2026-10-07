@@ -9,6 +9,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_compare, float_is_zero, float_round
 
+from .security_utils import require_staff
+
 KINDS = ('customer', 'supplier', 'employee', 'other')
 
 
@@ -70,6 +72,7 @@ class OrsquareAccountsService(models.AbstractModel):
     # ------------------------------------------------------------------ directory
     @api.model
     def directory(self, kind='all', search=None, limit=80, offset=0):
+        require_staff(self.env)
         env = self.sudo().env
         domain = [('company_id', 'in', (False, self.env.company.id)), ('is_company', 'in', (True, False)),
                   ('id', '!=', self.env.company.partner_id.id)]
@@ -209,7 +212,7 @@ class OrsquareAccountsService(models.AbstractModel):
         if open_lines and counter:
             (open_lines | counter).reconcile()
         env['orsquare.event'].publish(company, 'payment_recorded', {
-            'partner_id': partner.id, 'amount': amount, 'direction': direction})
+            'partner_id': partner.id, 'direction': direction}, money={'amount': amount})
         return payment.id
 
     @api.model

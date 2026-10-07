@@ -10,6 +10,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError
 from odoo.tools import float_compare, float_is_zero, float_round
 
+from .security_utils import require_staff
+
 
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
@@ -112,6 +114,7 @@ class OrsquareStockReports(models.AbstractModel):
     @api.model
     def stock_position(self, product_ids=None):
         """Per product: Godown, Counter and opened (ml) quantities; value only with valuation rights."""
+        require_staff(self.env)
         env = self.sudo().env
         company = self.env.company
         wh = env['stock.warehouse'].orsquare_main_warehouse(company)
@@ -172,6 +175,7 @@ class OrsquareStockReports(models.AbstractModel):
     @api.model
     def movement_history(self, product_id, limit=100):
         """Per-SKU ledger: intake, transfers, peg openings, POS deductions, scraps, adjustments."""
+        require_staff(self.env)
         env = self.sudo().env
         wh = env['stock.warehouse'].orsquare_main_warehouse(self.env.company)
         moves = env['stock.move'].search([('product_id', '=', int(product_id)), ('state', '=', 'done')],
@@ -213,6 +217,7 @@ class OrsquareStockReports(models.AbstractModel):
     # ------------------------------------------------------------------ opened bottle shelf (stock tab)
     @api.model
     def opened_shelf(self):
+        require_staff(self.env)
         return self.env['orsquare.opened_bottle'].tray()
 
     @api.model
