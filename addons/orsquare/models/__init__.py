@@ -24,3 +24,4 @@ from . import sync_service
 from . import api_facade
 from . import bill_service
 from . import login_throttle
+from . import realtime_service

@@ -5,7 +5,7 @@
   transaction-scoped advisory lock before inserting, so rows become visible in id order and a
   client that has seen ``seq = N`` can never later receive an event with a smaller seq.
 * After commit, the event is pushed (best effort) to Centrifugo's HTTP API on channel
-  ``shop:<company_id>``.  Odoo holds no WebSockets and a push failure never affects the business
+  ``shop:<database>``.  Odoo holds no WebSockets and a push failure never affects the business
   transaction; clients recover missed events from the feed (``since_seq``).
 """
 import json
@@ -41,11 +41,11 @@ class OrsquareEvent(models.Model):
         url = self.env['ir.config_parameter'].sudo().get_param('orsquare.centrifugo_url')
         api_key = self.env['ir.config_parameter'].sudo().get_param('orsquare.centrifugo_api_key')
         if url:
-            # Two channels: 'shop:N' carries no amounts (every staff device); 'shop:N:money' carries the
+            # Two channels: 'shop:<db>' carries no amounts (every staff device); 'shop:<db>:money' carries the
             # full event and must only be authorised by the realtime gateway for can_see_money users.
             safe = {'seq': event.id, 'type': event_type, 'payload': payload or {}}
             full = dict(safe, money=money or {})
-            base = 'shop:%s' % company.id
+            base = 'shop:%s' % self.env.cr.dbname      # database, not company id: every shop has company 1
             self.env.cr.postcommit.add(lambda: self._push(url, api_key, base, safe))
             if money:
                 self.env.cr.postcommit.add(lambda: self._push(url, api_key, base + ':money', full))

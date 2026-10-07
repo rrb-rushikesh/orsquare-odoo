@@ -13,7 +13,8 @@
       "history_size": 200,
       "history_ttl": "300s",
       "force_recovery": true,
-      "allow_subscribe_for_client": false
+      "allow_subscribe_for_client": false,
+      "allow_subscribe_for_anonymous": false
     }
   ]
 }

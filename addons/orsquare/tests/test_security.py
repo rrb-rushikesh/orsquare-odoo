@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import HttpCase, tagged
 
 from .common import OrsquareCase
@@ -64,7 +64,7 @@ class TestSecurityHardening(OrsquareCase):
             self.env['orsquare.event'].publish(self.company, 'sale_settled', {'order_id': 1}, money={'total': 5.0})
             self.env.cr.postcommit.run()      # the test cursor never commits: run the hooks by hand
         channels = [m['channel'] for m in sent]
-        base = 'shop:%s' % self.company.id
+        base = 'shop:%s' % self.env.cr.dbname
         self.assertEqual(channels.count(base), 2)
         self.assertEqual(channels.count(base + ':money'), 1, "only the event with amounts goes to the money channel")
         self.assertTrue(all('money' not in m['data'] for m in sent if m['channel'] == base))
@@ -102,3 +102,40 @@ class TestLoginThrottle(HttpCase):
                           headers={'Content-Type': 'application/json'})
         self.assertEqual(r.status_code, 422)
         self.assertIn('Invalid parameters', r.json()['error']['message'])
+
+
+@tagged('post_install', '-at_install', 'orsquare')
+class TestRealtimeToken(OrsquareCase):
+
+    def _decode(self, token, secret):
+        import base64, hashlib, hmac
+        head, body, sig = token.split('.')
+        expected = hmac.new(secret.encode(), ('%s.%s' % (head, body)).encode(), hashlib.sha256).digest()
+        pad = lambda s: s + '=' * (-len(s) % 4)
+        self.assertEqual(base64.urlsafe_b64decode(pad(sig)), expected, "signature must verify")
+        return json.loads(base64.urlsafe_b64decode(pad(body)))
+
+    def test_01_channels_depend_on_the_users_rights_and_are_keyed_by_database(self):
+        self.env['ir.config_parameter'].sudo().set_param('orsquare.centrifugo_secret', 's3cret-for-tests')
+        svc = self.env['orsquare.realtime.service']
+        cashier = self.env['res.users'].create({'name': 'RT C', 'login': 'rt_c', 'groups_id': [
+            (6, 0, [self.env.ref('orsquare.group_orsquare_cashier').id])]})
+        owner = self.env['res.users'].create({'name': 'RT O', 'login': 'rt_o', 'groups_id': [
+            (6, 0, [self.env.ref('orsquare.group_orsquare_owner').id])]})
+        db = self.env.cr.dbname
+        c = self._decode(svc.with_user(cashier).token()['token'], 's3cret-for-tests')
+        o = self._decode(svc.with_user(owner).token()['token'], 's3cret-for-tests')
+        self.assertEqual(c['channels'], ['shop:%s' % db], "a cashier can never be subscribed to the money channel")
+        self.assertEqual(o['channels'], ['shop:%s' % db, 'shop:%s:money' % db])
+        self.assertGreater(o['exp'], o['iat'])
+        self.assertTrue(o['sub'].startswith(db + ':'), "two shops can never share a subject or a channel")
+
+    def test_02_not_configured_and_non_staff(self):
+        self.env['ir.config_parameter'].sudo().set_param('orsquare.centrifugo_secret', '')
+        with self.assertRaises(UserError):
+            self.env['orsquare.realtime.service'].token()
+        nobody = self.env['res.users'].create({'name': 'N', 'login': 'rt_nobody',
+                                               'groups_id': [(6, 0, [self.env.ref('base.group_user').id])]})
+        self.env['ir.config_parameter'].sudo().set_param('orsquare.centrifugo_secret', 'x')
+        with self.assertRaises(AccessError):
+            self.env['orsquare.realtime.service'].with_user(nobody).token()
