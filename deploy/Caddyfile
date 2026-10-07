@@ -1,0 +1,79 @@
+# ORSquare edge: Caddy terminates TLS and enforces the server-side routing guardrails (AGENTS.md section 4).
+#
+#   orsquare.com      public marketing site (static Astro build) - NEVER sent to a signed-in user
+#   app.orsquare.com  the React SPA + the Odoo JSON API (/api/*)
+#
+# Odoo's own web client (/web, /odoo, /longpolling) is not exposed: shop staff never see it.
+
+{
+	email ops@orsquare.com
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+# ----------------------------------------------------------------------------------------------
+# 1. Public site: ask Odoo about the session cookie BEFORE sending any HTML.
+#    /api/session/gate answers 302 -> app (authenticated) or 204 (guest). Caddy's forward_auth passes
+#    any non-2xx answer straight to the browser, so a signed-in visitor receives only the redirect and
+#    the landing page bytes are never transmitted.
+# ----------------------------------------------------------------------------------------------
+orsquare.com, www.orsquare.com {
+	import security_headers
+	encode zstd gzip
+
+	forward_auth odoo:8069 {
+		uri /api/session/gate
+	}
+
+	root * /srv/landing
+	try_files {path} {path}/index.html
+	file_server
+}
+
+# ----------------------------------------------------------------------------------------------
+# 2. Application host.
+#    - /api/*   -> Odoo. The session cookie Odoo issues is HttpOnly; here it is scoped to the root
+#                 domain and made Secure so orsquare.com and app.orsquare.com share one session.
+#    - Odoo UI paths are blocked.
+#    - everything else is the SPA shell: refreshing /sales (F5) or opening a deep link serves
+#      index.html, so a signed-in user can never be bounced to the landing page.
+# ----------------------------------------------------------------------------------------------
+app.orsquare.com {
+	import security_headers
+	encode zstd gzip
+
+	@odoo_ui path /web /web/* /odoo /odoo/* /longpolling/* /websocket
+	respond @odoo_ui 404
+
+	handle /api/* {
+		reverse_proxy odoo:8069 {
+			header_up X-Real-IP {remote_host}
+			header_down Set-Cookie "(?i)^(session_id=[^;]*)(.*)$" "$1$2; Domain=.orsquare.com; Secure"
+		}
+	}
+
+	handle {
+		root * /srv/app
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-store"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# ----------------------------------------------------------------------------------------------
+# 3. Realtime gateway (Centrifugo, WebSocket). Channel authorisation (shop:N vs shop:N:money) is
+#    done by Centrifugo subscribe-proxy / JWT claims issued by Odoo - see deploy/README.md.
+# ----------------------------------------------------------------------------------------------
+rt.orsquare.com {
+	import security_headers
+	reverse_proxy centrifugo:8000
+}

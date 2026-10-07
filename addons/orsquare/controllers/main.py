@@ -138,9 +138,20 @@ class OrsquareApi(http.Controller):
                 raise
             with registry.cursor() as cr:
                 api.Environment(cr, SUPERUSER_ID, {})['orsquare.login_throttle'].clear(login, ip)
-            request.session.db = db
-            request.update_env(user=request.session.uid)
-            return _ok(request.env['orsquare.staff.service'].me())
+            # This request is served without a database context (a guest has none yet), so build the
+            # response from an explicit registry cursor rather than request.env.
+            with registry.cursor() as cr:
+                env = api.Environment(cr, request.session.uid, {})
+                session = request.session
+                # Odoo only persists the session in database-bound requests; persist it here. Rotating the
+                # id on login also defeats session fixation.
+                if session.should_rotate:
+                    http.root.session_store.rotate(session, env)
+                else:
+                    http.root.session_store.save(session)
+                request.future_response.set_cookie(
+                    'session_id', session.sid, max_age=http.get_session_max_inactivity(env), httponly=True)
+                return _ok(env['orsquare.staff.service'].me())
         except AccessDenied:
             return _err(401, 'bad_credentials', 'Wrong shop, login or password.')
         except UserError as exc:

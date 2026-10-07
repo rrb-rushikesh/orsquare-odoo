@@ -1,0 +1,77 @@
+# Production-shaped stack TEMPLATE (single host). Not yet exercised end-to-end: see deploy/README.md
+# for what has and has not been verified.
+#
+#   caddy  -> odoo (JSON API only), static landing + SPA, centrifugo (WebSockets)
+#   odoo   -> postgres (one cluster, one database PER SHOP), redis (optional event bus)
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      POSTGRES_DB: postgres
+    secrets: [pg_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 10s
+      retries: 6
+    # Starting point only: size shared_buffers/work_mem for the host and measure with the benchmark scripts.
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=1GB", "-c", "synchronous_commit=on"]
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+
+  odoo:
+    image: odoo:18.0
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      HOST: postgres
+      USER: odoo
+      PASSWORD_FILE: /run/secrets/pg_password
+    secrets: [pg_password]
+    volumes:
+      - ./odoo.prod.conf:/etc/odoo/odoo.conf:ro
+      - ../addons:/mnt/extra-addons:ro
+      - odoo-filestore:/var/lib/odoo
+      - shop-backups:/var/lib/odoo/orsquare_backups
+    expose: ["8069", "8072"]
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    restart: unless-stopped
+    command: ["centrifugo", "--config=/centrifugo/config.json"]
+    volumes: [./centrifugo.json:/centrifugo/config.json:ro]
+    depends_on: [redis]
+    expose: ["8000"]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [odoo, centrifugo]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../web/landing/dist:/srv/landing:ro
+      - ../web/app/dist:/srv/app:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
+
+volumes:
+  pgdata:
+  redisdata:
+  odoo-filestore:
+  shop-backups:
+  caddy-data:
+  caddy-config:
