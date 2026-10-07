@@ -86,6 +86,7 @@ class OrsquareBusinessDay(models.Model):
                 "Business day %s is still open. Count the drawer and seal it before opening %s.",
                 stale.date, date))
         config = self.env['orsquare.shop.bootstrap'].pos_config(company)
+        self.env['orsquare.shop.bootstrap'].sync_restaurant_mode(company)
         session = self.env['pos.session'].with_company(company).create({
             'config_id': config.id, 'user_id': self.env.uid})
         session.set_opening_control(opening_float, note or '')

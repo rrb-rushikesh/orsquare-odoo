@@ -194,6 +194,16 @@ class OrsquareShopBootstrap(models.AbstractModel):
         return config
 
     @api.model
+    def sync_restaurant_mode(self, company):
+        """Mirror the Tables feature onto the POS config. Odoo forbids changing it while a session is
+        open, so it is applied now when possible and again whenever the next day opens."""
+        config = self.env['pos.config'].sudo().search([('company_id', '=', company.id)], limit=1)
+        want = bool(company.orsquare_feature_tables)
+        if config and config.module_pos_restaurant != want \
+                and not config.session_ids.filtered(lambda s: s.state != 'closed'):
+            config.module_pos_restaurant = want
+
+    @api.model
     def scrap_location(self, company):
         loc = self.env['stock.location'].search([
             ('scrap_location', '=', True), ('company_id', 'in', (False, company.id))], limit=1)

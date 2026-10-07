@@ -48,8 +48,11 @@ dist/
 .turbo/
 
 # Scratch & Temporary
-scratch/
+scratch/*.py
+scratch/*.log
 tmp/
 *.tmp
 __pycache__/
 *.pyc
+scratch/*.py
+scratch/*.log
