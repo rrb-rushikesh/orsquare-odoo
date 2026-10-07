@@ -74,9 +74,20 @@ export function call<T = any>(service: string, method: string, params: Record<st
   return request<T>('POST', '/api/call', { service, method, params });
 }
 
+/** The password was right but the account has an authenticator app: the 6-digit code is the second step. */
+export interface MfaChallenge { mfa_required: true; mfa: 'totp' }
+export const isMfaChallenge = (r: Me | MfaChallenge): r is MfaChallenge => (r as MfaChallenge).mfa_required === true;
+
+export interface MfaSetup { secret: string; url: string; qrcode: string }
+
 export const session = {
   login: (login: string, password: string, shop?: string, surface?: string) =>
-    request<Me>('POST', '/api/session/login', { login, password, ...(shop ? { shop } : {}), ...(surface ? { surface } : {}) }),
+    request<Me | MfaChallenge>('POST', '/api/session/login', { login, password, ...(shop ? { shop } : {}), ...(surface ? { surface } : {}) }),
+  /** Second sign-in step: the 6-digit code for a password-verified pre-session. */
+  mfa: (code: string) => request<Me>('POST', '/api/session/mfa', { code }),
+  mfaBegin: () => request<MfaSetup>('POST', '/api/session/mfa/begin', {}),
+  mfaEnable: (secret: string, code: string) => request<{ enabled: boolean }>('POST', '/api/session/mfa/enable', { secret, code }),
+  mfaDisable: (password: string) => request<{ enabled: boolean }>('POST', '/api/session/mfa/disable', { password }),
   me: () => request<Me>('GET', '/api/session/me'),
   logout: () => request<null>('POST', '/api/session/logout', {}),
 };
@@ -96,6 +107,12 @@ export interface Me {
   login: string;
   surface?: string;
   shop?: string;
+  /** Platform operators only: 'admin' may change things, 'support' may only look. */
+  platform_role?: 'admin' | 'support';
+  mfa?: { enabled: boolean; required?: boolean };
+  /** The shop's chosen presentation of a tab (same data, different view). */
+  variants?: { stock: 'standard' | 'wine'; accounts: 'standard' | 'advanced' };
+  settings_version?: number;
   roles: ('owner' | 'cashier' | 'stockkeeper' | 'developer')[];
   flags: { can_see_money: boolean; can_see_valuation: boolean; can_manage_returns: boolean };
   tabs: string[];

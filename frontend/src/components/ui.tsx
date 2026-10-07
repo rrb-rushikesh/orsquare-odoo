@@ -859,9 +859,11 @@ export function Pager({
 export function PageSizePicker({
   value,
   onChange,
+  options = [10, 20, 50],
 }: {
   value: number
   onChange: (n: number) => void
+  options?: number[]
 }) {
   return (
     <label className="page-size">
@@ -872,7 +874,7 @@ export function PageSizePicker({
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="Rows per page"
       >
-        {[10, 20, 50].map((n) => (
+        {options.map((n) => (
           <option key={n} value={n}>
             {n}
           </option>

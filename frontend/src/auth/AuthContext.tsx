@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ApiError, session, type Me } from '@/lib/api';
+import { ApiError, isMfaChallenge, session, type Me } from '@/lib/api';
 import { startStore, stopStore } from '@/lib/sync';
+import { isPlatformDev } from './surface';
 
 /**
  * Who is signed in and what they may see.
@@ -60,7 +61,11 @@ export interface AuthApi {
   can: (perm: Perm) => boolean;
   featureOn: (key: string) => boolean;
   sessionError: string | null;
-  signIn: (login: string, password: string, shop?: string, surface?: string) => Promise<Me>;
+  /** Resolves to the signed-in identity, or `{ mfaRequired: true }` when the account has an authenticator (then call `completeMfa`). */
+  signIn: (login: string, password: string, shop?: string, surface?: string) => Promise<Me | { mfaRequired: true }>;
+  completeMfa: (code: string) => Promise<Me>;
+  /** The shop's chosen presentation of a tab. */
+  variant: (surface: 'stock' | 'accounts') => string;
   refreshUserProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -125,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(SHOP_KEY, shop);
       localStorage.setItem(ME_KEY, JSON.stringify(normalized));
     } catch { /* private mode */ }
-    if ((normalized as any).surface !== 'dev' && !normalized.roles?.includes('developer')) {
+    if (!isPlatformDev(normalized)) {
       void startStore(shop, normalized);
     }
   }, []);
@@ -133,7 +138,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const drop = useCallback(() => {
     setMe(null);
     stopStore();
-    try { localStorage.removeItem(ME_KEY); } catch { /* ignore */ }
+    // Forget the shop too: a stale code (another shop, or 'orsquare_platform' after a developer session) would be sent
+    // with the next sign-in and pin it to the wrong database. The server resolves the shop from the login instead.
+    try { localStorage.removeItem(ME_KEY); localStorage.removeItem(SHOP_KEY); } catch { /* ignore */ }
   }, []);
 
   // Restore the session on load. The router renders a splash until this settles, so a refresh on /sales
@@ -142,12 +149,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     const hydrate = async () => {
       const cached = readCached();
-      if (cached?.me && cached?.shop && (cached.me as any).surface !== 'dev' && !cached.me.roles?.includes('developer')) {
+      if (cached?.me && cached?.shop && !isPlatformDev(cached.me)) {
         void startStore(cached.shop, cached.me);
       }
       try {
         const m = await session.me();
-        if (alive) adopt(m, cached?.shop || '');
+        if (alive) adopt(m, m.shop || cached?.shop || '');
       } catch (e) {
         if (!alive) return;
         if (e instanceof ApiError && e.status === 401) {
@@ -170,10 +177,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adopt, drop]);
 
   const signIn = useCallback(async (login: string, password: string, shop?: string, surface?: string) => {
-    const cachedShop = shop || (surface === 'dev' ? 'orsquare_platform' : localStorage.getItem(SHOP_KEY) || '');
+    const remembered = (() => { try { return localStorage.getItem(SHOP_KEY) || ''; } catch { return ''; } })();
+    // Never reuse the platform database for a shop sign-in.
+    const cachedShop = shop || (surface === 'dev' ? 'orsquare_platform' : remembered === 'orsquare_platform' ? '' : remembered);
     const m = await session.login(login.trim(), password, cachedShop || undefined, surface);
+    if (isMfaChallenge(m)) return { mfaRequired: true as const };
     const resolvedShop = m.shop || cachedShop || (m.company ? `orsquare_shop${m.company.id}` : '');
     adopt(m, resolvedShop);
+    return m;
+  }, [adopt]);
+
+  const completeMfa = useCallback(async (code: string) => {
+    const m = await session.mfa(code);
+    adopt(m, m.shop || (m.company ? `orsquare_shop${m.company.id}` : ''));
     return m;
   }, [adopt]);
 
@@ -236,9 +252,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageReturns: !!me?.flags?.can_manage_returns,
       can: (perm) => tabs.has(perm),
       featureOn,
-      sessionError, signIn, refreshUserProfile, signOut,
+      variant: (surface) => me?.variants?.[surface] ?? 'standard',
+      sessionError, signIn, completeMfa, refreshUserProfile, signOut,
     };
-  }, [me, shopCode, ready, sessionError, signIn, refreshUserProfile, signOut]);
+  }, [me, shopCode, ready, sessionError, signIn, completeMfa, refreshUserProfile, signOut]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

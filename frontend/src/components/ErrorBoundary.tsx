@@ -23,6 +23,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
+    // A malformed cached session once made every reload throw the same error. The server cookie is the source of
+    // truth, so dropping the cached envelope is safe: the session is re-read from the server on the next load.
+    try { localStorage.removeItem('or2_me'); } catch { /* storage blocked */ }
     this.setState({ hasError: false, error: null });
     if (this.props.onReset) {
       this.props.onReset();

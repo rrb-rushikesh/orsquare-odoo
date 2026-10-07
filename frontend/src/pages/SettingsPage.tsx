@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
+import { ChangeLog } from '@/features/governance/ChangeLog'
+import { MfaPanel } from '@/features/governance/MfaPanel'
+import { StudioEditor } from '@/features/governance/StudioEditor'
+import { TeamAccess } from '@/features/governance/TeamAccess'
+import { shopGov } from '@/features/governance/api'
 import * as repo from '@/lib/repo'
-import type { PBusinessDayInfo, PEmployee, PFeatureCatalogEntry, PFeatureState, ShopClosingSettings } from '@/lib/repo'
+import type { PBusinessDayInfo } from '@/lib/repo'
 import { call, ApiError } from '@/lib/api'
 async function restoreUnavailable(_file: File): Promise<{ products?: number; customers?: number; suppliers?: number; sales?: number; days?: number }> {
   throw new ApiError('File restore is not available yet.', 'not_available')
 }
-import { SURFACE_SHEET } from '@/lib/experience'
 import {
   applyPrefs,
   loadPrefs,
@@ -35,14 +39,13 @@ import PrintingPanel, { ReceiptPreview } from '@/components/PrintingPanel'
 import { buildTestSheet, type TestKind } from '@/lib/printing/testSheets'
 import { beginPrint, outcomeMessage } from '@/lib/printing/service'
 import type { PrintSettings } from '@/lib/printing/presets'
-import { fuzzyMatch } from '@/lib/search'
 import { now as nowClock } from '@/lib/clock'
 import { currentBusinessDateKey, timeToMinutes, labelDayKey } from '@/lib/businessDay'
 import { normalizeTablesConfig, tableId, tableLabels } from '@/lib/tables'
 import type { TablePattern, TablesConfig } from '@/types'
 import { money } from '@/lib/utils'
 import { pullCatalogDelta, flushOfflineSalesQueue, listQueueForReview, retryQueuedSale, discardQueuedSale, getOfflineCacheStats, purgeCatalogCache, type QueueInspectionRow } from '@/lib/sync'
-import { Btn, ConfirmDialog, Drawer, EmptyState, Field, NoAccess, Panel, SearchField, Tag, useToast } from '@/components/ui'
+import { Btn, ConfirmDialog, EmptyState, Field, NoAccess, Panel, Tag, useToast } from '@/components/ui'
 import {
   IconGear,
   IconLayers,
@@ -63,31 +66,7 @@ import {
   IconDatabase,
 } from '@/components/icons'
 
-type SettingsTab = 'appearance' | 'billing' | 'features' | 'tables' | 'team' | 'shops' | 'management'
-
-const ROLE_LABEL: Record<string, string> = {
-  owner: 'Owner',
-  employee: 'Employee',
-}
-
-const ROLE_TONE: Record<string, 'blue' | 'green' | 'gray' | 'purple'> = {
-  owner: 'purple',
-  employee: 'blue',
-}
-
-/** Server-delivered grantable-tab registry (GRANTABLE_TABS). Used to render
- *  the per-employee tab checkbox group when the session payload omits it. */
-const FALLBACK_TABS: { key: string; label: string }[] = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'sales', label: 'Sales' },
-  { key: 'stock', label: 'Stock' },
-  { key: 'products', label: 'Products' },
-  { key: 'accounts', label: 'Accounts' },
-  { key: 'cashflow', label: 'Cash Flow' },
-  { key: 'daybook', label: 'Day Book' },
-  { key: 'reports', label: 'Calendar & analytics' },
-  { key: 'settings', label: 'Settings' },
-]
+type SettingsTab = 'appearance' | 'billing' | 'features' | 'tables' | 'team' | 'security' | 'shops' | 'management'
 
 function Seg<T extends string>({
   value,
@@ -271,362 +250,9 @@ function GridSizeEditor({
   )
 }
 
-function FeaturesPanel({
-  shopId,
-  prefs,
-  update,
-}: {
-  shopId: string
-  prefs: Prefs
-  update: (patch: Partial<Prefs>) => void
-}) {
-  const toast = useToast()
-  const { refreshUserProfile } = useAuth()
-  const [features, setFeatures] = useState<Record<string, PFeatureState>>({})
-  const [catalog, setCatalog] = useState<PFeatureCatalogEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-
-  // Day closing rules. Server-owned, so read and written through the console API
-  // rather than the local preference blob: they decide what the shop is allowed
-  // to get away with, and a device-local setting would let two tablets disagree
-  // about it. They live here because `close_day`'s refusal points here.
-  const [closingSettings, setClosingSettings] = useState<ShopClosingSettings | null>(null)
-  const [closingMateriality, setClosingMateriality] = useState('')
-  const [closingSettingsError, setClosingSettingsError] = useState('')
-
-  const loadClosing = useCallback(async () => {
-    try {
-      const s = await repo.getShopClosingSettings(shopId)
-      setClosingSettings(s)
-      setClosingMateriality(s.materiality)
-      setClosingSettingsError('')
-    } catch (err) {
-      setClosingSettingsError(err instanceof Error ? err.message : 'Could not load.')
-    }
-  }, [shopId])
-
-  const saveClosing = useCallback(async (patch: { materiality?: string; depth?: 'simple' | 'rigorous' }) => {
-    setClosingSettingsError('')
-    try {
-      const s = await repo.updateShopClosingSettings(shopId, patch)
-      setClosingSettings(s)
-      setClosingMateriality(s.materiality)
-    } catch (err) {
-      setClosingSettingsError(err instanceof Error ? err.message : 'Could not save.')
-    }
-  }, [shopId])
-
-  useEffect(() => { void loadClosing() }, [loadClosing])
-
-  useEffect(() => {
-    let alive = true
-    if (!shopId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    repo
-      .getShopFeatures(shopId)
-      .then((d) => {
-        if (!alive) return
-        setFeatures(d.features)
-        setCatalog(d.catalog)
-        setError(null)
-      })
-      .catch((err) => {
-        if (!alive) return
-        setError(err instanceof Error ? err.message : 'Could not load feature settings.')
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [shopId])
-
-  async function apply(key: string, patch: Partial<PFeatureState>, label: string) {
-    if (busy) return
-    const previous = features
-    // Optimistic: the switch answers immediately, then reconciles with the
-    // server response (or rolls back on failure) — never a silent divergence.
-    setFeatures((f) => ({ ...f, [key]: { ...f[key], ...patch } }))
-    setBusy(key)
-    try {
-      const resolved = await repo.updateShopFeatures(shopId, { [key]: patch })
-      setFeatures(resolved)
-      // Capability changes are permission-adjacent: refresh the session so
-      // every page (nav, POS, cash flow) re-reads the server-authoritative
-      // feature state instead of running on a stale copy.
-      void refreshUserProfile()
-      toast(`${label} updated.`)
-    } catch (err) {
-      setFeatures(previous)
-      toast(err instanceof Error ? err.message : `Could not update ${label}.`, 'err')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const groups = useMemo(() => {
-    const map = new Map<string, PFeatureCatalogEntry[]>()
-    for (const entry of catalog) {
-      const list = map.get(entry.group) || []
-      list.push(entry)
-      map.set(entry.group, list)
-    }
-    return [...map.entries()]
-  }, [catalog])
-
-  if (loading) return <div className="skeleton" style={{ height: 260 }} />
-  if (error) {
-    return (
-      <Panel title="Feature controls" bodyPad>
-        <div style={{ color: 'var(--err-fg)' }}>{error}</div>
-      </Panel>
-    )
-  }
-
-  const title = 'Feature controls'
-  const intro = 'Optional capabilities and behaviour settings for this shop. Turning a capability off hides its screens, selectors, filters and reports for owners and employees alike — server-side, so it cannot be bypassed from another screen or by an offline client. Existing data is always preserved and reappears if you turn the capability back on. GST/tax, printing, tables and discount schemes are configured in their own dedicated tabs, not here.'
-
-  return (
-    <div className="grid-2">
-      <div className="stack">
-        <Panel title={title} bodyPad>
-          <div className="t-caption" style={{ marginBottom: 16 }}>
-            {intro}
-          </div>
-
-          {groups.length === 0 && (
-            <EmptyState title="Nothing to configure" hint="No options are available in this section for your shop." />
-          )}
-
-          {groups.map(([group, entries]) => (
-            <div key={group} className="stack" style={{ gap: 0, marginBottom: 8 }}>
-              <div className="t-caption" style={{ textTransform: 'uppercase', letterSpacing: 0.32, fontWeight: 600, margin: '8px 0' }}>
-                {group}
-              </div>
-              {entries.map((entry, idx) => {
-                const state = features[entry.key] || entry.default
-                const isLast = idx === entries.length - 1
-                return (
-                  <div
-                    key={entry.key}
-                    className="pref-row"
-                    style={isLast ? undefined : { borderBottom: '1px solid var(--line)' }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div className="pref-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>{entry.label}</span>
-                        <Tag kind={state.enabled ? 'green' : 'gray'}>{state.enabled ? 'ON' : 'OFF'}</Tag>
-                        {state.enabled && state.owner_only && <Tag kind="blue">Owners only</Tag>}
-                      </div>
-                      <div className="t-caption" style={{ marginTop: 2 }}>{entry.description}</div>
-                      {state.enabled && entry.owner_only_capable && (
-                        <div style={{ marginTop: 8 }}>
-                          <Seg<'all' | 'owner'>
-                            value={state.owner_only ? 'owner' : 'all'}
-                            options={[
-                              { v: 'all', label: 'Everyone' },
-                              { v: 'owner', label: 'Owners only' },
-                            ]}
-                            onChange={(v) => apply(entry.key, { owner_only: v === 'owner' }, entry.label)}
-                          />
-                        </div>
-                      )}
-                      {state.enabled && entry.modes && entry.modes.length > 1 && (
-                        <div style={{ marginTop: 8 }}>
-                          <Seg<string>
-                            value={state.mode || entry.modes[0]}
-                            options={entry.modes.map((m) => ({
-                              v: m,
-                              label: m === 'auto'
-                                ? 'Auto (suggest)'
-                                : m === 'manual'
-                                  ? 'Manual'
-                                  : m === 'gross'
-                                    ? 'Gross sales'
-                                    : m === 'net'
-                                      ? 'Net sales'
-                                      : m,
-                            }))}
-                            onChange={(v) => apply(entry.key, { mode: v }, `${entry.label} mode`)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      className={`switch ${state.enabled ? 'on' : ''}`}
-                      type="button"
-                      role="switch"
-                      aria-checked={state.enabled}
-                      aria-label={`Toggle ${entry.label}`}
-                      disabled={busy === entry.key}
-                      onClick={() => apply(entry.key, { enabled: !state.enabled }, entry.label)}
-                    >
-                      <span className="knob" />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </Panel>
-
-        <Panel title="Sales Register &amp; Checkout Preferences" bodyPad>
-          <div className="t-caption" style={{ marginBottom: 16 }}>
-            Configure scanning behaviour and payment enforcement for the POS sales register.
-          </div>
-
-          <div className="stack" style={{ gap: 0 }}>
-            {/* Continuous Scanning */}
-            <div className="pref-row" style={{ borderBottom: '1px solid var(--line)' }}>
-              <div style={{ flex: 1 }}>
-                <div className="pref-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Continuous Scanning</span>
-                  <Tag kind={prefs.continuousScanning ? 'green' : 'gray'}>{prefs.continuousScanning ? 'ON' : 'OFF'}</Tag>
-                </div>
-                <div className="t-caption" style={{ marginTop: 2 }}>
-                  Accumulates scans into a persistent open draft sale. Quick-access tiles are hidden, and the cart list is locked by default.
-                </div>
-              </div>
-              <button
-                className={`switch ${prefs.continuousScanning ? 'on' : ''}`}
-                type="button"
-                role="switch"
-                aria-checked={prefs.continuousScanning}
-                aria-label="Toggle Continuous Scanning"
-                onClick={() => update({ continuousScanning: !prefs.continuousScanning })}
-              >
-                <span className="knob" />
-              </button>
-            </div>
-
-            {/* Enforce Payment Method */}
-            <div className="pref-row last">
-              <div style={{ flex: 1 }}>
-                <div className="pref-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Enforce Payment Method</span>
-                  <Tag kind={prefs.salesDefaultPaymentMode === 'all' ? 'gray' : 'blue'}>
-                    {prefs.salesDefaultPaymentMode === 'all' ? 'All (No restriction)' : `${prefs.salesDefaultPaymentMode} only`}
-                  </Tag>
-                </div>
-                <div className="t-caption" style={{ marginTop: 2 }}>
-                  Restricts checkout to a single payment method. When enforced, payment method buttons in Sales are hidden, settlement buttons settle that method directly, and keyboard shortcuts (F8/F9/Ctrl+Enter) route to the enforced method.
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <Seg<'all' | 'Cash' | 'UPI'>
-                    value={prefs.salesDefaultPaymentMode || 'all'}
-                    options={[
-                      { v: 'all', label: 'All / Any (No restriction)' },
-                      { v: 'Cash', label: 'Cash only' },
-                      { v: 'UPI', label: 'UPI only' },
-                    ]}
-                    onChange={(v) => update({ salesDefaultPaymentMode: v })}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Panel>
-      </div>
-
-      <div className="rail">
-        <Panel title="Day closing rules" bodyPad>
-          <div className="t-caption" style={{ marginBottom: 12 }}>
-            How much cash difference this shop tolerates at close, and how strict the
-            closing count is. A rigorous shop is held to an exact zero whatever the
-            limit is set to.
-          </div>
-          {!closingSettings ? (
-            <div className="t-caption">
-              {closingSettingsError
-                ? <>{closingSettingsError} <Btn sm variant="ghost" onClick={() => void loadClosing()}>Retry</Btn></>
-                : 'Loading…'}
-            </div>
-          ) : <div className="stack" style={{ gap: 12 }}>
-            <div>
-              <label className="pref-label" htmlFor="closing-materiality">
-                Cash difference allowed at close (₹)
-              </label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                <input
-                  id="closing-materiality"
-                  className="field-control"
-                  style={{ width: 120 }}
-                  inputMode="decimal"
-                  value={closingMateriality}
-                  onChange={e => setClosingMateriality(e.target.value)}
-                  onBlur={() => void saveClosing({ materiality: closingMateriality })}
-                  onKeyDown={e => { if (e.key === 'Enter') void saveClosing({ materiality: closingMateriality }) }}
-                />
-                <Btn sm onClick={() => void saveClosing({ materiality: closingMateriality })}>
-                  Save
-                </Btn>
-              </div>
-              <div className="t-caption" style={{ marginTop: 4 }}>
-                0 means the drawer must match to the paisa. Set a small amount if a few
-                rupees of change routinely goes missing in the till.
-              </div>
-            </div>
-            <div>
-              <span className="pref-label">Closing count strictness</span>
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <Btn sm variant={closingSettings.depth === 'simple' ? 'primary' : 'ghost'}
-                  onClick={() => void saveClosing({ depth: 'simple' })}>Simple</Btn>
-                <Btn sm variant={closingSettings.depth === 'rigorous' ? 'primary' : 'ghost'}
-                  onClick={() => void saveClosing({ depth: 'rigorous' })}>Rigorous</Btn>
-              </div>
-              <div className="t-caption" style={{ marginTop: 4 }}>
-                Simple counts the products that moved. Rigorous also counts the whole
-                active range and hides the expected quantity until you commit to a number.
-              </div>
-            </div>
-          </div>}
-        </Panel>
-        <Panel title="How features behave" bodyPad>
-          <div className="stack" style={{ gap: 12 }}>
-            <div>
-              <div className="pref-label">Server-enforced</div>
-              <div className="t-caption">
-                The POS and catalog APIs re-check every option. A disabled rate edit or discount
-                is refused even from a queued offline bill or a direct API call.
-              </div>
-            </div>
-            <div>
-              <div className="pref-label">Data is never destroyed</div>
-              <div className="t-caption">
-                Disabling Kitchen hides kitchen products everywhere but keeps them, their sales and their history
-                intact. Turn it back on to restore visibility instantly.
-              </div>
-            </div>
-            <div>
-              <div className="pref-label">Owners vs employees</div>
-              <div className="t-caption">
-                For rate editing and quick discounts you can keep the capability for owners while employees bill
-                at the catalog rate and without manual discounts.
-              </div>
-            </div>
-            <div>
-              <div className="pref-label">One home per setting</div>
-              <div className="t-caption">
-                GST/tax and printing live under Bill &amp; Invoice; table layouts live under Tables; discount
-                schemes and coupons have their own editor. This tab never duplicates them.
-              </div>
-            </div>
-          </div>
-        </Panel>
-      </div>
-    </div>
-  )
-}
-
 function SettingsPage() {
   const toast = useToast()
-  const { activeShop, signOut, isOwner, isOwnerAccount, isMultiShop, featureOn } = useAuth()
+  const { activeShop, signOut, isOwner, isOwnerAccount, isMultiShop, featureOn, me, refreshUserProfile } = useAuth()
   const canManageShops = isOwnerAccount && isMultiShop
 
   const [tab, setTab] = useState<SettingsTab>('appearance')
@@ -845,11 +471,11 @@ function SettingsPage() {
           <button
             type="button"
             role="tab"
-            disabled title="Not available yet." aria-selected={tab === 'features'}
+            aria-selected={tab === 'features'}
             className={`subtab ${tab === 'features' ? 'active' : ''}`}
             onClick={() => setTab('features')}
           >
-            <IconLayers /> Features
+            <IconLayers /> Business Studio
           </button>
         )}
         <button
@@ -861,14 +487,25 @@ function SettingsPage() {
         >
           <IconCal /> Tables
         </button>
+        {isOwner && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'team'}
+            className={`subtab ${tab === 'team' ? 'active' : ''}`}
+            onClick={() => setTab('team')}
+          >
+            <IconUsers /> Team &amp; Access
+          </button>
+        )}
         <button
           type="button"
           role="tab"
-          disabled title="Not available yet." aria-selected={tab === 'team'}
-          className={`subtab ${tab === 'team' ? 'active' : ''}`}
-          onClick={() => setTab('team')}
+          aria-selected={tab === 'security'}
+          className={`subtab ${tab === 'security' ? 'active' : ''}`}
+          onClick={() => setTab('security')}
         >
-          <IconUsers /> Team &amp; Access
+          <IconCheck /> Security{isOwner ? ' & activity' : ''}
         </button>
         {canManageShops && (
           <button
@@ -1205,9 +842,7 @@ function SettingsPage() {
         </div>
       )}
 
-      {tab === 'features' && isOwner && (
-        <FeaturesPanel shopId={activeShop?.id ?? ''} prefs={prefs} update={update} />
-      )}
+      {tab === 'features' && isOwner && <StudioEditor api={shopGov} onSaved={() => void refreshUserProfile()} />}
 
       {tab === 'appearance' && (
         <div className="grid-2">
@@ -1695,7 +1330,19 @@ function SettingsPage() {
 
       {tab === 'tables' && <TablesPanel />}
 
-      {tab === 'team' && <TeamPanel />}
+      {tab === 'team' && isOwner && me && <TeamAccess selfId={me.id} />}
+
+      {tab === 'security' && (
+        <div className="gv-stack">
+          <MfaPanel enabled={!!me?.mfa?.enabled} onChanged={refreshUserProfile} />
+          {isOwner && (
+            <section className="gv-section" aria-label="Activity">
+              <header><h3>Who changed what</h3><span className="gv-hint">Every change to staff, tabs, features and passwords.</span></header>
+              <div className="gv-body"><ChangeLog api={shopGov} /></div>
+            </section>
+          )}
+        </div>
+      )}
 
       {tab === 'shops' && canManageShops && <ShopsPanel />}
 
@@ -2255,491 +1902,6 @@ function TablesPanel() {
 
 // ------------------------------------------------------------------
 // Team: staff accounts with per-account tab grants and status tags
-// ------------------------------------------------------------------
-
-function TeamPanel() {
-  const { wsUid, role, user } = useAuth()
-  const shopId = wsUid
-  const toast = useToast()
-
-  const [data, setData] = useState<{ cap: number | null; count: number; employees: PEmployee[] } | null>(null)
-  const [search, setSearch] = useState('')
-  const [drawer, setDrawer] = useState<{ mode: 'new' } | { mode: 'edit'; emp: PEmployee } | null>(null)
-  const [confirmTarget, setConfirmTarget] = useState<PEmployee | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<PEmployee | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const load = async () => {
-    try {
-      setData(await repo.listEmployees(shopId))
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not load staff.', 'err')
-    }
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopId])
-
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase()
-    if (!s || !data) return data?.employees ?? []
-    return data.employees.filter((m) => fuzzyMatch([m.name, m.email], s))
-  }, [data, search])
-
-  async function flipStatus(m: PEmployee) {
-    if (!confirmTarget) return
-    setBusy(true)
-    try {
-      if (m.isActive) await repo.suspendEmployee(shopId, m.userId)
-      else await repo.reactivateEmployee(shopId, m.userId)
-      toast(m.isActive ? `${m.name} suspended. Sign-in is blocked at the database.` : `${m.name} reactivated.`)
-      setConfirmTarget(null)
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Status change failed.', 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return
-    setBusy(true)
-    try {
-      await repo.deleteEmployee(shopId, deleteTarget.userId)
-      toast(`${deleteTarget.name} deleted. Sales history is preserved.`)
-      setDeleteTarget(null)
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Delete failed.', 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const tabsRegistry = user?.tabs && user.tabs.length > 0 ? user.tabs : FALLBACK_TABS
-
-  if (role !== 'owner') {
-    return (
-      <Panel bodyPad>
-        <EmptyState
-          title="Owner access required"
-          hint="Only the shop owner account can manage staff accounts, credentials, and access grants. Ask the shop owner to sign in on this device."
-        />
-      </Panel>
-    )
-  }
-
-  const atLimit = data != null && data.cap != null && data.count >= data.cap
-
-  return (
-    <div className="stack" style={{ gap: 24 }}>
-      <Panel>
-        <div className="panel-head">
-          <div className="panel-title-group">
-            <span className="panel-title">Team register</span>
-            <span className="t-caption">
-              {filtered.length} of {data?.count ?? 0} accounts
-            </span>
-          </div>
-          <div className="panel-actions">
-            <SearchField
-              placeholder="Search staff by name or email…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onClear={() => setSearch('')}
-            />
-            {atLimit ? (
-              <span className="t-caption" style={{ color: 'var(--err)' }}>
-                Plan limit of {data?.cap} staff reached.
-              </span>
-            ) : (
-              <Btn variant="primary" onClick={() => setDrawer({ mode: 'new' })}>
-                + Add employee
-              </Btn>
-            )}
-          </div>
-        </div>
-
-        {!data ? (
-          <div className="skeleton" style={{ height: 140 }} />
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title={data.employees.length ? 'No matching employees' : 'No employee accounts yet'}
-            hint={
-              data.employees.length
-                ? 'Adjust the search keyword to find staff.'
-                : 'Create employee accounts and grant each one access per tab.'
-            }
-          />
-        ) : (
-          <div className="tbl-scroll">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th className="td-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((m) => {
-                  const deleted = m.status === 'deleted'
-                  const suspended = m.status === 'suspended' || (!deleted && !m.isActive)
-                  return (
-                    <tr key={m.userId}>
-                      <td>
-                        <span className="cell-main">{m.name}</span>
-                        <span className="cell-sub">{m.email}</span>
-                      </td>
-                      <td>
-                        <Tag kind={ROLE_TONE[m.role] ?? 'gray'}>{ROLE_LABEL[m.role] ?? m.role}</Tag>
-                        {m.role !== 'owner' && (
-                          <span className="cell-sub">
-                            {m.tabGrants?.length ?? 0} tab{(m.tabGrants?.length ?? 0) === 1 ? '' : 's'}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {deleted ? (
-                          <Tag kind="red">Deleted</Tag>
-                        ) : suspended ? (
-                          <Tag kind="warn">Suspended</Tag>
-                        ) : (
-                          <Tag kind="green">Active</Tag>
-                        )}
-                      </td>
-                      <td className="td-right">
-                        <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
-                          <Btn sm variant="secondary" disabled={deleted} onClick={() => setDrawer({ mode: 'edit', emp: m })}>
-                            Edit
-                          </Btn>
-                          <Btn
-                            sm
-                            variant="ghost"
-                            disabled={deleted}
-                            style={m.isActive ? { color: 'var(--err)' } : undefined}
-                            onClick={() => setConfirmTarget(m)}
-                          >
-                            {deleted ? 'Deleted' : m.isActive ? 'Suspend' : 'Reactivate'}
-                          </Btn>
-                          {!deleted && (
-                            <Btn sm variant="ghost" style={{ color: 'var(--err)' }} onClick={() => setDeleteTarget(m)}>
-                              <IconTrash size={14} /> Delete
-                            </Btn>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Panel>
-
-      {/* Access model summary */}
-      <Panel title="Access model" bodyPad>
-        <div className="team-note">
-          Owners see every module plus all money and valuation figures. Employees see only the
-          tabs you grant them in each account's drawer, plus two switches. Money (sales totals,
-          drawer cash) and Valuation (cost price, stock value). Purchases stays owner-only.
-        </div>
-
-        <div className="micro-label" style={{ margin: '16px 0 6px', fontSize: 11, fontWeight: 600, color: 'var(--subtle)', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
-          Grantable tabs (per employee)
-        </div>
-        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-          {tabsRegistry.map((t) => (
-            <Tag key={t.key} kind="gray">{t.label}</Tag>
-          ))}
-        </div>
-      </Panel>
-
-      <MemberDrawer
-        state={drawer}
-        onClose={() => setDrawer(null)}
-        onSaved={() => {
-          setDrawer(null)
-          load()
-        }}
-      />
-
-      <ConfirmDialog
-        open={!!confirmTarget}
-        title={confirmTarget?.isActive ? `Suspend ${confirmTarget?.name}?` : `Reactivate ${confirmTarget?.name}?`}
-        message={
-          confirmTarget?.isActive
-            ? 'Their active JWT sessions will be revoked and database queries denied immediately.'
-            : 'They regain login access and the tabs granted on this account.'
-        }
-        busy={busy}
-        onClose={() => setConfirmTarget(null)}
-        onConfirm={() => confirmTarget && flipStatus(confirmTarget)}
-      />
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title={`Delete ${deleteTarget?.name}?`}
-        message="Delete this employee account? Sales history is preserved."
-        confirmLabel="Delete employee"
-        busy={busy}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-      />
-    </div>
-  )
-}
-
-function MemberDrawer({
-  state,
-  onClose,
-  onSaved,
-}: {
-  state: { mode: 'new' } | { mode: 'edit'; emp: PEmployee } | null
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const { wsUid, user, surfaceOn } = useAuth()
-  const shopId = wsUid
-  const toast = useToast()
-
-  const initial = state?.mode === 'edit' ? state.emp : null
-  const baseTabs = user?.tabs && user.tabs.length > 0 ? user.tabs : FALLBACK_TABS
-  const tabsRegistry = useMemo(() => {
-    if (surfaceOn(SURFACE_SHEET) && !baseTabs.some((t) => t.key === 'sheet')) {
-      const stockIdx = baseTabs.findIndex((t) => t.key === 'stock')
-      const item = { key: 'sheet', label: 'Sheet (Daily registers)' }
-      if (stockIdx >= 0) {
-        return [...baseTabs.slice(0, stockIdx + 1), item, ...baseTabs.slice(stockIdx + 1)]
-      }
-      return [...baseTabs, item]
-    }
-    return baseTabs.filter((t) => t.key !== 'sheet' || surfaceOn(SURFACE_SHEET))
-  }, [baseTabs, surfaceOn])
-
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [tabKeys, setTabKeys] = useState<string[]>(['dashboard'])
-  const [canMoney, setCanMoney] = useState(false)
-  const [canValuation, setCanValuation] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (!state) return
-    setName(initial?.name ?? '')
-    setEmail(initial?.email ?? '')
-    setPassword('')
-    setTabKeys(initial && initial.tabGrants && initial.tabGrants.length > 0 ? [...initial.tabGrants] : ['dashboard'])
-    setCanMoney(initial?.canSeeMoney ?? false)
-    setCanValuation(initial?.canSeeValuation ?? false)
-  }, [state, initial])
-
-  function toggleTab(key: string, on: boolean) {
-    setTabKeys((prev) => (on ? (prev.includes(key) ? prev : [...prev, key]) : prev.filter((k) => k !== key)))
-  }
-
-  async function save() {
-    if (!name.trim()) return toast('Name is required.', 'err')
-    if (tabKeys.length === 0) return toast('Select at least one tab.', 'err')
-    setBusy(true)
-    try {
-      if (initial) {
-        const grantsChanged =
-          JSON.stringify([...tabKeys].sort()) !== JSON.stringify([...(initial.tabGrants ?? [])].sort()) ||
-          canMoney !== initial.canSeeMoney ||
-          canValuation !== initial.canSeeValuation
-        if (grantsChanged) {
-          await repo.updateEmployeeAccess(shopId, initial.userId, {
-            tabGrants: tabKeys,
-            canSeeMoney: canMoney,
-            canSeeValuation: canValuation,
-          })
-          toast(`${name.trim()} access updated.`)
-        }
-        if (password.trim()) {
-          if (password.length < 8) return toast('Temporary password must be at least 8 characters.', 'err')
-          await repo.resetEmployeePassword(shopId, initial.userId, password)
-          toast('Password reset. Share the new one privately.')
-        }
-        if (!grantsChanged && !password.trim()) toast(`${name.trim()}: nothing changed.`)
-      } else {
-        const em = email.trim().toLowerCase()
-        if (!em || !em.includes('@')) return toast('A valid email is required.', 'err')
-        if (password.length < 8) return toast('Temporary password must be at least 8 characters.', 'err')
-        await repo.createEmployee(shopId, {
-          name: name.trim(),
-          email: em,
-          password,
-          tabGrants: tabKeys,
-          canSeeMoney: canMoney,
-          canSeeValuation: canValuation,
-        })
-        toast(`Account created for ${name.trim()}. Share the email and temporary password with them.`)
-      }
-      onSaved()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Save failed.', 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Drawer
-      open={!!state}
-      title={initial ? `Edit ${initial.name}` : 'New employee account'}
-      onClose={onClose}
-      wide
-      footer={
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Btn variant="primary" disabled={busy} onClick={save}>
-            {busy ? 'Saving…' : initial ? 'Save changes' : 'Create account & grant access'}
-          </Btn>
-          <Btn variant="ghost" onClick={onClose}>
-            Cancel
-          </Btn>
-        </div>
-      }
-    >
-      <div className="stack" style={{ gap: 14 }}>
-        {!initial && (
-          <>
-            <Field label="Full name">
-              <input
-                className="field-control"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Ravi Kumar"
-                autoFocus
-              />
-            </Field>
-            <Field label="Login email">
-              <input
-                className="field-control"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="staff@example.com"
-              />
-            </Field>
-            <Field
-              label="Temporary password"
-              help="At least 8 characters. Share it privately; employee can sign in immediately."
-            >
-              <input
-                className="field-control num"
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="min 8 characters"
-              />
-            </Field>
-          </>
-        )}
-        {initial && (
-          <>
-            <Field
-              label="Full name"
-              help="Name is set at account creation and cannot be edited here."
-            >
-              {/* Read-only like the email: no backend endpoint updates a staff
-                  name, so an editable field would silently discard edits. */}
-              <input className="field-control" value={name} disabled readOnly />
-            </Field>
-            <Field label="Login email">
-              <input className="field-control" type="email" value={email} disabled readOnly />
-            </Field>
-          </>
-        )}
-
-        <Field label="Tabs this employee can access" help="Only granted tabs appear in their app navigation.">
-          <div className="perm-grid">
-            {tabsRegistry.map((t) => {
-              const on = tabKeys.includes(t.key)
-              return (
-                <label key={t.key} className={`perm-card ${on ? 'on' : ''}`}>
-                  <input
-                    type="checkbox"
-                    className="check-box"
-                    checked={on}
-                    onChange={(e) => toggleTab(t.key, e.target.checked)}
-                  />
-                  <span className="perm-card-main">
-                    <span className="perm-card-label">{t.label}</span>
-                  </span>
-                </label>
-              )
-            })}
-          </div>
-        </Field>
-
-        <div className="pref-row">
-          <div>
-            <div className="pref-label">Money (see sales totals, drawer cash)</div>
-            <div className="t-caption">Grants aggregate sales figures, daybook cash, and dashboard money tiles.</div>
-          </div>
-          <button
-            className={`switch ${canMoney ? 'on' : ''}`}
-            type="button"
-            role="switch"
-            aria-checked={canMoney}
-            aria-label="See money"
-            onClick={() => setCanMoney((v) => !v)}
-          >
-            <span className="knob" />
-          </button>
-        </div>
-
-        <div className="pref-row last">
-          <div>
-            <div className="pref-label">Valuation (see cost price, stock value)</div>
-            <div className="t-caption">Reveals cost prices, COGS, margins, and stock valuation figures.</div>
-          </div>
-          <button
-            className={`switch ${canValuation ? 'on' : ''}`}
-            type="button"
-            role="switch"
-            aria-checked={canValuation}
-            aria-label="See valuation"
-            onClick={() => setCanValuation((v) => !v)}
-          >
-            <span className="knob" />
-          </button>
-        </div>
-
-        {initial && (
-          <Field label="Reset temporary password" help="Leave blank to keep the current password.">
-            <input
-              className="field-control num"
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="new password (min 8 chars)"
-            />
-          </Field>
-        )}
-
-        <div className="t-caption" style={{ lineHeight: 1.6 }}>
-          <strong>Owner:</strong> always sees every tab plus all money and valuation figures.<br />
-          <strong>Employee:</strong> sees only the tabs granted here. Money and valuation are opt-in per
-          account. Changes apply within one sync poll.
-        </div>
-      </div>
-    </Drawer>
-  )
-}
-
-// ------------------------------------------------------------------
-// ------------------------------------------------------------------
-// Shops: multi-shop owner - read-only shop list + retailer login
-// password reset. Shop CREATION is developer-only (dev console);
-// the owner's single permitted action is resetting a retailer login.
 // ------------------------------------------------------------------
 
 function ShopsPanel() {
