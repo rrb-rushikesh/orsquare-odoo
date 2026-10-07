@@ -1,79 +1,75 @@
-# HANDOVER: live state of the ORSquare build
+# HANDOVER (authoritative, read first)
 
-> **Any model/engineer taking over: read this file first, then `AGENTS.md`, `context.md`, `docs/`. Update this file at the end of every work chunk (the "Log" and "Status" sections). If you are cut off, the next person continues from "NEXT STEPS".**
-> Owner: product designer (not a developer): explain simply, ask before architecture changes (see `AGENTS.md`). Owner has granted autonomy for the backend and the frontend build ("do not compromise").
+> Written at the owner's request when the previous worker was about to be cut off. It supersedes every earlier version of this file.
+> Then read `AGENTS.md`, `context.md`, `docs/` (all of it) before deciding anything. Do not redesign locked decisions.
+> The owner is a **product designer, not a developer**. Explain simply, give reasons and trade-offs, ask before architecture changes.
 
-## 1. Product in one paragraph
-ORSquare (OR²): retail counter platform for bottle/beverage shops (optional restaurant mode). **Odoo 18 Community is the only authority** for accounting, tax, pricing, stock, valuation. One shop = one database. React retailer app (`frontend/`), Developer Console, and an Astra marketing site are separate front ends with hard boundaries. Offline-first POS (Dexie outbox + idempotent flush). Realtime = Odoo events -> Centrifugo/Redis (never blocks a sale).
+## 0. THE ONE THING THAT MATTERS MOST
 
-## 2. Repos / locations
-| What | Where |
-|---|---|
-| This repo (backend + new frontend) | `C:\Repo\orsquare-odoo` |
-| Odoo module | `addons/orsquare/` (services in `models/`, HTTP in `controllers/main.py`, 208 tests in `tests/`) |
-| Retailer app (React 19 + Vite) | `frontend/` |
-| Old live retailer app (REFERENCE ONLY for screens/UX, never its backend/business logic) | `C:\Users\rushi\Music\production-hot-fix` |
-| Old repo for Developer Console + Astra landing (REFERENCE/SOURCE for those two only) | `C:\Repo\orsquare-tryton` (`landing/`, `prototypes/console`; its `frontend/` is NOT the retailer source) |
-| Specs | `docs/tabs/*.md`, `docs/*.md`, `context.md`; API reference `docs/backend-api-reference.md` (generated: `scripts/gen_api_docs.sh`) |
+**The retailer frontend must be a MIRROR of the original live app, not a redesign.**
+The previous worker rebuilt screens by hand (new Sales counter, Stock, Products, Purchases, Accounts, Cash Flow, Dashboard, a new shell, new login). Those screens **do not look or behave like the original**. That was the wrong direction and the owner rejected it.
 
-## 3. Run it (Windows, Git Bash)
-```
-Docker Desktop must be running.  cd scratch/odoo18-spike && docker compose up -d      # Odoo :8088, PG
-scripts/run_tests.sh                       # backend: must stay green (208)
-scripts/e2e_realtime.sh / e2e_gateway.sh / concurrency_test.sh / benchmark.sh
-cd frontend && npm install && npx tsc --noEmit && npx vite build
-preview server: .claude/launch.json -> "retailer-app" (Vite :5173, proxies /api -> :8088)
-Demo login: shop code orsquare_shop1 / krishna_owner / Krishna#Owner2026  (local dev only)
-```
-Dev shop DBs: `orsquare_dev` (tests), `orsquare_shop1` (demo; origin allow-list param `orsquare.allowed_origins` includes http://localhost:5173), `orsquare_template`.
-Schema/bootstrap change => bump manifest version + `migrations/<ver>/post-migration.py`; then `scripts/upgrade_shops.sh`; **restart `odoo18-spike-web`** after python changes (config params are ormcache'd).
+The owner wants: **same tabs, same layouts, spacing, typography, buttons, icons, controls, tables, drawers, dialogs, states, interactions, responsive behaviour, same desktop experience.** Only the plumbing underneath changes (old DRF backend + frontend business logic -> Odoo API + offline layer + realtime). If an optimisation would visibly change the UI, **do not do it**. Correctness and visual fidelity beat "optimisation". Capability must be preserved even where the old implementation is messy: reproduce it against the new backend, do not drop it.
 
-## 4. Architecture rules that must not be broken (summary of locked decisions)
-1. **No business math in the UI.** Prices/tax/discount via `sales.quote` (read-only, same engine as `settle`); stock/valuation/accounting from Odoo reads. Offline-only exception: `lib/estimate.ts` (labelled estimate, never authority).
-2. Every backend call goes through `frontend/src/lib/api.ts` (`call(service, method, params)` -> `POST /api/call`, whitelist in `api_registry.py`). Cookie session (httpOnly); 401 => login; network error => offline path.
-3. Local-first: `lib/db.ts` (Dexie per shop+user), `lib/sync.ts` (snapshot from `/api/sync/bootstrap`, `/api/sync/delta` poll 15 s, durable outbox -> `/api/sync/flush`, idempotency key = `client_ref`, per-device `device_seq` last+1). Only offline-capable: billing (sales), purchases-as-specified, stock transfers per spec; online-only areas must say so.
-4. Realtime push is **after-commit, background thread, 30 s circuit breaker** (`models/event.py`); never in the request path.
-5. Guardrails: authenticated users never get the landing page (Caddy `forward_auth` -> `/api/session/gate`); deep links stable on refresh (splash while hydrating; `/login` only on explicit 401); landing `orsquare.com`, app `app.orsquare.com`, console `app.orsquare.com/dev`.
-6. Roles = Odoo groups (owner/cashier/stockkeeper + flags can_see_money/can_see_valuation/can_manage_returns + per-user tab grants). Masked values are `null`, not 0.
-7. Hierarchy: Odoo core -> OCA -> thin custom module. Do not redesign locked decisions; do not casually change backend foundations (run the 208 tests).
+Source of truth for the retailer UI: `C:\Users\rushi\Music\production-hot-fix` (`src/pages`, `src/components`, `src/styles`). Port **that** code, keep its JSX/CSS, and replace only its data layer (`lib/repo.ts`, `lib/api.ts`, `lib/sync.ts`, `lib/db.ts`, `auth/AuthContext.tsx`, `data/DataProvider.tsx`) and its client-side business maths.
 
-## 5. Status (update me)
-### Backend: COMPLETE, 208 tests green, realtime E2E 8/8, gateway E2E 14/14, concurrency proof
-Added in session 2: `sales.quote`, product rows carry `product_id`/`category`/`low_stock_qty`, async push + breaker.
-Open owner items: confirm TCS-never-in-cost (D6); set real State VAT (ships 0%); prod stack on a real host/TLS/restore drill not verified.
+## 1. Repositories
+| What | Where | Use for |
+|---|---|---|
+| This repo | `C:\Repo\orsquare-odoo` | Odoo backend (done), new `frontend/` (needs redo), `landing/` (done), `addons/orsquare_platform` (new) |
+| Old live retailer app | `C:\Users\rushi\Music\production-hot-fix` | **Exact visual/UX source of the retailer app** |
+| Old repo #2 | `C:\Repo\orsquare-tryton` | **Developer Console** (`frontend/src/features/dev`, `prototypes/console`) and **Astra landing** (`landing/`) ONLY. Its `frontend/` is NOT the retailer source |
 
-### Frontend
-| Area | State |
-|---|---|
-| Foundation (api client, Dexie store, outbox, auth, shell, login with shop code, workspace hook) | DONE, verified in browser |
-| Sales counter: search/scan, live Odoo quote, two-step F8/F9 pay, offline estimate + outbox | DONE (basic). TODO: pegs/open bottle, returns/exchanges, tables/tabs, promo UX, print |
-| Stock: levels, transfer, history, open-bottle list | DONE (basic) |
-| Products (list, form w/ pegs + opening stock + Odoo price suggestion, masters drawer) | DONE, verified in browser |
-| Purchases (register, simple/advanced bill with Odoo reverse-rate preview, offline-queueable, return/exchange drawer) | DONE (return/exchange UI built, not yet browser-verified) |
-| Accounts / Cash Flow / Dashboard | DONE, verified in browser (Dashboard refreshes on sync; realtime tickers pending Centrifugo client) |
-| Sales extras: open-bottle tray + pegs, returns/exchanges (bill finder), restaurant tables + autosave + KOT, printing (lib/print.ts: QZ raw ESC/POS or browser dialog; offline provisional slip) | DONE, verified in browser except physical printing |
-| Settings (Team & Access, Business Studio), Ledger | TODO |
-| Daybook, Calendar | SKIPPED by owner for now |
-| Variants | placeholder only |
-| Developer Console | TODO (source: orsquare-tryton `prototypes/console` + its frontend `features/dev`) |
-| Astra landing | TODO: copy `orsquare-tryton/landing` unchanged into `landing/` here; do NOT redesign |
-| Old screens waiting to be ported | `frontend/src/_pending/` (excluded from tsconfig) |
+## 2. KEEP: backend/foundation work that is correct (do not rewrite)
+Verified: **208 backend tests green** (`scripts/run_tests.sh`), realtime E2E 8/8 (`scripts/e2e_realtime.sh`), gateway E2E 14/14, concurrency proof, benchmarks.
+- `addons/orsquare/` complete Odoo 18 module. Services behind a whitelist (`api_registry.py`) over `POST /api/call`; routes `/api/session/{login,logout,me,gate}`, `/api/sync/{bootstrap,delta,flush}`, `/api/health`. Docs: `docs/backend-api-reference.md` (generated by `scripts/gen_api_docs.sh`), `docs/backend-architecture.md`, `docs/backend-decisions.md`, `docs/operations-runbook.md`.
+- Added this session and correct: `sales.quote` (read-only pricing with the exact settle engine; 2 tests), product rows carry `product_id/category/category_id/low_stock_qty/uom_id/po_uom_id/uoms/brand_id/regime_id`, `purchases.list_bills/bill_detail` and per-line rate in `preview_bill` (1 test), suppliers in bootstrap/delta, `tabs` render exposes `peg`, queued stock transfer publishes `stock_changed` (assert in test_sync), **realtime push is after-commit on a background thread with a 30 s circuit breaker** (a dead Centrifugo used to make a sale take 16 s; now ~125 ms), race-free `e2e_realtime.sh`.
+- `addons/orsquare_platform/` (commit `7ada033`): platform registry for the Developer Console: fleet, `create_shop` (clones `orsquare_template` in-process), suspend/reactivate (shop-side flag `orsquare.suspended` enforced in login + guard), reset owner password, expiry/extend, per-shop studio, append-only audit, system info. 3 tests pass and are repeatable (`odoo -d orsquare_platform -u orsquare_platform --test-enable --test-tags=/orsquare_platform`). `scripts/build_platform.sh [db] [dev_login] [dev_password]`. Developers = Odoo `base.group_system` users of DB `orsquare_platform`; the existing `/api/session/gate` already redirects them to `/dev` (param `orsquare.dev_console=1`). **NOT yet verified over HTTP**: developer login via `/api/session/login` with shop=`orsquare_platform`, `/api/call` `platform.*`, gate 302 to `/dev`, refusal of a shop user calling `platform.*`, suspended shop login 403. Do those first when you resume the Console.
+- `landing/` (commit `86d69eb`): Astra site copied **unchanged** from `orsquare-tryton/landing`; builds; `PUBLIC_APP_URL=https://app.orsquare.com/login npm run check` passes. Do not redesign.
+- Deploy templates `deploy/` (Caddy gate etc.), scripts, docs.
 
-## 6. Gotchas learned
-- Root `.gitignore` had `lib/`; negated for `frontend/src/lib/` (use `git add -f` for `_pending/lib`).
-- `odoo shell` scripts exit right after commit: background push threads die (test scripts must join `orsquare-push` threads).
-- Use the Write tool / Python scripts for files; long bash heredocs with quotes break. Avoid Odoo reserved attrs (`_order`, `_table`) as method names.
-- Windows paths inside Python string literals need raw strings.
-- A sale once took 16 s because a dead Centrifugo URL blocked the request: fixed (125 ms). Always measure.
+## 3. WHAT WENT WRONG (frontend)
+Everything under `frontend/src/pages` (SalesPage, StockPage, ProductsPage, PurchasesPage, AccountsPage, CashFlowPage, DashboardPage, ComingSoon), `components/AppShell.tsx` (rewritten), `pages/LoginPage.tsx` (rewritten), plus `App.tsx`, was **hand-written new UI**. They look different from the original and are rejected. Cause: the worker took the "rebuild and clean up" instruction as licence to design new screens and to delete the old pages into `src/_pending/`.
 
-## 7. Log (newest first)
-- 2026-10-07 s2: Sales extras done and browser-verified (peg bill, 495 exchange refund, table 2 bill + KOT). Bugs found+fixed by measuring: per-render array identity caused a request loop (always memoize derived payload objects used as effect deps); settings change now forces full re-bootstrap; SNAPSHOT_VERSION=3. Tabs `_render` now returns `peg`.
-- 2026-10-07 s2: Products + Purchases done. Backend adds: purchases.list_bills/bill_detail, preview_bill returns per-line rate/amount, bootstrap+delta carry suppliers, product rows carry po_uom/uoms/uom_id/brand_id/regime_id. Frontend snapshot has SNAPSHOT_VERSION (bump when sections change, else stale devices show gaps).
-- 2026-10-07 s2: frontend foundation + Sales + Stock committed; backend quote/async push committed. Handover file created. Starting: Dashboard, Products, Purchases, Accounts, Cash Flow, Sales extras, Console, landing.
+### What must be reverted/replaced
+- **Replace** all of the above with the original screens ported from `production-hot-fix` (files are preserved in `frontend/src/_pending/pages|components` and in the old repo; use the old repo as reference of truth, they are byte-for-byte originals).
+- Restore the original `AppShell`, `LoginPage` look (add only a shop-code field if required by Odoo login, styled exactly like the other fields), original nav/tabs/labels.
+- Note: these were already committed in git history (commits `fb528bd`..`8fe2c5f`). Nothing was committed after the owner objected. Reverting = overwrite the files; do not rewrite history.
 
-## 8. NEXT STEPS (ordered)
-1. Products -> Purchases -> Accounts -> Cash Flow -> Dashboard (real Odoo, all states, tests/build/browser check each).
-2. Sales extras: pegs/open bottle, returns/exchanges, tables+KOT, print (ESC/POS from `bills.escpos`).
-3. Settings (Team & Access, Business Studio) and Ledger.
-4. Developer Console (own folder/route), landing in `landing/`, Caddy wiring per `deploy/Caddyfile`.
-5. Latency measurements of key flows into `docs/benchmarks.md`.
+### Frontend pieces that are NOT UI and are worth keeping (the "plumbing")
+These contain no visual design and implement the locked architecture; reuse them as the new data layer under the ORIGINAL screens:
+- `frontend/src/lib/api.ts` (cookie-session client, `call(service, method, params)`), `lib/db.ts` (Dexie per shop+user: `kv` snapshot, `outbox`), `lib/sync.ts` (bootstrap, delta poll, durable outbox, `submitMutation`, `submitQueued`, SNAPSHOT_VERSION, settings-change re-bootstrap), `lib/realtime.ts` (Centrifugo push only triggers a delta pull; polling is the fallback), `auth/AuthContext.tsx` (from `staff.me`), `data/workspace.ts` (snapshot hook), `lib/print.ts` (prints Odoo-rendered ESC/POS/thermal text), `lib/estimate.ts` (offline-only labelled estimate). Adapt them to expose the **shapes the original pages expect** (`useData()`, `useAuth()`, `repo.*`) so the original JSX keeps working. A thin compatibility layer (e.g. `lib/repo.ts` re-implemented over `call()`) is the right way: **keep the page code, swap what is under `repo`/`useData`/`useAuth`.**
+- Vite config, tsconfig, `.claude/launch.json` (config `retailer-app`, port 5173, proxies `/api` to :8088), `.gitignore` fix for `frontend/src/lib`.
+
+## 4. Locked architecture (do not change)
+1. Odoo 18 Community is the only authority for pricing, tax, accounting, stock, valuation. **No business maths in the frontend.** Live prices via `sales.quote`, billing via `sales.settle`, purchase preview via `purchases.preview_bill`. Only exception: `lib/estimate.ts` while offline, labelled estimate, never sent as authority.
+2. One shop = one database. Platform DB `orsquare_platform` is separate (Developer Console only).
+3. Offline/local-first underneath the unchanged UI: Dexie, single bootstrap (`/api/sync/bootstrap`), delta (`/api/sync/delta`, 2-min overlap), durable outbox, idempotency key = `client_ref`/mutation id, per-device `device_seq` last+1, batch `/api/sync/flush`, reconnect. Offline allowed: cash/UPI sales, peg sales from cached open bottles, queued stock transfers, thermal printing. Online-only: new/edited products, Khata beyond limit, day sealing, returns, table tabs, open-bottle opening.
+4. Realtime: Odoo -> event layer -> Centrifugo/Redis; push never blocks a transaction; a push only prompts a delta pull.
+5. Auth/routing guardrails (AGENTS.md section 4): Caddy gate before landing HTML; `/sales` etc. stable on refresh (splash while hydrating, `/login` only on explicit 401); landing `orsquare.com`, app `app.orsquare.com`, console `app.orsquare.com/dev`; roles = Odoo groups + tab grants + flags (masked values are `null`).
+6. Roles: owner / cashier / stockkeeper + `can_see_money`, `can_see_valuation`, `can_manage_returns`.
+7. Reuse hierarchy: Odoo core -> OCA -> thin custom module. Do not rewrite working backend to suit the old UI; if the old UI needs data the API lacks, add a small additive read method with a test.
+
+## 5. Mapping the original screens to the new backend (starting guide)
+The old app's `lib/repo.ts` (in `production-hot-fix/src/lib/repo.ts`, also parked at `frontend/src/_pending/lib/repo.old.ts`) lists every capability the screens use. Re-implement each function over `call(...)`; where a capability has no Odoo equivalent, do not delete the control: wire it to the closest backend service, or if truly unsupported show it disabled with the original look and record it in section 7.
+Backend services available (see `docs/backend-api-reference.md`): sales, purchases (incl. list_bills/bill_detail), stock (position, value, history, opening stock, adjust, discrepancies), bottles tray, accounts (directory, statement, receive_payment, pay_supplier, employees, GSTIN lookup), cashflow (register, new_entry), reports (dashboard, calendar, day_detail, trial_balance, P&L, balance sheet, GST report, registers), catalog (products, units, brands, categories, tax regimes, margin rules, floors/tables), day (open/seal/reaudit/transfer/bills), promos, tabs (table tabs + KOT), staff (me, roles, presets, settings), wipe, realtime.token, sync.*.
+Known gaps vs the old app (state them honestly in the UI work): Sheet/WineStock register, Closing Stock Audit, AI page, multi-shop owner views, distribution, Product Master Library/importer (skipped by spec), Variants (clean placeholder only), Daybook and Calendar (owner said skip for now).
+
+## 6. Developer Console and landing
+- Console source: `C:\Repo\orsquare-tryton\frontend\src\features\dev` (DevApp, FleetPage, BusinessPanel, StudioPanel, AuditPage, SystemPage, NewBusinessDialog, SubscriptionBlock, CashiersBlock) and `prototypes/console`. Reproduce it **visually identical**, data from `platform.*` (`orsquare.platform.service`). Keep it in its own folder/route (`/dev`), lazy-loaded; no retailer code in it; shop-level fields it expects but we lack (e.g. cashier cap) must be shown as in the original or disabled, documented in section 7.
+- Landing: leave `landing/` as is; wire Caddy (`deploy/Caddyfile`) to serve its `dist/` at `/srv/landing`.
+
+## 7. Open items / honest status
+- Frontend: needs the mirror rebuild described above. Nothing in `frontend/src/pages` should be trusted visually.
+- Platform HTTP verification pending (section 2).
+- Console UI not built.
+- Full backend suite was last confirmed green (208) before the platform module; re-run `scripts/run_tests.sh` after any backend change (platform change touched `controllers/main.py`: me/login/guard/dispatcher).
+- Owner decisions still open: confirm TCS-never-in-cost (D6); set real State VAT rate (ships 0%); production host/TLS/restore drill unverified.
+- Demo: shop code `orsquare_shop1`, login `krishna_owner` / `Krishna#Owner2026` (local dev only). Platform DB `orsquare_platform`, developer `dev_ops` / `Dev#Ops2026Local` (local dev only). Run: Docker Desktop, `cd scratch/odoo18-spike && docker compose up -d`, Odoo at :8088, restart `odoo18-spike-web` after python changes.
+
+## 8. Rules for the next worker
+1. Read everything first (AGENTS.md, context.md, docs/, this file). Ask the owner before architecture changes or new stages.
+2. **Fidelity first.** Before touching a screen, open the original in `production-hot-fix` and the new one side by side; they must match. Do not "improve" anything.
+3. Work screen by screen: port original page -> replace its data calls -> remove only legacy backend/business-logic code -> compare visually -> next. Commit per screen. Verify in the browser pane against the original look.
+4. Measure latency of cashier flows; never put a network call or a render loop on the hot path (memoize any object/array used as an effect dependency: a render loop already bit us once).
+5. Gotchas: root `.gitignore` had `lib/` (negated for `frontend/src/lib`; use `git add -f` for `_pending/lib`); `odoo shell` exits right after commit and kills background push threads; long bash heredocs with quotes break (use Write/Python); Odoo reserved attribute names; restart Odoo after python changes (config params are ormcache'd); bump `SNAPSHOT_VERSION` in `lib/sync.ts` whenever the snapshot gains a section.

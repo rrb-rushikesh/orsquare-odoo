@@ -8,6 +8,9 @@ unique to the product; a React app (later) talks to it over a JSON API; an Astro
 [`docs/backend-decisions.md`](docs/backend-decisions.md) → [`docs/operations-runbook.md`](docs/operations-runbook.md).
 Working rules for agents: [`AGENTS.md`](AGENTS.md).
 
+## Direction
+The retailer frontend is to be a **mirror-to-mirror** recreation of the original live app, with Odoo, offline and realtime underneath. See `HANDOVER.md` and `NEXT_WORKER_PROMPT.md`.
+
 ## State
 
 Milestone 1 (backend) is built and verified — 206 automated tests (also green on a from-scratch install), real-concurrency,

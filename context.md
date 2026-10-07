@@ -1,3 +1,5 @@
+
+> **DIRECTION (read this):** the retailer frontend must be an exact visual/UX mirror of the original live app (`C:\Users\rushi\Music\production-hot-fix`), rebuilt on the Odoo + offline + realtime architecture. The hand-written screens now in `frontend/src/pages` were rejected. See `HANDOVER.md` and `NEXT_WORKER_PROMPT.md`.
 # ORSquare Project Context & Architecture
 
 **Project:** ORSquare (OR²)  
