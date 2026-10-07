@@ -114,6 +114,10 @@ Cleanup is committed locally in three groups: unused frontend code/dependencies,
 - **Dedicated Developer Login Screen:**
   - Visiting `http://localhost:5173/dev` unauthenticated presents the dedicated Developer Console sign-in screen with fields for Developer Email and Password.
   - Retail shop staff visiting `/dev` are unconditionally redirected to `/` in 0ms.
+- **Cached Session Self-Healing & Optional Chaining Fix (Screenshot 232334):**
+  - Resolved `Cannot read properties of undefined (reading 'can_see_money')` caused by reading stale cached session envelopes from `localStorage` lacking `flags`.
+  - Added optional chaining `me?.flags?.can_see_money` in `AuthContext.tsx`.
+  - Added self-healing normalization in `readCached()` and `adopt()` ensuring default flags, company, roles, and tabs are always populated even from legacy cached browser state.
 - **Validation:**
   - `npm run typecheck`: Passed (0 errors).
   - `npm test`: **107 passed, 1 physical-printer test skipped**.
