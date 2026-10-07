@@ -129,8 +129,13 @@ class OrsquareBusinessDay(models.Model):
         self.ensure_one()
         if self.state != 'open':
             return self.expected_cash
-        self.session_id.invalidate_recordset(['cash_register_balance_end'])
-        return self.session_id.cash_register_balance_end + self._external_cash_net()
+        session = self.session_id
+        session.invalidate_recordset(['cash_register_balance_end', 'cash_register_difference'])
+        expected = session.cash_register_balance_end + self._external_cash_net()
+        # cash_register_difference is a cached compute that does not depend on the counted cash:
+        # never leave the value computed against an empty count behind.
+        session.invalidate_recordset(['cash_register_balance_end', 'cash_register_difference'])
+        return expected
 
     # ------------------------------------------------------------------ snapshot
     def _day_orders(self):
@@ -147,17 +152,17 @@ class OrsquareBusinessDay(models.Model):
         by_method = defaultdict(float)
         for pay in orders.payment_ids:
             method = pay.payment_method_id
-            if method.is_cash_count:
+            if method.orsquare_is_concession:
+                key = 'concession'
+            elif method.is_cash_count:
                 key = 'cash'
             elif method.type == 'pay_later':
                 key = 'khata'
-            elif method.orsquare_is_concession:
-                key = 'concession'
             else:
                 key = 'upi'
             by_method[key] += pay.amount
         revenue_ex_tax = sum(l.price_subtotal for l in orders.lines)
-        cogs = sum(o.total_cost for o in orders)
+        cogs = sum(l.total_cost for l in orders.lines)
         retail = sum(l.price_subtotal_incl for l in orders.lines if not l.product_id.is_kitchen)
         kitchen = sum(l.price_subtotal_incl for l in orders.lines if l.product_id.is_kitchen)
         top = defaultdict(lambda: [0.0, 0.0])
@@ -199,8 +204,10 @@ class OrsquareBusinessDay(models.Model):
 
     def _linked_adjustments(self, orders):
         """Refund orders / credit notes dated on other days that reverse this day's sales."""
-        refunds = self.env['pos.order'].sudo().search([
-            ('refunded_order_id', 'in', orders.ids), ('orsquare_business_date', '!=', self.date)])
+        refund_lines = self.env['pos.order.line'].sudo().search([
+            ('refunded_orderline_id.order_id', 'in', orders.ids)])
+        refunds = refund_lines.mapped('order_id').filtered(
+            lambda o: o.orsquare_business_date != self.date and o.state in ('paid', 'done', 'invoiced'))
         total = sum(refunds.mapped('amount_total'))
         invoices = orders.account_move
         credit_notes = self.env['account.move'].sudo().search([
@@ -232,6 +239,7 @@ class OrsquareBusinessDay(models.Model):
         res = session.post_closing_cash_details(counted_cash - external)
         if not res.get('successful'):
             raise UserError(res.get('message') or _("The POS session could not be closed."))
+        session.invalidate_recordset(['cash_register_balance_end', 'cash_register_difference'])
         session.update_closing_control_state_session(note or '')
         res = session.close_session_from_ui([])
         if not res.get('successful'):

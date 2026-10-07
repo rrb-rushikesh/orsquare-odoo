@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 
+from odoo import fields
+
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 
@@ -72,7 +74,7 @@ class TestDaybook(OrsquareCase):
         self.assertEqual(self.day.cash_variance, -100.0)
         # Odoo itself booked the cash difference (we did not touch the ledger).
         diff_lines = self.env['account.move.line'].search([
-            ('move_id', 'in', self.day.session_id.move_id.ids), ('account_id.code', '=', '999002')])
+            ('account_id.code', '=', '999002'), ('move_id.state', '=', 'posted')])
         self.assertEqual(sum(diff_lines.mapped('debit')), 100.0)
 
     def test_07_session_entry_balances_and_cogs_posted(self):
@@ -107,25 +109,28 @@ class TestDaybook(OrsquareCase):
         res = self.sell([{'product_id': self.item.id, 'qty': 2}])
         self.day.action_seal(1400.0)
         order = self.env['pos.order'].browse(res['order_id'])
-        # Customer returns one bottle the next day -> a refund dated on a later business date.
+        # Customer returns one bottle the next business day: the refund belongs to that later day.
         next_day = self.company.orsquare_current_business_date() + timedelta(days=1)
-        tomorrow = self.Day.open_day(0.0, date=next_day)
-        refund = order.with_context(orsquare_event_dt=None).refund()
+        self.Day.open_day(0.0, date=next_day)
+        noon = fields.Datetime.now() + timedelta(days=1)
+        refund = order.with_context(orsquare_event_dt=noon).refund()
         refund_order = self.env['pos.order'].browse(refund['res_id'])
-        refund_order.orsquare_business_date = False if False else refund_order.orsquare_business_date
-        before = dict(self.day.snapshot)
-        self.assertEqual(before['adjustments_total'], 0.0)
-        # The refund order is dated "today" == the same business date here, so emulate a later day.
-        self.env.cr.execute("UPDATE pos_order SET orsquare_business_date = %s WHERE id = %s", [next_day, refund_order.id])
-        refund_order.invalidate_recordset()
+        self.assertEqual(refund_order.orsquare_business_date, next_day)
+        self.assertEqual(self.day.snapshot['adjustments_total'], 0.0)
+        # refund still draft; pay + validate it like a counter return
+        cash = self.env['orsquare.shop.bootstrap'].payment_method('cash')
+        refund_order.add_payment({'pos_order_id': refund_order.id, 'amount': refund_order.amount_total,
+                                  'payment_method_id': cash.id, 'name': 'refund'})
+        refund_order.action_pos_order_paid()
         self.day.action_reaudit("Customer returned stock")
         self.assertEqual(self.day.state, 're_audited')
         log = self.day.audit_log_ids
         self.assertEqual(len(log), 1)
-        self.assertEqual(log.previous_snapshot['gross_sales'], 400.0)
+        self.assertEqual(log.previous_snapshot['adjustments_total'], 0.0)
         self.assertEqual(log.reason, "Customer returned stock")
         self.assertEqual(self.day.snapshot['gross_sales'], 400.0, "History is not rewritten")
         self.assertEqual(self.day.snapshot['adjustments_total'], -400.0)
+        self.assertEqual(self.day.snapshot['adjusted_net_sales'], 0.0)
         with self.assertRaises(UserError):
             log.write({'reason': 'tamper'})
         with self.assertRaises(UserError):
