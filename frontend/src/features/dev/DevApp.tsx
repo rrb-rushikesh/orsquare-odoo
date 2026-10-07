@@ -1,36 +1,28 @@
-import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { isPlatformDev } from '@/auth/surface';
-import { BrandLogo } from '@/components/Logo';
-import { MfaCodeForm } from '@/components/MfaCodeForm';
-import { Btn, Field, Modal, Tag } from '@/components/ui';
-import { IconGear, IconHistory, IconLayers, IconUsers } from '@/components/icons';
-import { MfaPanel } from '@/features/governance/MfaPanel';
-import { ApiError } from '@/lib/api';
-import { AuditTab } from './AuditTab';
-import { FleetTab } from './FleetTab';
-import { OperatorsTab } from './OperatorsTab';
-import { PlansTab } from './PlansTab';
-import { SystemTab } from './SystemTab';
-import '@/features/governance/governance.css';
-import './dev.css';
+import { IconHistory, IconGear, IconLogout, IconStore } from '@/components/icons';
+import { Button, IconButton } from '@/components/ui/Button';
+import { Field, Input } from '@/components/ui/Field';
+import { ToastProvider } from '@/components/ui/Toast';
+import { ICON } from '@/components/ui/tokens';
+import { BrandLogo } from '@/components/shell/BrandLogo';
+import { cx } from '@/lib/cx';
+import { AuditPage } from './AuditPage';
+import { FleetPage } from './FleetPage';
+import { SystemPage } from './SystemPage';
 
-type DevTab = 'fleet' | 'plans' | 'operators' | 'audit' | 'system';
+const NAV = [
+  { to: '/dev', label: 'Businesses', icon: IconStore, end: true },
+  { to: '/dev/audit', label: 'Audit', icon: IconHistory, end: true },
+  { to: '/dev/system', label: 'System', icon: IconGear, end: true },
+] as const;
 
-const TABS: { key: DevTab; label: string; icon: typeof IconLayers; adminOnly?: boolean }[] = [
-  { key: 'fleet', label: 'Fleet', icon: IconLayers },
-  { key: 'plans', label: 'Plans', icon: IconLayers },
-  { key: 'operators', label: 'Operators', icon: IconUsers, adminOnly: true },
-  { key: 'audit', label: 'Audit trail', icon: IconHistory },
-  { key: 'system', label: 'System', icon: IconGear },
-];
-
-function DevLogin() {
-  const { signIn, completeMfa } = useAuth();
+function DevLogin({ onSignedIn }: { onSignedIn: () => void }) {
+  const { signIn } = useAuth();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [awaitingCode, setAwaitingCode] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -39,129 +31,113 @@ function DevLogin() {
     setBusy(true);
     setError('');
     try {
-      // The server resolves the platform database from surface 'dev'; the shop code is not asked of developers.
-      const r = await signIn(login.trim().toLowerCase(), password, 'orsquare_platform', 'dev');
-      if ('mfaRequired' in r) setAwaitingCode(true);
+      await signIn(login.trim().toLowerCase(), password, 'orsquare_platform', 'dev');
+      onSignedIn();
     } catch (ex: any) {
-      setError(ex?.message || 'Developer sign-in failed. Please verify credentials.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitCode(code: string) {
-    setBusy(true);
-    setError('');
-    try {
-      await completeMfa(code);
-    } catch (ex: any) {
-      if (ex instanceof ApiError && ex.code === 'mfa_expired') setAwaitingCode(false);
-      setError(ex?.message || 'That code did not work.');
+      setError(ex instanceof Error ? ex.message : 'Sign-in failed.');
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="dev-login">
-      <div className="dev-login-card">
-        <BrandLogo size={28} />
-        <div>
-          <h1>Developer Console</h1>
-          <p>Restricted platform surface. Every action is recorded.</p>
-        </div>
-        {awaitingCode ? (
-          <MfaCodeForm onSubmit={submitCode} onCancel={() => { setAwaitingCode(false); setError(''); setPassword(''); }} error={error} busy={busy} />
-        ) : (
-          <>
-            {error && <div className="dev-alert" role="alert">{error}</div>}
-            <form onSubmit={submit} className="dev-form">
-              <Field label="Developer email">
-                <input className="field-control" autoFocus type="text" autoComplete="username" value={login}
-                  onChange={(e) => setLogin(e.target.value)} placeholder="dev@orsquare.com" required />
-              </Field>
-              <Field label="Password">
-                <input className="field-control" type="password" autoComplete="current-password" value={password}
-                  onChange={(e) => setPassword(e.target.value)} required />
-              </Field>
-              <Btn variant="primary" type="submit" block disabled={busy}>{busy ? 'Signing in…' : 'Sign in to console'}</Btn>
-            </form>
-          </>
-        )}
+    <div className="mx-auto flex min-h-dvh max-w-[380px] flex-col justify-center gap-16 px-16">
+      <BrandLogo size={26} />
+      <div>
+        <h1 className="m-0 text-s20 font-normal">Developer Console</h1>
+        <p className="m-0 text-s13 text-muted">Restricted. Every action is recorded.</p>
       </div>
+      {error && (
+        <div role="alert" className="border border-line border-l-4 border-l-err bg-layer px-14 py-10 text-s13 text-err-fg">
+          {error}
+        </div>
+      )}
+      <form onSubmit={submit} className="flex flex-col gap-16">
+        <Field label="Developer login">
+          <Input autoFocus autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="dev@orsquare.com" required />
+        </Field>
+        <Field label="Password">
+          <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </Field>
+        <Button variant="primary" type="submit" block loading={busy}>
+          Sign in
+        </Button>
+      </form>
     </div>
   );
 }
 
-/** Operators must have an authenticator app. Until they do, nothing else in the console opens. */
-function EnrolGate() {
-  const { me, refreshUserProfile, signOut } = useAuth();
+function Shell({ me, onSignOut }: { me: any; onSignOut: () => void }) {
   return (
-    <div className="dev-login">
-      <div className="dev-login-card" style={{ maxWidth: 560 }}>
-        <BrandLogo size={28} />
-        <div>
-          <h1>Set up your authenticator</h1>
-          <p>Hello {me?.name}. Platform accounts need two-step sign-in before the console opens.</p>
-        </div>
-        <MfaPanel enabled={false} required onChanged={refreshUserProfile} />
-        <Btn variant="ghost" onClick={() => void signOut()}>Sign out</Btn>
-      </div>
-    </div>
-  );
-}
-
-function DevConsole() {
-  const { me, signOut, refreshUserProfile } = useAuth();
-  const [tab, setTab] = useState<DevTab>('fleet');
-  const [account, setAccount] = useState(false);
-  const admin = me?.platform_role !== 'support';
-  const tabs = TABS.filter((t) => admin || !t.adminOnly);
-
-  return (
-    <div className="dev-shell">
-      <header className="dev-bar">
-        <div className="dev-brand">
+    <div className="flex min-h-dvh flex-col bg-canvas">
+      <header className="flex h-44 items-center gap-16 border-b border-line bg-canvas px-16">
+        <span className="flex items-center gap-8">
           <BrandLogo size={22} />
-          <span>DEV CONSOLE</span>
-        </div>
-        <div className="dev-tabs" role="tablist" aria-label="Console sections">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" role="tab" className="dev-tab" aria-selected={tab === key} onClick={() => setTab(key)}>
-              <Icon size={14} /> {label}
-            </button>
+          <span className="text-s13 font-semibold narrow:hidden">Console</span>
+        </span>
+        <nav className="flex items-center gap-2" aria-label="Console">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              aria-label={label}
+              title={label}
+              className={({ isActive }) =>
+                cx(
+                  'flex h-28 items-center gap-6 px-10 text-s13h',
+                  isActive ? 'bg-layer-accent font-semibold text-blue' : 'text-muted hover:bg-layer hover:text-ink',
+                )
+              }
+            >
+              <Icon size={ICON.md} />
+              <span className="narrow:hidden">{label}</span>
+            </NavLink>
           ))}
-        </div>
-        <div className="dev-operator">
-          <span>Operator: <strong>{me?.login ?? '—'}</strong> <Tag tone={admin ? 'blue' : 'gray'}>{admin ? 'Admin' : 'Support'}</Tag></span>
-          <Btn variant="secondary" size="sm" onClick={() => setAccount(true)}>Security</Btn>
-          <Btn variant="secondary" size="sm" onClick={() => void signOut()}>Sign out</Btn>
-        </div>
+        </nav>
+        <span className="ml-auto flex items-center gap-4 text-s12 text-muted">
+          <span className="narrow:hidden">{me?.name || me?.login || 'Operator'}</span>
+          <IconButton label="Sign out" variant="ghost" onClick={onSignOut}>
+            <IconLogout size={ICON.md} />
+          </IconButton>
+        </span>
       </header>
-
-      <main className="dev-main">
-        {tab === 'fleet' && <FleetTab canWrite={admin} />}
-        {tab === 'plans' && <PlansTab canWrite={admin} />}
-        {tab === 'operators' && admin && me && <OperatorsTab selfId={me.id} />}
-        {tab === 'audit' && <AuditTab />}
-        {tab === 'system' && <SystemTab canWrite={admin} />}
+      <main className="min-w-0 flex-1 p-16">
+        <Outlet />
       </main>
-
-      <Modal open={account} onClose={() => setAccount(false)} title="Your account" width={560}>
-        <MfaPanel enabled={!!me?.mfa?.enabled} required={!!me?.mfa?.required} onChanged={refreshUserProfile} />
-      </Modal>
     </div>
   );
 }
 
-/**
- * Route entry. Deliberately hook-light: it only decides WHICH screen to show, so the screens below own their
- * hooks and the hook order never changes when `me` flips on sign-in or sign-out.
- */
 export default function DevApp() {
-  const { me } = useAuth();
-  if (!me) return <DevLogin />;
-  if (!isPlatformDev(me)) return <Navigate to="/" replace />;
-  if (me.mfa?.required && !me.mfa.enabled) return <EnrolGate />;
-  return <DevConsole />;
+  const { me, signOut, refreshUserProfile } = useAuth();
+
+  useEffect(() => {
+    const prev = document.documentElement.dataset.density;
+    document.documentElement.dataset.density = 'compact';
+    return () => {
+      if (prev) document.documentElement.dataset.density = prev;
+      else delete document.documentElement.dataset.density;
+    };
+  }, []);
+
+  const isDev = isPlatformDev(me);
+
+  if (!isDev) {
+    return <DevLogin onSignedIn={() => void refreshUserProfile()} />;
+  }
+
+  return (
+    <ToastProvider>
+      <Routes>
+        <Route element={<Shell me={me} onSignOut={() => void signOut()} />}>
+          <Route index element={<FleetPage />} />
+          <Route path="b/:slug" element={<FleetPage />} />
+          <Route path="audit" element={<AuditPage />} />
+          <Route path="system" element={<SystemPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dev" replace />} />
+      </Routes>
+    </ToastProvider>
+  );
 }

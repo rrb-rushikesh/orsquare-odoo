@@ -1,142 +1,102 @@
-export type Lifecycle = 'active' | 'trial' | 'expiring' | 'expired' | 'suspended' | 'archived';
-export type ShopStatus = 'active' | 'suspended' | 'archived';
-export type OperatorLevel = 'admin' | 'support';
+export type Stage = 'active' | 'trial' | 'expiring' | 'suspended' | 'unavailable'
+export type PlanKey = '7d' | '28d' | '1y'
 
-export interface PlatformShopRow {
-  code: string;
-  name: string;
-  owner_name: string;
-  owner_login: string;
-  phone: string;
-  plan: string;
-  status: ShopStatus;
-  lifecycle: Lifecycle;
-  expires_on: string;
-  suspended_reason: string;
-  created_at: string | null;
-  preset: string;
+export interface Person {
+  id: string
+  name: string
+  login: string
+  active: boolean
+  role: 'owner' | 'cashier'
+  mobile: { country: string; number: string } | null
 }
 
-export interface PlatformFleetResponse {
-  rows: PlatformShopRow[];
-  /** Rows matching the current search/filter (for paging). */
-  total: number;
-  page: number;
-  page_size: number;
-  /** Fleet-wide counts per lifecycle, whatever the filter. */
-  counts: Partial<Record<Lifecycle, number>>;
-  grand_total: number;
-}
-
-export interface FleetQuery {
-  search?: string;
-  lifecycle?: Lifecycle | '';
-  plan?: string;
-  page?: number;
-  page_size?: number;
-  sort?: 'created' | 'name' | 'code' | 'plan' | 'expires' | 'status' | 'owner';
-  desc?: boolean;
-}
-
-export interface ShopHealth {
-  module_version: string | null;
-  template_version: string | null;
-  needs_upgrade: boolean;
-  db_size_bytes: number;
-  staff_count: number;
-  last_day: string | null;
-  day_state: string | null;
-  settings_version: number;
-  profile: string;
-  preset_version: number;
-  current_preset_version: number;
-  blocked: boolean;
-  directory: boolean;
-  entitlements: { plan?: string; features?: string[] | null; tabs?: string[] | null; max_staff?: number };
-}
-
-export interface PlatformShopDetail extends PlatformShopRow {
-  health: ShopHealth | null;
-  live_error?: string;
-}
-
-export interface PlatformAuditRow {
-  id: number;
-  at: string;
-  actor: string;
-  action: string;
-  shop_code: string;
-  detail: string;
-}
-
-export interface AuditQuery {
-  page?: number;
-  page_size?: number;
-  shop_code?: string;
-  action?: string;
-  actor?: string;
-  q?: string;
-  date_from?: string;
-  date_to?: string;
-}
-
-export interface PlatformAuditPage {
-  rows: PlatformAuditRow[];
-  total: number;
-  page: number;
-  page_size: number;
-  actions: string[];
-}
-
-export interface PlatformSystemInfo {
-  engine: string;
-  platform_db: string;
-  platform_module: string;
-  server_time: string;
-  shop_databases: number;
-  registered_shops: number;
-  unregistered: string[];
-  unregistered_count: number;
-  counts: Partial<Record<Lifecycle, number>>;
-  plans: Record<string, number>;
-  directory_keys: number;
-  operators: number;
-  template: { db: string; exists: boolean; version: string | null };
-  require_mfa: boolean;
-  platform_db_bytes: number;
+export interface Business {
+  slug: string
+  code: string
+  name: string
+  status: 'active' | 'suspended' | 'unavailable'
+  reason: 'administrative' | 'expired' | 'not_started' | null
+  stage: Stage
+  plan: PlanKey | null
+  planLabel: string | null
+  validFrom: string | null
+  validUntil: string | null
+  daysLeft: number | null
+  timezone: string
+  owner: Person | null
+  cashiers: { used: number; limit: number; list: Person[] }
+  users: { total: number; active: number }
+  tabs: number
+  createdAt: string
+  /** Set only for a business whose database could not be read. */
+  error?: string
 }
 
 export interface Plan {
-  code: string;
-  name: string;
-  description: string;
-  sequence: number;
-  features: string[];
-  tabs: string[];
-  max_staff: number;
-  builtin: boolean;
-  shops: number;
+  key: PlanKey
+  label: string
+  days: number
+  price: number | null
 }
 
-export interface PlansResponse {
-  plans: Plan[];
-  features: string[];
-  tabs: string[];
+export interface DevMe {
+  user: { name: string; login: string }
 }
 
-export interface Operator {
-  id: number;
-  name: string;
-  login: string;
-  active: boolean;
-  role: OperatorLevel;
-  mfa: boolean;
+/** Business Studio: Business -> Tabs -> Variants -> Features. */
+export interface StudioFeature {
+  id: string
+  label: string
+  description: string
+  default: boolean
+}
+export interface StudioVariant {
+  key: string
+  label: string
+  features: StudioFeature[]
+}
+export interface StudioTab {
+  key: string
+  label: string
+  variants: StudioVariant[]
+}
+export interface StudioGroup {
+  key: string
+  label: string
+  tabs: StudioTab[]
+}
+export interface StudioSetup {
+  /** Enabled variant keys: the unit the server enforces. */
+  tabs: string[]
+  /** Feature switches that differ from their default, by variant key. */
+  features: Record<string, Record<string, boolean>>
+}
+export interface StudioData {
+  groups: StudioGroup[]
+  setup: StudioSetup
+  templates: Record<string, string[]>
 }
 
-export interface Progress {
-  total: number;
-  done: number;
-  next_offset: number | null;
-  failed: { code?: string; shop?: string; error: string }[];
-  conflicts?: { shop: string; error: string }[];
+export interface AuditEvent {
+  id: string
+  at: string
+  actor: string
+  action: string
+  target: string
+  business: string
+  detail: string
+}
+
+export interface Health {
+  tryton: string
+  database: string
+  template: string
+  serverTime: string
+  businesses: number
+  expiryJob: { registered: boolean; active: boolean }
+}
+
+export interface Secret {
+  login: string
+  password: string
 }
