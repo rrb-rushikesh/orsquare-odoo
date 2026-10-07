@@ -61,3 +61,6 @@ scratch/*.txt
 scratch/*.out
 scratch/*.sql
 scratch/Caddyfile.e2e
+
+# the React app has its own src/lib (not a Python build dir)
+!frontend/src/lib/
