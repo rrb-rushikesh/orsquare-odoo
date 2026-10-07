@@ -123,5 +123,29 @@ Cleanup is committed locally in three groups: unused frontend code/dependencies,
   - `npm test`: **107 passed, 1 physical-printer test skipped**.
   - Verified authentication across all roles via automated API tests (Developer email/username, Owner email/phone, Cashier email/phone, Stale shop cookie override).
 
+## Active Blockers & Server Shutdown Notice (2026-10-07 23:31 IST)
+
+> **CRITICAL NOTICE:** All dev servers (Vite on port 5173, Astro on port 4321) and all Docker containers/background tasks were explicitly stopped by the product owner. Before restarting services in the next session, review the diagnosis below.
+
+### Detailed Problem Diagnosis: Developer Console Hydration & ErrorBoundary Loop
+1. **The Visible Symptom:**
+   - The browser displays full-screen: `System Notice / Application Error / Cannot read properties of undefined (reading 'can_see_money')`.
+   - Clicking `[ Reload View ]` fails to clear the error and immediately shows the same screen.
+2. **The Underlying Mechanism:**
+   - **Step 1:** In early revisions of `orsquare.platform.service.me()`, developer accounts returned an incomplete JSON envelope lacking `flags` and `company` (`{'id': 6, 'name': 'dev_ops', 'surface': 'dev', 'roles': ['developer']}`).
+   - **Step 2:** The client stored this object in the browser's persistent `localStorage['or2_me']`.
+   - **Step 3:** On page load, `frontend/src/auth/AuthContext.tsx` synchronously hydrates `initial = readCached()`.
+   - **Step 4:** During the first synchronous render pass, `AuthApi`'s `useMemo` evaluated `seesMoney: !!me?.flags.can_see_money`. Because `me.flags` was `undefined`, accessing `.can_see_money` threw a fatal `TypeError` before `useEffect` or network re-hydration could run.
+   - **Step 5:** `frontend/src/main.tsx` wraps the whole application in `<ErrorBoundary fallbackTitle="Application Error">`. The error boundary caught the fatal exception and painted the fallback screen.
+   - **Step 6:** The `[ Reload View ]` button in `ErrorBoundary.tsx` only resets React local error state (`this.setState({ hasError: false })`). Because the malformed `me` object was still in React state / `localStorage`, the re-render instantly threw the exact same error, creating an unbreakable loop.
+3. **Applied Code Fixes in Repository:**
+   - Commit `78153e5`: Backend `platform.py` updated to return complete `Me` envelope with standard `company`, `flags`, and `roles`.
+   - Commit `6c291df`: Frontend `DevApp.tsx` updated with dedicated `DevLogin` and `me.company?.name` fallback.
+   - Commit `06ccc75`: Frontend `AuthContext.tsx` updated with `me?.flags?.can_see_money` optional chaining, and `readCached()` / `adopt()` self-healing normalization to populate missing properties automatically.
+4. **Action Required on Next Service Start:**
+   - Run `node_modules/.bin/vite --force` (or clear `.vite` cache) to ensure Vite serves the un-cached bundle.
+   - If a browser window was left open during the error, a hard browser refresh (`Ctrl + Shift + R`) or clearing `localStorage` may be required to flush the old bundle currently executing in the browser tab.
+
+
 
 
