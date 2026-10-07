@@ -1,288 +1,417 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useEffect, useDeferredValue, useMemo, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
-import { useWorkspace, bootstrapNow, refreshNow, type CounterProduct } from '@/data/workspace'
-import { call } from '@/lib/api'
+import { useData } from '@/data/DataProvider'
+import { deleteProduct, type PProduct } from '@/lib/repo'
+import { compact, downloadCsv, money, num0, unitMl } from '@/lib/utils'
 import { searchProducts } from '@/lib/search'
-import { money, num } from '@/lib/utils'
-import { Btn, Drawer, EmptyState, Field, NumInput, Panel, Tag, useToast } from '@/components/ui'
+import { todayKey } from '@/lib/clock'
+import {
+  NoAccess,
+  Btn,
+  ConfirmDialog,
+  EmptyState,
+  Panel,
+  Tag,
+  Tile,
+  useToast,
+} from '@/components/ui'
+import { DataTable, type DTCol } from '@/components/DataTable'
+import { ProductFormDrawer } from '@/components/ProductForm'
+import { ProductImportDrawer } from '@/components/ProductImport'
+import { CatalogManager } from '@/components/CatalogManager'
+import { IconGear, IconLowStock, IconSheet, IconUpload } from '@/components/icons'
 
-/**
- * Products: the shop's catalogue.  Online-only by design (the offline spec blocks adding products offline), so
- * every change goes straight to Odoo and the new row comes back with the next sync.  The suggested selling price is
- * Odoo's own answer (cost + the category/size margin rule): this screen never computes it.
- */
-
-type Kind = 'retail' | 'kitchen' | 'consumable'
-interface Form {
-  name: string; barcode: string; shortCode: string; kind: Kind; categId: number | ''; brandId: number | ''
-  uomId: number | ''; regimeId: number | ''; mrp: number; price: number; cost: number; lowStock: number
-  pegs: { ml: number; price: number }[]; openingQty: number; openingWhere: 'godown' | 'counter'
+function productSub(p: PProduct): string {
+  const size = p.unit && p.unit !== '-' ? p.unit : ''
+  return [size, p.barcode].filter(Boolean).join(' · ')
 }
 
-const EMPTY: Form = {
-  name: '', barcode: '', shortCode: '', kind: 'retail', categId: '', brandId: '', uomId: '', regimeId: '',
-  mrp: 0, price: 0, cost: 0, lowStock: 0, pegs: [], openingQty: 0, openingWhere: 'godown',
-}
-
-export default function ProductsPage() {
-  const { seesValuation, isOwner, featureOn } = useAuth()
-  const ws = useWorkspace()
+function ProductsPage() {
+  const { wsUid, seesMoney, seesValuation, featureOn } = useAuth()
+  const kitchenEnabled = featureOn('kitchen')
+  const d = useData()
   const toast = useToast()
-  const [search, setSearch] = useState('')
-  const q = useDeferredValue(search)
-  const [kind, setKind] = useState<'all' | Kind>('all')
-  const [category, setCategory] = useState('')
-  const [editing, setEditing] = useState<{ product: CounterProduct | null } | null>(null)
-  const [mastersOpen, setMastersOpen] = useState(false)
-  const kitchenOn = featureOn('kitchen')
+  const shopId = wsUid
 
-  const categories = useMemo(() => [...new Set(ws.counterProducts.map((p) => p.category).filter(Boolean))].sort(), [ws.counterProducts])
-  const rows = useMemo(() => {
-    const base = ws.counterProducts.filter((p) => (kind === 'all' || p.kind === kind) && (!category || p.category === category))
-    return q.trim() ? searchProducts(base, q) : base
-  }, [ws.counterProducts, kind, category, q])
+  const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [lowOnly, setLowOnly] = useState(false)
+  const [sort, setSort] = useState('newest')
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<PProduct | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const [productTypeFilter, setProductTypeFilter] = useState<'all' | 'retail' | 'kitchen'>('all')
+  const [formDefaultType, setFormDefaultType] = useState<'retail' | 'kitchen'>('retail')
+  const [importOpen, setImportOpen] = useState(false)
+
+  useEffect(() => {
+    if (!kitchenEnabled && productTypeFilter === 'kitchen') {
+      setProductTypeFilter('all')
+    }
+  }, [kitchenEnabled, productTypeFilter])
+
+  const categories = useMemo(
+    () => [...new Set([...(d.meta?.categories ?? []), ...d.products.map((p) => p.category).filter(Boolean)])].sort(),
+    [d.meta?.categories, d.products]
+  )
+
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim()
+    const base = d.products.filter((p) => {
+      if (!kitchenEnabled && p.isKitchen) return false
+      if (productTypeFilter === 'retail' && p.isKitchen) return false
+      if (productTypeFilter === 'kitchen' && !p.isKitchen) return false
+      if (categoryFilter !== 'All' && p.category !== categoryFilter) return false
+      if (lowOnly && (p.isKitchen || p.godownPcs + p.counterPcs > p.lowLevel)) return false
+      return true
+    })
+    if (q) {
+      const scored = searchProducts(base, q)
+      if (sort === 'name-asc') return [...scored].sort((a, b) => a.name.localeCompare(b.name))
+      if (sort === 'name-desc') return [...scored].sort((a, b) => b.name.localeCompare(a.name))
+      if (sort === 'ml-asc' || sort === 'ml-desc') {
+        const dir = sort === 'ml-asc' ? 1 : -1
+        const mlOf = (p: PProduct): number => {
+          const v = unitMl(p.unit)
+          return Number.isFinite(v) ? v : Number.POSITIVE_INFINITY
+        }
+        return [...scored].sort((a, b) => {
+          const ma = mlOf(a)
+          const mb = mlOf(b)
+          if (ma === mb) return a.name.localeCompare(b.name)
+          return (ma - mb) * dir
+        })
+      }
+      return scored
+    }
+    switch (sort) {
+      case 'name-asc':
+        return [...base].sort((a, b) => a.name.localeCompare(b.name))
+      case 'name-desc':
+        return [...base].sort((a, b) => b.name.localeCompare(a.name))
+      case 'ml-asc':
+      case 'ml-desc': {
+        const dir = sort === 'ml-asc' ? 1 : -1
+        const mlOf = (p: PProduct): number => {
+          const v = unitMl(p.unit)
+          return Number.isFinite(v) ? v : Number.POSITIVE_INFINITY
+        }
+        return [...base].sort((a, b) => {
+          const ma = mlOf(a)
+          const mb = mlOf(b)
+          if (ma === mb) return a.name.localeCompare(b.name)
+          return (ma - mb) * dir
+        })
+      }
+      default:
+        return base
+    }
+  }, [d.products, deferredSearch, productTypeFilter, categoryFilter, lowOnly, sort, kitchenEnabled])
+
+  const cols = useMemo<DTCol<PProduct>[]>(() => {
+    const c: DTCol<PProduct>[] = [
+      {
+        key: 'name',
+        label: 'Product',
+        sortValue: (p) => p.name.toLowerCase(),
+        render: (p) => {
+          const sub = productSub(p)
+          return (
+            <>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span className="cell-main">{p.name}</span>
+                {p.isKitchen && <Tag kind="blue">KITCHEN</Tag>}
+              </div>
+              {sub && <span className="cell-sub num">{sub}</span>}
+            </>
+          )
+        },
+      },
+      {
+        key: 'category',
+        label: 'Category',
+        sortValue: (p) => p.category.toLowerCase(),
+        render: (p) =>
+          p.category && p.category !== '-' ? (
+            <Tag kind="gray">{p.category.toUpperCase()}</Tag>
+          ) : (
+            <span className="td-muted">—</span>
+          ),
+      },
+    ]
+    if (seesMoney) {
+      c.push(
+        {
+          key: 'mrp',
+          label: 'MRP',
+          align: 'right',
+          sortValue: (p) => p.mrp,
+          hideMobile: true,
+          render: (p) => (p.isKitchen ? <span className="td-muted">—</span> : <span className="num">{money(p.mrp)}</span>),
+        },
+        {
+          key: 'rate',
+          label: 'Sales Rate',
+          align: 'right',
+          sortValue: (p) => p.rate || p.mrp,
+          render: (p) => <span className="num">{money(p.rate || p.mrp)}</span>,
+        }
+      )
+    }
+    c.push({
+      key: 'stock',
+      label: 'Stock (pcs)',
+      align: 'right',
+      sortValue: (p) => (p.isKitchen ? 999999 : p.godownPcs + p.counterPcs),
+      render: (p) => {
+        if (p.isKitchen) {
+          return (
+            <>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                <Tag kind="blue">Infinite Stock</Tag>
+              </div>
+              <div className="cell-sub">Made-to-order · No godown count</div>
+            </>
+          )
+        }
+        const total = p.godownPcs + p.counterPcs
+        const low = total <= p.lowLevel
+        return (
+          <>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+              <span className="num" style={{ fontWeight: 500 }}>{num0(total)}</span>
+              <Tag kind={low ? 'red' : 'green'}>{low ? 'Low' : 'OK'}</Tag>
+            </div>
+            <div className="cell-sub num">{num0(p.godownPcs)} godown · {num0(p.counterPcs)} counter · {p.piecesPerBox || 1}/box</div>
+          </>
+        )
+      },
+    })
+    if (seesValuation) {
+      c.push({
+        key: 'value',
+        label: 'Value',
+        align: 'right',
+        sortValue: (p) => (p.isKitchen ? 0 : (p.godownPcs + p.counterPcs) * p.mrp),
+        hideMobile: true,
+        render: (p) =>
+          p.isKitchen ? (
+            <span className="td-muted">—</span>
+          ) : (
+            <span className="num" style={{ fontWeight: 600 }}>{money((p.godownPcs + p.counterPcs) * p.mrp)}</span>
+          ),
+      })
+    }
+    return c
+  }, [seesMoney, seesValuation])
+
+  const summary = useMemo(() => {
+    let value = 0
+    let low = 0
+    let out = 0
+    d.products.forEach((p) => {
+      if (p.isKitchen) return
+      const total = p.godownPcs + p.counterPcs
+      value += total * p.mrp
+      if (total === 0) out++
+      else if (total <= p.lowLevel) low++
+    })
+    return { value, low, out }
+  }, [d.products])
+
+  function exportCsv() {
+    downloadCsv(
+      `products-${todayKey()}.csv`,
+      filtered.map((p) => ({
+        Type: p.isKitchen ? 'Kitchen' : 'Retail',
+        Barcode: p.barcode, Name: p.name, Category: p.category, Unit: p.unit,
+        ...(seesMoney ? { MRP: p.isKitchen ? '' : p.mrp, OurRate: p.rate || p.mrp } : {}),
+        PcsPerBox: p.piecesPerBox,
+        Godown: p.isKitchen ? 'Infinite' : p.godownPcs,
+        Counter: p.isKitchen ? 'Infinite' : p.counterPcs,
+        Total: p.isKitchen ? 'Infinite' : p.godownPcs + p.counterPcs,
+        LowLevel: p.isKitchen ? 'N/A' : p.lowLevel,
+      }))
+    )
+  }
 
   return (
-    <div className="stack" style={{ gap: 16 }}>
-      {!ws.online && <div className="alert" role="status">Offline: products can be browsed but not added or changed until the connection returns.</div>}
-      <Panel
-        title="Products"
-        subtitle={`${ws.counterProducts.length} in your catalogue`}
-        actions={
-          <div className="row" style={{ gap: 8 }}>
-            <Btn sm variant="tertiary" onClick={() => setMastersOpen(true)} aria-label="Categories, units and brands">Categories · Units · Brands</Btn>
-            <Btn sm variant="primary" disabled={!ws.online} onClick={() => setEditing({ product: null })}>+ New product</Btn>
+    <>
+      <div className="tiles">
+        <Tile
+          label="Products"
+          value={kitchenEnabled ? d.products.length : d.products.filter((p) => !p.isKitchen).length}
+          note={`${categories.length} categories`}
+        />
+        {seesValuation && <Tile label="Stock value" value={compact(summary.value)} note="Total pcs × MRP" />}
+        <Tile label="Low stock" value={summary.low} note="At or below minimum level" />
+        <Tile label="Out of stock" value={summary.out} />
+      </div>
+
+      <Panel>
+        <div className="panel-head">
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <h3 className="panel-title" style={{ margin: 0 }}>
+              {kitchenEnabled && productTypeFilter === 'kitchen'
+                ? 'Kitchen Dishes'
+                : kitchenEnabled && productTypeFilter === 'retail'
+                  ? 'Retail Inventory'
+                  : 'Catalogue'}
+            </h3>
+            <span className="t-caption">{filtered.length} shown</span>
           </div>
-        }
-      >
-        <div className="row" style={{ gap: 8, padding: 12, flexWrap: 'wrap' }}>
-          <input className="field-control" style={{ flex: '1 1 240px' }} placeholder="Search by name, code or barcode…"
-            value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search products" />
-          <select className="field-control" style={{ width: 160 }} value={kind} onChange={(e) => setKind(e.target.value as 'all' | Kind)} aria-label="Type">
-            <option value="all">All types</option><option value="retail">Retail</option>
-            {kitchenOn && <option value="kitchen">Kitchen</option>}<option value="consumable">Consumable</option>
-          </select>
-          <select className="field-control" style={{ width: 180 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
-            <option value="">All categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="panel-actions">
+            <div className="toolbar-grow search-box">
+              <input
+                className="field-control"
+                placeholder="Search by name or barcode…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select className="field-control" style={{ width: 170 }} value={sort} onChange={(e) => setSort(e.target.value)} title="Sort products">
+              <option value="newest">Newest added</option>
+              <option value="name-asc">Name · A–Z</option>
+              <option value="name-desc">Name · Z–A</option>
+              <option value="ml-asc">Unit · Low → High</option>
+              <option value="ml-desc">Unit · High → Low</option>
+            </select>
+            {kitchenEnabled && (
+              <select
+                className="field-control"
+                style={{ width: 140 }}
+                value={productTypeFilter}
+                onChange={(e) => setProductTypeFilter(e.target.value as 'all' | 'retail' | 'kitchen')}
+                title="Filter by product type"
+              >
+                <option value="all">All items</option>
+                <option value="retail">Retail only</option>
+                <option value="kitchen">Kitchen dishes</option>
+              </select>
+            )}
+            <select className="field-control" style={{ width: 160 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="All">All categories</option>
+              {categories.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+            <Btn
+              variant="ghost"
+              className="btn-icon"
+              style={{
+                width: 40,
+                height: 40,
+                ...(lowOnly ? { background: 'var(--blue)', borderColor: 'var(--blue)', color: '#ffffff' } : {}),
+              }}
+              aria-label="Filter low stock only"
+              aria-pressed={lowOnly}
+              title="Filter low stock only"
+              data-tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
+              onClick={() => setLowOnly((v) => !v)}
+            >
+              <IconLowStock size={16} />
+            </Btn>
+            <Btn
+              variant="ghost"
+              className="btn-icon"
+              style={{ width: 40, height: 40 }}
+              aria-label="Export to spreadsheet"
+              data-tooltip="Export to spreadsheet"
+              onClick={exportCsv}
+            >
+              <IconSheet size={16} />
+            </Btn>
+            <Btn
+              variant="ghost"
+              className="btn-icon"
+              style={{ width: 40, height: 40 }}
+              disabled title="Product import is not available yet." aria-label="Import products from Excel"
+              data-tooltip="Import products from Excel (Retail only)"
+              onClick={() => setImportOpen(true)}
+            >
+              <IconUpload size={16} />
+            </Btn>
+            <Btn
+              variant="ghost"
+              className="btn-icon"
+              onClick={() => setManageOpen(true)}
+              data-tooltip="Manage categories and units"
+              aria-label="Manage categories and units"
+              title="Manage categories and units"
+            >
+              <IconGear size={16} />
+            </Btn>
+            <Btn
+              variant="primary"
+              onClick={() => {
+                setEditing(null)
+                setFormDefaultType(kitchenEnabled && productTypeFilter === 'kitchen' ? 'kitchen' : 'retail')
+                setFormOpen(true)
+              }}
+            >
+              + Add Product
+            </Btn>
+          </div>
         </div>
-        {ws.status === 'loading' ? <div className="skeleton" style={{ minHeight: 160, margin: 12 }} /> : rows.length === 0 ? (
-          <EmptyState title={ws.counterProducts.length ? 'No products match' : 'No products yet'}
-            hint={ws.counterProducts.length ? 'Try a different search or filter.' : 'Add your first product to start billing.'}
-            action={ws.counterProducts.length || !ws.online ? undefined : <Btn variant="primary" onClick={() => setEditing({ product: null })}>+ New product</Btn>} />
+
+        {d.products.length === 0 ? (
+          <EmptyState title="No products found" hint="Add products so you can bill them at the counter." />
         ) : (
-          <div className="tbl-scroll">
-            <table className="tbl">
-              <thead><tr>
-                <th>Product</th><th>Unit</th><th>Tax regime</th><th className="td-right">MRP</th>
-                <th className="td-right">Selling rate</th>{seesValuation && <th className="td-right">Cost</th>}
-                <th className="td-right">In stock</th><th style={{ width: 80 }}></th>
-              </tr></thead>
-              <tbody>{rows.map((p) => (
-                <tr key={p.productId}>
-                  <td><span className="cell-main">{p.name}</span>{' '}{!p.active && <Tag kind="gray">ARCHIVED</Tag>}{' '}{p.isKitchen && <Tag kind="blue">KITCHEN</Tag>}
-                    <div className="t-caption">{[p.brand, p.category, p.barcode || p.code].filter(Boolean).join(' · ')}</div></td>
-                  <td className="td-muted">{p.unit}</td><td className="td-muted">{p.regime || '—'}</td>
-                  <td className="td-right num">{money(p.mrp)}</td><td className="td-right num">{money(p.rate)}</td>
-                  {seesValuation && <td className="td-right num">{p.cost !== undefined ? money(p.cost) : '—'}</td>}
-                  <td className="td-right num">{p.isKitchen ? '∞' : num(p.totalPcs)}</td>
-                  <td className="td-right"><Btn sm disabled={!ws.online} onClick={() => setEditing({ product: p })}>Edit</Btn></td>
-                </tr>))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            key={sort}
+            cols={cols}
+            rows={filtered}
+            ariaLabel="Product catalogue"
+            onRowClick={(p) => { setEditing(p); setFormOpen(true) }}
+            empty={<EmptyState title="No products found" hint="Adjust the filters to see more." />}
+          />
         )}
       </Panel>
 
-      {editing && <ProductDrawer product={editing.product} onClose={() => setEditing(null)}
-        onSaved={(msg) => { setEditing(null); toast(msg, 'ok'); void refreshNow() }} />}
-      <MastersDrawer open={mastersOpen} onClose={() => setMastersOpen(false)} owner={isOwner} />
-    </div>
+      <CatalogManager open={manageOpen} onClose={() => setManageOpen(false)} />
+
+      <ProductImportDrawer open={importOpen} onClose={() => setImportOpen(false)} />
+
+      <ProductFormDrawer
+        open={formOpen}
+        initial={editing}
+        defaultProductType={formDefaultType}
+        onClose={() => { setFormOpen(false); setEditing(null) }}
+        onSaved={() => { setFormOpen(false); setEditing(null); d.refresh() }}
+        onDelete={(p) => { setConfirmId(p.id); setFormOpen(false) }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmId}
+        title="Delete this product?"
+        message="Past bills keep their line items, but the product disappears from the catalogue and POS."
+        busy={busy}
+        onClose={() => setConfirmId(null)}
+        onConfirm={async () => {
+          if (!confirmId) return
+          setBusy(true)
+          try {
+            await deleteProduct(shopId, confirmId)
+            toast('Product deleted.')
+            setConfirmId(null)
+            d.refresh()
+          } catch (e) {
+            toast(e instanceof Error ? e.message : 'Delete failed.', 'err')
+          } finally {
+            setBusy(false)
+          }
+        }}
+      />
+    </>
   )
 }
 
-function ProductDrawer({ product, onClose, onSaved }: { product: CounterProduct | null; onClose: () => void; onSaved: (msg: string) => void }) {
-  const ws = useWorkspace()
-  const { seesValuation, featureOn } = useAuth()
-  const [f, setF] = useState<Form>(() => product ? {
-    ...EMPTY, name: product.name, barcode: product.barcode, shortCode: product.code, kind: product.kind,
-    categId: product.categoryId || '', brandId: product.brandId || '', uomId: product.uomId || '', regimeId: product.regimeId || '',
-    mrp: product.mrp, price: product.rate, cost: product.cost ?? 0, lowStock: product.lowStockQty, pegs: product.pegs.map((x) => ({ ...x })),
-  } : EMPTY)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => ({ ...x, [k]: v }))
-  const units = ws.units
-  const unitOptions = useMemo(() => units ? [
-    ...units.shop_units.map((u: any) => ({ id: u.id, name: u.name })),
-    ...units.base_units.filter((u: any) => u.visible).map((u: any) => ({ id: u.id, name: u.name })),
-  ] : [], [units])
-  const isNew = !product
-
-  const save = async () => {
-    setErr('')
-    if (!f.name.trim()) return setErr('Give the product a name.')
-    if (f.price < 0 || f.mrp < 0 || f.cost < 0) return setErr('Amounts cannot be negative.')
-    setBusy(true)
-    try {
-      const values: Record<string, unknown> = {
-        name: f.name.trim(), barcode: f.barcode.trim() || false, short_code: f.shortCode.trim() || false, kind: f.kind,
-        list_price: f.price, mrp: f.mrp, low_stock_qty: f.lowStock,
-        categ_id: f.categId || undefined, brand_id: f.brandId || false, uom_id: f.uomId || undefined, regime_id: f.regimeId || false,
-        pegs: f.pegs.filter((p) => p.ml > 0 && p.price > 0),
-      }
-      if (seesValuation) values.cost = f.cost
-      const tmplId = await call<number>('catalog', 'save_product', { values, product_tmpl_id: product?.templateId })
-      if (isNew && f.kind === 'retail' && f.openingQty > 0) {
-        const rows = await call<{ id: number; product_id: number }[]>('catalog', 'list_products', { search: f.barcode.trim() || f.name.trim(), limit: 20 })
-        const created = rows.find((r) => r.id === tmplId)
-        if (created) await call('stock', 'set_opening_stock', { lines: [{ product_id: created.product_id, qty: f.openingQty, ...(seesValuation ? { cost: f.cost } : {}) }], location: f.openingWhere })
-      }
-      onSaved(isNew ? `Added ${f.name.trim()}` : 'Product saved')
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not save the product.')
-    } finally { setBusy(false) }
-  }
-
-  const suggest = product?.suggestedPrice
-  return (
-    <Drawer open onClose={onClose} title={isNew ? 'New product' : 'Edit product'} wide
-      footer={<div className="row" style={{ gap: 8 }}><Btn variant="tertiary" onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save product'}</Btn></div>}>
-      <div className="stack" style={{ gap: 14 }}>
-        {err && <div className="alert" role="alert">{err}</div>}
-        <Field label="Name"><input className="field-control" autoFocus value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
-        <div className="form-grid">
-          <Field label="Type">
-            <select className="field-control" value={f.kind} disabled={!isNew} onChange={(e) => set('kind', e.target.value as Kind)}>
-              <option value="retail">Retail (stock-tracked)</option>{featureOn('kitchen') && <option value="kitchen">Kitchen dish</option>}
-              <option value="consumable">Consumable (not tracked)</option>
-            </select>
-          </Field>
-          <Field label="Barcode"><input className="field-control" value={f.barcode} onChange={(e) => set('barcode', e.target.value)} /></Field>
-          <Field label="Short code"><input className="field-control" value={f.shortCode} onChange={(e) => set('shortCode', e.target.value)} /></Field>
-          <Field label="Unit / bottle size">
-            <select className="field-control" value={f.uomId} onChange={(e) => set('uomId', e.target.value ? Number(e.target.value) : '')}>
-              <option value="">Default (Piece)</option>{unitOptions.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Category">
-            <select className="field-control" value={f.categId} onChange={(e) => set('categId', e.target.value ? Number(e.target.value) : '')}>
-              <option value="">Default</option>{ws.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Brand">
-            <select className="field-control" value={f.brandId} onChange={(e) => set('brandId', e.target.value ? Number(e.target.value) : '')}>
-              <option value="">No brand</option>{ws.brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Tax regime" help="Decides the taxes Odoo applies when this item is sold or bought.">
-            <select className="field-control" value={f.regimeId} onChange={(e) => set('regimeId', e.target.value ? Number(e.target.value) : '')}>
-              <option value="">Category default</option>{ws.regimes.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Low-stock level"><NumInput className="field-control" value={f.lowStock} onChange={(n) => set('lowStock', n)} /></Field>
-        </div>
-
-        <div className="form-grid">
-          <Field label="MRP (₹)"><NumInput className="field-control" value={f.mrp} onChange={(n) => set('mrp', n)} /></Field>
-          <Field label="Selling rate (₹)"><NumInput className="field-control" value={f.price} onChange={(n) => set('price', n)} /></Field>
-          {seesValuation && <Field label="Cost (₹)"><NumInput className="field-control" value={f.cost} onChange={(n) => set('cost', n)} /></Field>}
-        </div>
-        {seesValuation && suggest !== undefined && suggest > 0 && suggest !== f.price && (
-          <div className="alert" role="note">
-            Odoo suggests a selling price of <strong>{money(suggest)}</strong> (cost plus your category margin).{' '}
-            <button type="button" className="link-btn" onClick={() => set('price', suggest)}>Apply suggestion</button>
-          </div>
-        )}
-
-        {f.kind === 'retail' && (product?.canOpen || isNew) && (
-          <div>
-            <div className="micro-label">Peg rates (for open bottles)</div>
-            {f.pegs.map((p, i) => (
-              <div key={i} className="row" style={{ gap: 8, marginTop: 8 }}>
-                <NumInput className="field-control" value={p.ml} placeholder="ml" aria-label="Peg size in ml" onChange={(n) => set('pegs', f.pegs.map((x, k) => (k === i ? { ...x, ml: n } : x)))} />
-                <NumInput className="field-control" value={p.price} placeholder="₹" aria-label="Peg price" onChange={(n) => set('pegs', f.pegs.map((x, k) => (k === i ? { ...x, price: n } : x)))} />
-                <Btn sm onClick={() => set('pegs', f.pegs.filter((_, k) => k !== i))} aria-label="Remove peg size">×</Btn>
-              </div>
-            ))}
-            <Btn sm style={{ marginTop: 8 }} onClick={() => set('pegs', [...f.pegs, { ml: 30, price: 0 }])}>+ Add peg size</Btn>
-          </div>
-        )}
-
-        {isNew && f.kind === 'retail' && (
-          <div>
-            <div className="micro-label">Opening stock (accepted once)</div>
-            <div className="row" style={{ gap: 8, marginTop: 8 }}>
-              <NumInput className="field-control" value={f.openingQty} placeholder="Quantity" aria-label="Opening quantity" onChange={(n) => set('openingQty', n)} />
-              <select className="field-control" value={f.openingWhere} onChange={(e) => set('openingWhere', e.target.value as 'godown' | 'counter')}>
-                <option value="godown">Godown</option><option value="counter">Counter</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-    </Drawer>
-  )
-}
-
-function MastersDrawer({ open, onClose, owner }: { open: boolean; onClose: () => void; owner: boolean }) {
-  const ws = useWorkspace()
-  const toast = useToast()
-  const [tab, setTab] = useState<'categories' | 'units' | 'brands'>('categories')
-  const [name, setName] = useState('')
-  const [parent, setParent] = useState<number | ''>('')
-  const [regime, setRegime] = useState<number | ''>('')
-  const [baseUnit, setBaseUnit] = useState<number | ''>('')
-  const [ratio, setRatio] = useState(0)
-  const [busy, setBusy] = useState(false)
-  useEffect(() => { if (open) { setName(''); setRatio(0) } }, [open, tab])
-
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    setBusy(true)
-    try { await fn(); toast(ok, 'ok'); setName(''); await bootstrapNow() } catch (e) { toast(e instanceof Error ? e.message : 'Failed', 'err') } finally { setBusy(false) }
-  }
-  const visibleBase = (ws.units?.base_units ?? []).filter((u: any) => u.visible)
-
-  return (
-    <Drawer open={open} onClose={onClose} title="Catalogue masters" wide>
-      <div className="pay-seg flow" role="tablist" style={{ marginBottom: 16 }}>
-        {(['categories', 'units', 'brands'] as const).map((t) => (
-          <button key={t} type="button" className={`pay-seg-btn ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>))}
-      </div>
-      {tab === 'categories' && (<>
-        <table className="tbl"><thead><tr><th>Category</th><th>Tax regime</th></tr></thead>
-          <tbody>{ws.categories.map((c) => <tr key={c.id}><td>{c.name}</td><td className="td-muted">{c.regime || '—'}</td></tr>)}</tbody></table>
-        <div className="stack" style={{ gap: 8, marginTop: 16 }}>
-          <input className="field-control" placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} aria-label="New category name" />
-          <select className="field-control" value={parent} onChange={(e) => setParent(e.target.value ? Number(e.target.value) : '')} aria-label="Parent category">
-            <option value="">No parent</option>{ws.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <select className="field-control" value={regime} onChange={(e) => setRegime(e.target.value ? Number(e.target.value) : '')} aria-label="Tax regime">
-            <option value="">No tax regime</option>{ws.regimes.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
-          <Btn variant="primary" disabled={busy || !name.trim()} onClick={() => void run(() => call('catalog', 'create_category', { name, parent_id: parent || undefined, regime_id: regime || undefined }), 'Category added')}>Add category</Btn>
-        </div></>)}
-      {tab === 'brands' && (<>
-        <table className="tbl"><thead><tr><th>Brand</th></tr></thead><tbody>{ws.brands.map((b: any) => <tr key={b.id}><td>{b.name}</td></tr>)}</tbody></table>
-        <div className="row" style={{ gap: 8, marginTop: 16 }}>
-          <input className="field-control" placeholder="New brand" value={name} onChange={(e) => setName(e.target.value)} aria-label="New brand name" />
-          <Btn variant="primary" disabled={busy || !name.trim()} onClick={() => void run(() => call('catalog', 'create_brand', { name }), 'Brand added')}>Add</Btn>
-        </div></>)}
-      {tab === 'units' && ws.units && (<>
-        <div className="micro-label">Standard units {owner ? '(tap to show or hide)' : ''}</div>
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap', margin: '8px 0 16px' }}>
-          {ws.units.base_units.map((u: any) => (
-            <Btn key={u.id} sm variant={u.visible ? 'primary' : 'tertiary'} disabled={!owner || busy} aria-pressed={u.visible}
-              onClick={() => void run(() => call('catalog', 'set_base_unit_visibility', { uom_id: u.id, visible: !u.visible }), `${u.name} ${u.visible ? 'hidden' : 'shown'}`)}>{u.name}</Btn>))}
-        </div>
-        <div className="micro-label">Your units</div>
-        <table className="tbl"><thead><tr><th>Unit</th><th>Base</th><th className="td-right">Ratio</th></tr></thead>
-          <tbody>{ws.units.shop_units.map((u: any) => <tr key={u.id}><td>{u.name}</td><td className="td-muted">{u.base_unit}</td><td className="td-right num">{num(u.ratio)}</td></tr>)}</tbody></table>
-        <div className="stack" style={{ gap: 8, marginTop: 16 }}>
-          <input className="field-control" placeholder="Unit name, e.g. 330 ml" value={name} onChange={(e) => setName(e.target.value)} aria-label="New unit name" />
-          <select className="field-control" value={baseUnit} onChange={(e) => setBaseUnit(e.target.value ? Number(e.target.value) : '')} aria-label="Base unit">
-            <option value="">Base unit…</option>{visibleBase.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-          <NumInput className="field-control" value={ratio} placeholder="Ratio (e.g. 330)" aria-label="Ratio to base unit" onChange={setRatio} />
-          <Btn variant="primary" disabled={busy || !name.trim() || !baseUnit || ratio <= 0} onClick={() => void run(() => call('catalog', 'create_shop_unit', { name, base_unit_id: baseUnit, ratio }), 'Unit added')}>Add unit</Btn>
-        </div></>)}
-    </Drawer>
-  )
+export default function ProductsPageGuarded() {
+  const { can } = useAuth()
+  if (!can('products')) return <NoAccess what="Products" />
+  return <ProductsPage />
 }

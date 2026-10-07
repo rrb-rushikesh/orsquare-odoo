@@ -7,6 +7,8 @@
  * One database per shop+user, so a shared counter PC never mixes two shops' data.
  */
 import Dexie, { type Table } from 'dexie';
+export interface OfflineSalePayment { method: 'Cash' | 'UPI' | 'Khata'; amount: string; ref?: string }
+export interface OfflineSalePayload { [key: string]: any; lines: any[]; payments: OfflineSalePayment[]; idempotency_key: string }
 
 export interface KvRow { key: string; value: unknown }
 

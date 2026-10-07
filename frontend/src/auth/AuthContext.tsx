@@ -22,8 +22,11 @@ export interface ShopInfo {
   phone?: string;
   /** Business-day cutoff is applied by the server; kept for display only. */
   lockInTime?: string;
-  experience?: undefined;
+  experience?: ShopExperienceInfo;
+  tenant_name?: string;
+  is_primary?: boolean;
 }
+export interface ShopExperienceInfo { version: number; profile: string; surfaces: Record<string, boolean>; variants: Record<string, string>; settings: Record<string, any> }
 
 export interface AppUser {
   id: string;
@@ -32,6 +35,9 @@ export interface AppUser {
   role: string;
   isStaff: false;
   me: Me;
+  email: string;
+  shops: ShopInfo[];
+  tabs: { key: string; label: string }[];
 }
 
 export interface AuthApi {
@@ -44,6 +50,10 @@ export interface AuthApi {
   role: string;
   isOwner: boolean;
   isEmployee: boolean;
+  isOwnerAccount: boolean;
+  isMultiShop: boolean;
+  surfaceOn: (key: string) => boolean;
+  feature: (key: string) => { enabled: boolean; owner_only: boolean; mode?: string };
   seesMoney: boolean;
   seesValuation: boolean;
   canManageReturns: boolean;
@@ -81,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const adopt = useCallback((m: Me, shop: string) => {
     setMe(m);
+    setReady(true);
     setShopCode(shop);
     setSessionError(null);
     try {
@@ -100,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // never flashes the login screen - it redirects to /login only on an explicit 401.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const hydrate = async () => {
       const cached = readCached();
       try {
         const m = await session.me();
@@ -109,19 +120,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!alive) return;
         if (e instanceof ApiError && e.status === 401) {
           drop();
-        } else if (cached) {
+          setReady(true);
+        } else if (cached && e instanceof ApiError && e.network) {
           adopt(cached.me, cached.shop); // offline reopen: run from the local copy
           setSessionError('Working offline - bills will sync when the connection returns.');
         } else {
           setSessionError(e instanceof Error ? e.message : 'Could not reach the server.');
         }
-      } finally {
-        if (alive) setReady(true);
       }
-    })();
+    };
+    void hydrate();
+    const onOnline = () => void hydrate();
     const onUnauthorized = () => drop();
     window.addEventListener('or2:unauthorized', onUnauthorized);
-    return () => { alive = false; window.removeEventListener('or2:unauthorized', onUnauthorized); };
+    window.addEventListener('online', onOnline);
+    return () => { alive = false; window.removeEventListener('or2:unauthorized', onUnauthorized); window.removeEventListener('online', onOnline); };
   }, [adopt, drop]);
 
   const signIn = useCallback(async (shop: string, login: string, password: string) => {
@@ -135,7 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adopt, shopCode]);
 
   const signOut = useCallback(async () => {
-    try { await session.logout(); } catch { /* cookie may already be gone */ }
+    try { await session.logout(); } catch (e) {
+      if (!(e instanceof ApiError && e.status === 401)) {
+        setSessionError('Could not sign out. Reconnect and try again.');
+        return;
+      }
+    }
     drop();
   }, [drop]);
 
@@ -143,25 +161,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isOwner = !!me?.roles.includes('owner');
     const tabs = new Set<string>(me?.tabs ?? []);
     const role = me ? (isOwner ? 'owner' : me.roles[0] || '') : '';
-    const user: AppUser | null = me
-      ? { id: String(me.id), name: me.name, login: me.login, role, isStaff: false, me }
-      : null;
     const activeShop: ShopInfo | null = me
       ? { id: shopCode || String(me.company.id), name: me.company.name, code: shopCode, role, lockInTime: undefined }
       : null;
+    const user: AppUser | null = me
+      ? { id: String(me.id), name: me.name, login: me.login, email: me.login, role, isStaff: false, me,
+          shops: activeShop ? [activeShop] : [], tabs: me.tabs.map(key => ({ key, label: key })) }
+      : null;
+    const featureKey = (key: string) => ({ continuousScanning: 'continuous_scanning', autoGodownTransfer: 'auto_godown_transfer' }[key] || key);
+    const featureOn = (key: string) => {
+      if (!me) return false;
+      const mapped = featureKey(key);
+      if (mapped in me.features) return !!(me.features as Record<string, unknown>)[mapped];
+      return ALWAYS_ON.has(mapped);
+    };
     return {
       user, me, activeShop, shopCode,
       wsUid: me ? `${shopCode}:${me.id}` : '',
       ready, role, isOwner, isEmployee: !!me && !isOwner,
+      isOwnerAccount: false, isMultiShop: false,
+      surfaceOn: key => key === 'surface.ledger' ? tabs.has('reports') : key === 'surface.advanced_accounting' ? true : key === 'surface.stock',
+      feature: key => ({ enabled: featureOn(key), owner_only: false }),
       seesMoney: !!me?.flags.can_see_money,
       seesValuation: !!me?.flags.can_see_valuation,
       canManageReturns: !!me?.flags.can_manage_returns,
       can: (perm) => tabs.has(perm),
-      featureOn: (key) => {
-        if (!me) return false;
-        if (key in me.features) return !!(me.features as Record<string, unknown>)[key];
-        return ALWAYS_ON.has(key);
-      },
+      featureOn,
       sessionError, signIn, refreshUserProfile, signOut,
     };
   }, [me, shopCode, ready, sessionError, signIn, refreshUserProfile, signOut]);

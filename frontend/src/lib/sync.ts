@@ -53,7 +53,33 @@ let serverTs: string | undefined;
 let flushing = false;
 let bound = false;
 
-const emit = () => listeners.forEach((l) => l());
+const emit = () => {
+  listeners.forEach((l) => l());
+  window.dispatchEvent(new CustomEvent('xpo_sync_change', { detail: status() }));
+};
+export interface SyncStatus { isOnline: boolean; isSyncing: boolean; pendingCount: number; lastSyncedAt: string | null; lastError: string | null }
+const status = (): SyncStatus => ({ isOnline: snap.online, isSyncing: snap.syncing, pendingCount: snap.pending, lastSyncedAt: snap.lastSyncedAt, lastError: snap.error });
+export async function getSyncStatus(): Promise<SyncStatus> { return status(); }
+export const pullCatalogDelta = async (_shop?: string) => refreshNow();
+export const flushOfflineSalesQueue = async () => refreshNow();
+export interface QueueInspectionRow { id: string; idempotency_key: string; status: string; total: number; lineCount: number; attempts: number; created_at: string; last_error?: string }
+export async function listQueueForReview(): Promise<QueueInspectionRow[]> {
+  if (!db) return [];
+  return (await db.outbox.toArray()).map(r => ({ id: r.id, idempotency_key: r.id, status: r.status, total: Number(r.payload.estimated_total ?? NaN),
+    lineCount: Array.isArray(r.payload.lines) ? r.payload.lines.length : 0, attempts: 0, created_at: r.created_at, last_error: r.error }));
+}
+export async function retryQueuedSale(_id: string): Promise<void> { throw new ApiError('Rejected bills need review before retrying.', 'not_available'); }
+export async function discardQueuedSale(id: string): Promise<void> {
+  const row = await db?.outbox.get(id);
+  if (!row || row.status !== 'rejected') throw new ApiError('Only a rejected bill can be discarded.');
+  await discardRejected(id);
+}
+export async function getOfflineCacheStats() { return { products: snap.products.length, categories: snap.categories.length, customers: snap.customers.length,
+  queue: db ? await db.outbox.count() : 0, lastSync: snap.lastSyncedAt }; }
+export async function purgeCatalogCache() {
+  await db?.kv.bulkDelete(['products', 'categories', 'customers', 'snapshotVersion']);
+  await bootstrapNow();
+}
 function set(patch: Partial<Snapshot>) {
   snap = { ...snap, ...patch };
   emit();
@@ -68,7 +94,7 @@ export function subscribe(l: () => void) {
 // ------------------------------------------------------------------------------------------------ persistence
 
 /** Bump when the snapshot gains or changes a section: devices holding an older copy re-download instead of showing gaps. */
-const SNAPSHOT_VERSION = 3;
+const SNAPSHOT_VERSION = 4;
 
 const SECTIONS = ['me', 'products', 'stock', 'customers', 'suppliers', 'categories', 'units', 'brands', 'regimes', 'openBottles',
   'day', 'floors', 'tables', 'promos', 'discrepanciesOpen', 'seq', 'serverTs'] as const;

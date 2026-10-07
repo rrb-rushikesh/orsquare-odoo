@@ -1,213 +1,678 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
-import { useWorkspace } from '@/data/workspace'
-import { ApiError, call } from '@/lib/api'
-import { money } from '@/lib/utils'
-import { Btn, Drawer, EmptyState, Field, NumInput, Panel, Tag, Tile, useToast } from '@/components/ui'
+import { useData } from '@/data/DataProvider'
+import { createAccount, deleteAccount, updateAccount, type PAccount } from '@/lib/repo'
+import { money, payablesOf, receivablesOf } from '@/lib/utils'
+import { searchAccounts } from '@/lib/search'
+import { todayKey } from '@/lib/clock'
+import { ACCOUNT_TYPES, OWNER_ACCOUNT_TYPES, type AccountType } from '@/types'
+import {
+  NoAccess,
+  Btn,
+  ConfirmDialog,
+  Drawer,
+  EmptyState,
+  Field,
+  NumInput,
+  Panel,
+  Tag,
+  Tile,
+  useToast,
+} from '@/components/ui'
+import { DataTable, type DTCol } from '@/components/DataTable'
+import { PhoneInput } from '@/components/PhoneInput'
+import { DEFAULT_DIAL, isValidNational } from '@/lib/phone'
+import { IconRupee } from '@/components/icons'
+import { AccountLedgerView } from '@/components/accounts/AccountLedgerView'
+import { AccountPaymentModal } from '@/components/accounts/AccountPaymentModal'
 
-/**
- * Accounts: customers (Khata), suppliers, employees and others.  A balance is always the sum of posted Odoo ledger
- * entries; this screen shows them and records settlements (receipts / supplier payments), never edits a balance.
- * Where the role may not see money, Odoo answers null and the screen shows a dash.
- */
+type Draft = {
+  id?: string
+  name: string
+  type: AccountType
+  phone: string
+  countryCode: string
+  opening: number
+  balance: number
+  active: boolean
+  openingType?: 'Debit' | 'Credit'
+  openingDate?: string
+}
 
-type Kind = 'customer' | 'supplier' | 'employee' | 'other'
-interface Party { id: number; name: string; mobile: string; kind: Kind; receivable: number | null; payable: number | null }
-interface Directory { rows: Party[]; count: number; summary: { receivables: number | null; payables: number | null; customers: number; suppliers: number } }
-interface Statement { opening: number; closing: number; rows: { date: string; voucher: string; ref: string; description: string; debit: number; credit: number; balance: number }[] }
+const blank = (defaultType: AccountType = 'Customer'): Draft => ({
+  name: '',
+  type: defaultType,
+  phone: '',
+  countryCode: DEFAULT_DIAL,
+  opening: 0,
+  balance: 0,
+  active: true,
+  openingType: defaultType === 'Supplier' ? 'Credit' : 'Debit',
+  openingDate: todayKey(),
+})
 
-const FILTERS: { key: 'all' | 'customers' | 'suppliers' | 'employees' | 'others'; label: string }[] = [
-  { key: 'all', label: 'All' }, { key: 'customers', label: 'Customers' }, { key: 'suppliers', label: 'Suppliers' },
-  { key: 'employees', label: 'Employees' }, { key: 'others', label: 'Others' },
-]
-const KIND_LABEL: Record<Kind, string> = { customer: 'Customer', supplier: 'Supplier', employee: 'Employee', other: 'Other' }
-const dash = (n: number | null) => (n === null ? '—' : money(n))
+const TYPE_TAG: Record<AccountType, string> = {
+  Customer: 'gray',
+  Supplier: 'blue',
+  Employee: 'gray',
+  Retailer: 'purple',
+}
 
-export default function AccountsPage() {
-  const { seesMoney, isOwner } = useAuth()
-  const ws = useWorkspace()
+function AccountsPage() {
+  const { wsUid, user, activeShop } = useAuth()
+  const d = useData()
   const toast = useToast()
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all')
+  const shopId = wsUid
+  const isOwner = activeShop?.role === 'owner'
+  // Retailer (connected-outlet) accounts are an enterprise-owner surface:
+  // a single-shop owner login never sees the Retailers category.
+  const isMultiShopOwner = isOwner && (user?.shops?.length ?? 0) > 1
+  const accountTypes = useMemo(() => isMultiShopOwner ? OWNER_ACCOUNT_TYPES : ACCOUNT_TYPES, [isMultiShopOwner])
+
+  const connectedShops = useMemo(() => {
+    if (!isMultiShopOwner || !user?.shops) return []
+    return user.shops.filter((s) => s.id !== activeShop?.id)
+  }, [isMultiShopOwner, user?.shops, activeShop?.id])
+
+  const [selectedShopId, setSelectedShopId] = useState<string>('')
   const [search, setSearch] = useState('')
-  const [dir, setDir] = useState<Directory | null>(null)
-  const [error, setError] = useState('')
-  const [selected, setSelected] = useState<Party | null>(null)
-  const [adding, setAdding] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'All' | AccountType>('All')
+  const [positionFilter, setPositionFilter] = useState<'all' | 'receivable' | 'payable' | 'settled'>('all')
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [paymentTargetId, setPaymentTargetId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setError('')
-    try { setDir(await call<Directory>('accounts', 'directory', { kind: filter, search: search.trim() || undefined, limit: 200 })) }
-    catch (e) { setDir(null); setError(e instanceof ApiError && e.network ? 'You are offline: the directory needs a connection.' : e instanceof Error ? e.message : 'Could not load accounts.') }
-  }, [filter, search])
-
+  // Dashboard drill-down: ?filter=receivables|payables opens the matching
+  // ledger register so "Customers owe" / "You owe suppliers" land on the
+  // actual accounts behind the number.
+  const [searchParams] = useSearchParams()
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 250)
-    return () => window.clearTimeout(t)
-  }, [load, ws.seq])
+    const f = searchParams.get('filter')
+    if (f === 'receivables') setTypeFilter('Customer')
+    else if (f === 'payables') setTypeFilter('Supplier')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+  const [editing, setEditing] = useState<Draft | null>(null)
+  const [viewingAccountId, setViewingAccountId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const sel = useMemo(() => (selected && dir?.rows.find((r) => r.id === selected.id)) || selected, [selected, dir])
+  const operationalAccounts = useMemo(() => {
+    return d.accounts.filter((a) => accountTypes.includes(a.type as AccountType))
+  }, [d.accounts, accountTypes])
 
-  return (
-    <div className="stack" style={{ gap: 16 }}>
-      <div className="tile-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-        <Tile label="Customers owe you" value={dir ? dash(dir.summary.receivables) : '—'} tone="amber" sub={dir ? `${dir.summary.customers} customers` : undefined} />
-        <Tile label="You owe suppliers" value={dir ? dash(dir.summary.payables) : '—'} tone="red" sub={dir ? `${dir.summary.suppliers} suppliers` : undefined} />
-      </div>
+  const filtered = useMemo(() => {
+    const base = operationalAccounts.filter((a) => {
+      if (typeFilter !== 'All' && a.type !== typeFilter) return false
+      if (positionFilter !== 'all') {
+        const bal = a.balance || 0
+        const isSupp = a.type === 'Supplier'
+        const isPayable = isSupp ? bal > 0 : bal < 0
+        const isReceivable = isSupp ? bal < 0 : bal > 0
+        const isSettled = bal === 0
+        if (positionFilter === 'receivable' && !isReceivable) return false
+        if (positionFilter === 'payable' && !isPayable) return false
+        if (positionFilter === 'settled' && !isSettled) return false
+      }
+      return true
+    })
+    const q = search.trim()
+    if (!q) return base
+    return searchAccounts(base, q)
+  }, [operationalAccounts, search, typeFilter, positionFilter])
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: sel ? 'repeat(auto-fit, minmax(380px, 1fr))' : '1fr', alignItems: 'start' }}>
-        <Panel title="Accounts" subtitle="Everyone you do business with"
-          actions={<Btn sm variant="primary" disabled={!ws.online} onClick={() => setAdding(true)}>+ Add account</Btn>}>
-          <div className="row" style={{ gap: 8, padding: 12, flexWrap: 'wrap' }}>
-            <input className="field-control" style={{ flex: '1 1 220px' }} placeholder="Search by name or mobile…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search accounts" />
-            <div className="pay-seg flow" role="group" aria-label="Type" style={{ flexWrap: 'wrap' }}>
-              {FILTERS.map((f) => <button key={f.key} type="button" className={`pay-seg-btn ${filter === f.key ? 'on' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</button>)}
+  const cols = useMemo<DTCol<PAccount>[]>(
+    () => [
+      {
+        key: 'name',
+        label: 'Name',
+        sortValue: (a) => a.name.toLowerCase(),
+        render: (a) => {
+          const initials = (a.name || 'Account')
+            .split(' ')
+            .filter(Boolean)
+            .map((w) => w[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase()
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: 'var(--layer-accent, #e0e0e0)',
+                  color: 'var(--ink, #161616)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {initials}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="cell-main" style={{ fontWeight: 600 }}>{a.name}</span>
+                {a.phone && <span className="td-muted num" style={{ fontSize: 11 }}>{a.phone}</span>}
+              </div>
             </div>
+          )
+        },
+      },
+      {
+        key: 'type',
+        label: 'Type',
+        sortValue: (a) => a.type,
+        render: (a) => <Tag kind={TYPE_TAG[a.type as AccountType]}>{a.type}</Tag>,
+      },
+      {
+        key: 'phone',
+        label: 'Mobile',
+        sortValue: (a) => a.phone,
+        render: (a) => <span className="td-muted num">{a.phone || '—'}</span>,
+      },
+      {
+        key: 'position',
+        label: 'Position',
+        sortValue: (a) => a.role ?? 'Settled',
+        render: (a) => {
+          if (a.balanceHidden) return <Tag kind="gray">Restricted</Tag>
+          if (a.isSettled) return <Tag kind="gray">Settled</Tag>
+          if (a.isPayable) {
+            return (
+              <span style={{ color: 'var(--pay-fg, #8a2e2e)', fontWeight: 600, fontSize: 12 }}>
+                ● Payable
+              </span>
+            )
+          }
+          if (a.isReceivable) {
+            return (
+              <span style={{ color: 'var(--rec-fg, #235c35)', fontWeight: 600, fontSize: 12 }}>
+                ● Receivable
+              </span>
+            )
+          }
+          // An advance is money on the WRONG side of the account - the shop
+          // holds cash for the party rather than being owed by them. It used to
+          // be labelled "Receivable" or "Payable" purely from the sign, which
+          // put a customer who had prepaid into the Sundry Debtors register as
+          // money "You'll Get".
+          return (
+            <span style={{ color: 'var(--adv-fg, #0f62fe)', fontWeight: 600, fontSize: 12 }}>
+              ● {a.role ?? 'Advance'}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'balance',
+        label: 'Balance',
+        align: 'right',
+        sortValue: (a) => a.balance ?? 0,
+        render: (a) => {
+          // A hidden balance is not a zero balance. It used to render as
+          // "Settled ₹0.00", telling a role that may not see money that the
+          // firm owes nothing.
+          if (a.balanceHidden) {
+            return <span className="num" style={{ color: 'var(--muted)' }}>—</span>
+          }
+          if (!a.balance) return <span className="num" style={{ color: 'var(--muted)' }}>{money(0)}</span>
+          // Dr/Cr and the position label come from accounts/selectors.py, one
+          // authority, so they cannot disagree with the Ledger tab.
+          const color = a.isReceivable
+            ? 'var(--rec-fg, #235c35)'
+            : a.isPayable
+            ? 'var(--pay-fg, #8a2e2e)'
+            : a.isAdvance
+            ? 'var(--adv-fg, #0f62fe)'
+            : 'var(--fin-zero, var(--muted))'
+          const statusText = a.isReceivable ? "You'll Get" : a.isPayable ? "You'll Give" : a.role ?? 'Settled'
+          const pillBg = a.isReceivable
+            ? 'var(--rec-bg, #edf6f0)'
+            : a.isPayable
+            ? 'var(--pay-bg, #faebeb)'
+            : a.isAdvance
+            ? 'var(--adv-bg, #edf5ff)'
+            : 'transparent'
+          return (
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', whiteSpace: 'nowrap' }}>
+              <span className="num" style={{ fontWeight: 700, fontSize: 13, color }}>
+                {`${money(Math.abs(a.balance))} ${a.side ?? ''}`}
+              </span>
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color,
+                  marginTop: 2,
+                  padding: '1px 6px',
+                  background: pillBg,
+                }}
+              >
+                {statusText}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        sortValue: (a) => (a.active ? 'Active' : 'Inactive'),
+        render: (a) => (a.active ? <Tag kind="green">Active</Tag> : <Tag kind="gray">Inactive</Tag>),
+      },
+    ],
+    []
+  )
+
+  const summary = useMemo(() => {
+    const byType = Object.fromEntries(accountTypes.map((t) => [t, filtered.filter((a) => a.type === t).length])) as Record<AccountType, number>
+    // Type-aware totals dynamically calculated from visible filtered accounts
+    const debtors = receivablesOf(filtered)
+    const creditors = payablesOf(filtered)
+    return { byType, debtors, creditors }
+  }, [filtered, accountTypes])
+
+  async function provisionConnectedRetailers() {
+    if (!isMultiShopOwner || !connectedShops.length) return
+    setBusy(true)
+    let added = 0
+    let skipped = 0
+    try {
+      for (const sh of connectedShops) {
+        const expectedCode = `RET-${sh.code}`
+        const exists = d.accounts.some((a) => a.code === expectedCode || a.name === `Retailer — ${sh.name}`)
+        if (exists) continue
+        if (!sh.phone || !String(sh.phone).trim()) {
+          // A ledger must always be contactable; the API rejects a blank
+          // phone. Skip and report rather than aborting the whole batch.
+          skipped++
+          continue
+        }
+        await createAccount(shopId, {
+          name: `Retailer — ${sh.name}`,
+          type: 'Retailer',
+          phone: sh.phone,
+          country_code: DEFAULT_DIAL,
+          code: expectedCode,
+        })
+        added++
+      }
+      if (added > 0) {
+        toast(`Added ${added} connected retailer shop account${added === 1 ? '' : 's'}.`)
+        await d.refresh()
+      } else if (skipped === 0) {
+        toast('All connected retailer shop accounts are already configured.')
+      }
+      if (skipped > 0) {
+        toast(`${skipped} shop${skipped === 1 ? '' : 's'} skipped — add a phone number on the shop first.`, 'warn')
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not provision retailer accounts.', 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function save() {
+    if (!editing) return
+    if (!editing.name.trim()) {
+      toast('Account name is required.', 'err')
+      return
+    }
+    // Phone is mandatory at creation (server enforces the same rule) and must
+    // be a plausible national number, not just any text.
+    if (!editing.id && !isValidNational(editing.phone)) {
+      toast('Enter a valid phone number (4–15 digits).', 'err')
+      return
+    }
+    if (editing.phone && !isValidNational(editing.phone)) {
+      toast('Enter a valid phone number (4–15 digits).', 'err')
+      return
+    }
+    setBusy(true)
+    try {
+      if (editing.id) {
+        // Balance/opening/type are ledger-authoritative: profile fields only.
+        await updateAccount(shopId, editing.id, {
+          name: editing.name.trim(),
+          phone: editing.phone.trim(),
+          country_code: editing.countryCode || DEFAULT_DIAL,
+          is_active: editing.active,
+        })
+        toast('Account updated.')
+      } else {
+        const matchedShop = connectedShops.find((s) => s.id === selectedShopId)
+        await createAccount(shopId, {
+          name: editing.name.trim(),
+          type: editing.type,
+          phone: editing.phone.trim(),
+          country_code: editing.countryCode || DEFAULT_DIAL,
+          code: editing.type === 'Retailer' && matchedShop ? `RET-${matchedShop.code}` : undefined,
+          opening_balance: editing.opening > 0 ? editing.opening : undefined,
+          opening_balance_type: editing.opening > 0 ? (editing.openingType || 'Debit') : undefined,
+          opening_date: editing.opening > 0 ? (editing.openingDate || todayKey()) : undefined,
+        })
+        toast(`${editing.type} account created.`)
+      }
+      setEditing(null)
+      setSelectedShopId('')
+      d.refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Save failed.', 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!confirmId) return
+    setBusy(true)
+    try {
+      // 409 from the backend surfaces its own message ("has transaction/ledger
+      // history... deactivate instead").
+      await deleteAccount(shopId, confirmId)
+      toast('Account deleted.')
+      setConfirmId(null)
+      setEditing(null)
+      d.refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Delete failed.', 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+
+      <div className={`tiles ${isMultiShopOwner ? 'tiles-5' : 'tiles-4'}`}>
+        <Tile label="Customers" value={summary.byType.Customer} note="Debtor accounts" />
+        {isMultiShopOwner && (
+          <Tile label="Retailers" value={summary.byType.Retailer || 0} note="Connected shops" />
+        )}
+        <Tile label="Suppliers" value={summary.byType.Supplier} note="Creditor accounts" />
+        <Tile label="Receivables (You'll Get)" value={<span style={{ color: 'var(--ok, #198038)' }}>{money(summary.debtors)}</span>} note="Owed to this shop" />
+        <Tile label="Payables (You'll Give)" value={<span style={{ color: 'var(--err, #da1e28)' }}>{money(summary.creditors)}</span>} note="Owed to suppliers" />
+      </div>
+
+      <Panel>
+        <div className="panel-head">
+          <div className="panel-title-group">
+            <h3 className="panel-title">All accounts</h3>
+            <span className="t-caption">{filtered.length} shown</span>
           </div>
-          {error ? <div className="alert" role="alert" style={{ margin: 12 }}>{error} <button className="link-btn" onClick={() => void load()}>Retry</button></div>
-            : !dir ? <div className="skeleton" style={{ minHeight: 160, margin: 12 }} />
-            : dir.rows.length === 0 ? <EmptyState title="No accounts found" hint="Add a customer, supplier or employee." />
-            : <div className="tbl-scroll"><table className="tbl">
-              <thead><tr><th>Name</th><th>Type</th><th className="td-right">Balance</th></tr></thead>
-              <tbody>{dir.rows.map((p) => {
-                const bal = p.kind === 'supplier' ? p.payable : p.receivable
-                return (
-                  <tr key={p.id} style={{ cursor: 'pointer', background: sel?.id === p.id ? 'var(--layer)' : undefined }} onClick={() => setSelected(p)}>
-                    <td><span className="cell-main">{p.name}</span><div className="t-caption">{p.mobile}</div></td>
-                    <td><Tag kind="gray">{KIND_LABEL[p.kind]}</Tag></td>
-                    <td className="td-right num">{bal === null ? '—' : bal === 0 ? 'Settled' : `${money(bal)} ${p.kind === 'supplier' ? 'payable' : 'due'}`}</td>
-                  </tr>)
-              })}</tbody></table></div>}
-        </Panel>
+          <div className="panel-actions">
+            <div className="toolbar-grow search-box">
+              <input
+                className="field-control"
+                placeholder="Search by name or mobile…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select className="field-control" style={{ width: 130 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
+              <option value="All">All types</option>
+              {accountTypes.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+            <select
+              className="field-control"
+              style={{ width: 130 }}
+              value={positionFilter}
+              onChange={(e) => setPositionFilter(e.target.value as any)}
+            >
+              <option value="all">All positions</option>
+              <option value="receivable">Receivable</option>
+              <option value="payable">Payable</option>
+              <option value="settled">Settled</option>
+            </select>
+            {isMultiShopOwner && connectedShops.length > 0 && (
+              <Btn variant="secondary" onClick={provisionConnectedRetailers} title="Create accounts for any unconfigured retailer shops in this enterprise">
+                + Provision shops
+              </Btn>
+            )}
+            <Btn
+              variant="secondary"
+              className="btn-icon"
+              style={{ width: 34, height: 34, padding: 0, fontWeight: 700 }}
+              onClick={() => {
+                setPaymentTargetId(null)
+                setPaymentModalOpen(true)
+              }}
+              title="Record payment or receipt"
+            >
+              <IconRupee size={16} />
+            </Btn>
+            <Btn variant="primary" onClick={() => {
+              setSelectedShopId('')
+              setEditing(blank())
+            }}>+ Add</Btn>
+          </div>
+        </div>
 
-        {sel && <Dossier party={sel} canSee={seesMoney} owner={isOwner} online={ws.online} onClose={() => setSelected(null)}
-          onChanged={() => { void load() }} />}
-      </div>
+        {d.accounts.length === 0 ? (
+          <EmptyState
+            title="No accounts yet"
+            hint="Add your first customer or supplier to get started."
+          />
+        ) : (
+          <DataTable
+            cols={cols}
+            rows={filtered}
+            defaultSort={{ key: 'name', dir: 'asc' }}
+            onRowClick={(a) => setViewingAccountId(a.id)}
+            rowKey={(a) => a.id}
+            empty={
+              <EmptyState
+                title="No accounts found"
+                hint="Try clearing the search or filter."
+              />
+            }
+          />
+        )}
+      </Panel>
 
-      {adding && <AddDrawer onClose={() => setAdding(false)} onDone={(name) => { setAdding(false); toast(`${name} added`, 'ok'); void load() }} />}
-    </div>
+      {/* Account Detail & Ledger Drawer */}
+      <Drawer
+        open={!!viewingAccountId}
+        title="Account Detail & Ledger"
+        onClose={() => setViewingAccountId(null)}
+        xwide
+      >
+        {viewingAccountId && (
+          <AccountLedgerView
+            shopId={shopId}
+            accountId={viewingAccountId}
+            onEdit={() => {
+              const acc = d.accounts.find((a) => a.id === viewingAccountId)
+              if (acc) {
+                setEditing({
+                  id: acc.id,
+                  name: acc.name,
+                  type: acc.type as AccountType,
+                  phone: acc.phone,
+                  countryCode: acc.countryCode || DEFAULT_DIAL,
+                  opening: acc.opening,
+                  // A hidden balance is not 0; the edit dialog needs a number,
+                  // and the read-only displays handle "restricted" separately.
+                  balance: acc.balance ?? 0,
+                  active: acc.active,
+                })
+                setViewingAccountId(null)
+              }
+            }}
+          />
+        )}
+      </Drawer>
+
+      <Drawer
+        open={!!editing}
+        title={editing?.id ? 'Edit account' : 'New account'}
+        onClose={() => {
+          setEditing(null)
+          setSelectedShopId('')
+        }}
+        footer={
+          <>
+            {editing?.id && (
+              <Btn variant="ghost" style={{ color: 'var(--err)' }} onClick={() => setConfirmId(editing.id!)}>
+                Delete
+              </Btn>
+            )}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <Btn variant="secondary" onClick={() => {
+                setEditing(null)
+                setSelectedShopId('')
+              }}>Cancel</Btn>
+              <Btn variant="primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save account'}</Btn>
+            </div>
+          </>
+        }
+      >
+        {editing && (
+          <>
+            {isMultiShopOwner && editing.type === 'Retailer' && connectedShops.length > 0 && !editing.id && (
+              <Field label="Connected retailer shop" help="Select a connected retailer outlet in this enterprise to auto-fill details.">
+                <select
+                  className="field-control"
+                  value={selectedShopId}
+                  onChange={(e) => {
+                    const sId = e.target.value
+                    setSelectedShopId(sId)
+                    const matched = connectedShops.find((s) => s.id === sId)
+                    if (matched) {
+                      setEditing({
+                        ...editing,
+                        name: `Retailer — ${matched.name}`,
+                        phone: matched.phone || '',
+                        countryCode: DEFAULT_DIAL,
+                      })
+                    }
+                  }}
+                >
+                  <option value="">-- Choose connected shop --</option>
+                  {connectedShops.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="Account name" help="Business or person this ledger tracks.">
+              <input className="field-control" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. Sharma & Sons" autoFocus />
+            </Field>
+            <div className="form-grid">
+              <Field label="Account type">
+                <select
+                  className="field-control"
+                  value={editing.type}
+                  disabled={!!editing.id}
+                  onChange={(e) => {
+                    const t = e.target.value as AccountType
+                    setEditing({
+                      ...editing,
+                      type: t,
+                      openingType: t === 'Supplier' ? 'Credit' : 'Debit',
+                    })
+                  }}
+                >
+                  {accountTypes.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Mobile / contact" required hint={editing.id ? undefined : 'Required — used for collections and delivery.'}>
+                <PhoneInput
+                  countryCode={editing.countryCode || DEFAULT_DIAL}
+                  phone={editing.phone}
+                  onCountryCode={(v) => setEditing({ ...editing, countryCode: v })}
+                  onPhone={(v) => setEditing({ ...editing, phone: v })}
+                  required={!editing.id}
+                />
+              </Field>
+              {!editing.id ? (
+                <>
+                  <Field label="Opening balance (₹)" help="Double-entry opening entry posted to ledger.">
+                    <NumInput
+                      className="field-control num"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editing.opening}
+                      onChange={(n) => setEditing({ ...editing, opening: n })}
+                    />
+                  </Field>
+                  <Field label="Balance type" help="Customers are normally Debit (Dr); Suppliers are Credit (Cr).">
+                    <select
+                      className="field-control"
+                      value={editing.openingType || 'Debit'}
+                      onChange={(e) => setEditing({ ...editing, openingType: e.target.value as 'Debit' | 'Credit' })}
+                    >
+                      <option value="Debit">Debit (Dr) — Receivable / Asset</option>
+                      <option value="Credit">Credit (Cr) — Payable / Liability</option>
+                    </select>
+                  </Field>
+                  <Field label="Opening date" help="Cut-off date for opening ledger entry.">
+                    <input
+                      type="date"
+                      className="field-control"
+                      value={editing.openingDate || todayKey()}
+                      onChange={(e) => setEditing({ ...editing, openingDate: e.target.value })}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Opening balance (₹)" help="Ledger-authoritative — set during creation.">
+                    <NumInput className="field-control num" step="0.01" allowNegative placeholder="0" disabled value={editing.opening} onChange={() => {}} />
+                  </Field>
+                  <Field label="Current balance (₹)" help="Ledger-authoritative — posted by sales, purchases and receipts.">
+                    <NumInput className="field-control num" step="0.01" allowNegative placeholder="0" disabled value={editing.balance} onChange={() => {}} />
+                  </Field>
+                </>
+              )}
+              <Field label="Status">
+                <label className="check-row" style={{ height: 40 }}>
+                  <input type="checkbox" className="check-box" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />
+                  Active for transactions
+                </label>
+              </Field>
+            </div>
+          </>
+        )}
+      </Drawer>
+
+      <ConfirmDialog
+        open={!!confirmId}
+        title="Delete this account?"
+        message="The ledger and its history reference will be removed. This cannot be undone."
+        busy={busy}
+        onClose={() => setConfirmId(null)}
+        onConfirm={remove}
+      />
+
+      <AccountPaymentModal
+        open={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false)
+          setPaymentTargetId(null)
+        }}
+        shopId={shopId}
+        accounts={d.accounts}
+        preselectedAccountId={paymentTargetId}
+        onSuccess={() => d.refresh()}
+      />
+    </>
   )
 }
 
-function Dossier({ party, canSee, owner, online, onClose, onChanged }: { party: Party; canSee: boolean; owner: boolean; online: boolean; onClose: () => void; onChanged: () => void }) {
-  const toast = useToast()
-  const [st, setSt] = useState<Statement | null>(null)
-  const [err, setErr] = useState('')
-  const [pay, setPay] = useState(false)
-  const [advance, setAdvance] = useState<number | null>(null)
-  const isEmployee = party.kind === 'employee'
-
-  const load = useCallback(async () => {
-    setErr(''); setSt(null)
-    if (!canSee) return
-    try {
-      if (isEmployee) setAdvance(await call<number>('accounts', 'employee_advance_balance', { employee_partner_id: party.id }))
-      else setSt(await call<Statement>('accounts', 'statement', { partner_id: party.id }))
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not load the statement.') }
-  }, [party.id, canSee, isEmployee])
-  useEffect(() => { void load() }, [load])
-
-  const settleLabel = party.kind === 'supplier' ? 'Pay supplier' : isEmployee ? 'Advance / wage' : 'Receive payment'
-  return (
-    <Panel title={party.name} subtitle={`${KIND_LABEL[party.kind]}${party.mobile ? ` · ${party.mobile}` : ''}`}
-      actions={<div className="row" style={{ gap: 8 }}>
-        {(party.kind === 'customer' || party.kind === 'supplier' || (isEmployee && owner)) && canSee &&
-          <Btn sm variant="primary" disabled={!online} onClick={() => setPay(true)}>{settleLabel}</Btn>}
-        <Btn sm onClick={onClose} aria-label="Close">×</Btn></div>}>
-      <div style={{ padding: 12 }}>
-        {!canSee ? <div className="alert">Balances and statements are hidden for your role.</div>
-          : err ? <div className="alert" role="alert">{err}</div>
-          : isEmployee ? (advance === null ? <div className="skeleton" style={{ minHeight: 60 }} /> :
-            <div className="pay-box"><div className="pay-net num"><span>Advance outstanding</span><span>{money(advance)}</span></div></div>)
-          : !st ? <div className="skeleton" style={{ minHeight: 120 }} />
-          : st.rows.length === 0 ? <EmptyState title="No transactions yet" />
-          : <div className="tbl-scroll"><table className="tbl">
-            <thead><tr><th>Date</th><th>Entry</th><th className="td-right">Debit</th><th className="td-right">Credit</th><th className="td-right">Balance</th></tr></thead>
-            <tbody>{st.rows.map((r, i) => (
-              <tr key={i}><td className="td-muted">{r.date}</td><td><span className="cell-main">{r.voucher}</span><div className="t-caption">{r.description || r.ref}</div></td>
-                <td className="td-right num">{r.debit ? money(r.debit) : ''}</td><td className="td-right num">{r.credit ? money(r.credit) : ''}</td><td className="td-right num">{money(r.balance)}</td></tr>))}</tbody></table></div>}
-      </div>
-      {pay && <SettleDrawer party={party} onClose={() => setPay(false)} onDone={() => { setPay(false); toast('Recorded', 'ok'); void load(); onChanged() }} />}
-    </Panel>
-  )
-}
-
-function SettleDrawer({ party, onClose, onDone }: { party: Party; onClose: () => void; onDone: () => void }) {
-  const [amount, setAmount] = useState(0)
-  const [method, setMethod] = useState<'cash' | 'upi'>('cash')
-  const [note, setNote] = useState('')
-  const [empKind, setEmpKind] = useState<'advance' | 'recovery' | 'wage'>('advance')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const supplier = party.kind === 'supplier'
-  const employee = party.kind === 'employee'
-  const due = supplier ? party.payable : party.receivable
-
-  const submit = async () => {
-    setErr('')
-    if (amount <= 0) return setErr('Enter an amount greater than zero.')
-    setBusy(true)
-    try {
-      if (employee) await call('accounts', 'employee_voucher', { employee_partner_id: party.id, kind: empKind, amount, method, note: note || undefined })
-      else await call('accounts', supplier ? 'pay_supplier' : 'receive_payment', { partner_id: party.id, amount, method, note: note || undefined })
-      onDone()
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not record this.') } finally { setBusy(false) }
-  }
-
-  return (
-    <Drawer open onClose={onClose} title={supplier ? `Pay ${party.name}` : employee ? `${party.name}: advance / wage` : `Receive from ${party.name}`}
-      footer={<Btn variant="primary" block disabled={busy} onClick={() => void submit()}>{busy ? 'Recording…' : 'Record'}</Btn>}>
-      <div className="stack" style={{ gap: 14 }}>
-        {err && <div className="alert" role="alert">{err}</div>}
-        {!employee && due !== null && due > 0 && <div className="t-caption">Outstanding: <strong className="num">{money(due)}</strong> <button className="link-btn" onClick={() => setAmount(due)}>Use full amount</button></div>}
-        {employee && <div className="pay-seg flow" role="group" aria-label="Voucher type">
-          {(['advance', 'recovery', 'wage'] as const).map((k) => <button key={k} type="button" className={`pay-seg-btn ${empKind === k ? 'on' : ''}`} onClick={() => setEmpKind(k)}>{k === 'advance' ? 'Advance' : k === 'recovery' ? 'Recovery' : 'Wage'}</button>)}</div>}
-        <Field label="Amount (₹)"><NumInput className="field-control" autoFocus value={amount} onChange={setAmount} /></Field>
-        <Field label={supplier || employee ? 'Paid from' : 'Received in'}>
-          <select className="field-control" value={method} onChange={(e) => setMethod(e.target.value as 'cash' | 'upi')}><option value="cash">Cash</option><option value="upi">UPI / bank</option></select></Field>
-        <Field label="Note"><input className="field-control" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-      </div>
-    </Drawer>
-  )
-}
-
-function AddDrawer({ onClose, onDone }: { onClose: () => void; onDone: (name: string) => void }) {
-  const { isOwner } = useAuth()
-  const [name, setName] = useState('')
-  const [mobile, setMobile] = useState('')
-  const [kind, setKind] = useState<Kind>('customer')
-  const [opening, setOpening] = useState(0)
-  const [gstin, setGstin] = useState('')
-  const [gst, setGst] = useState<{ valid: boolean; reason: string; state: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  useEffect(() => {
-    if (gstin.trim().length < 15) { setGst(null); return }
-    let stale = false
-    call<{ valid: boolean; reason: string; state: string }>('accounts', 'lookup_gstin', { gstin }).then((r) => { if (!stale) setGst(r) }).catch(() => undefined)
-    return () => { stale = true }
-  }, [gstin])
-
-  const submit = async () => {
-    setErr('')
-    if (!name.trim()) return setErr('A name is required.')
-    if (gstin.trim() && gst && !gst.valid) return setErr(gst.reason || 'The GSTIN is not valid.')
-    setBusy(true)
-    try { await call('accounts', 'create_party', { name, kind, mobile: mobile || undefined, opening_balance: opening || 0, gstin: gstin.trim() || undefined }); onDone(name.trim()) }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not add the account.') } finally { setBusy(false) }
-  }
-  return (
-    <Drawer open onClose={onClose} title="Add account" footer={<Btn variant="primary" block disabled={busy} onClick={() => void submit()}>{busy ? 'Saving…' : 'Add account'}</Btn>}>
-      <div className="stack" style={{ gap: 14 }}>
-        {err && <div className="alert" role="alert">{err}</div>}
-        <Field label="Type"><select className="field-control" value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-          <option value="customer">Customer</option><option value="supplier">Supplier</option>{isOwner && <option value="employee">Employee</option>}<option value="other">Other</option></select></Field>
-        <Field label="Name"><input className="field-control" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="Mobile"><input className="field-control" inputMode="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} /></Field>
-        {(kind === 'customer' || kind === 'supplier') && <Field label="GSTIN (optional)" help={gst ? (gst.valid ? `Valid · ${gst.state}` : gst.reason) : 'Checked for format and check digit.'}>
-          <input className="field-control" value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} maxLength={15} /></Field>}
-        <Field label="Opening balance (₹)" help="What they already owe you (customer) or you owe them (supplier)."><NumInput className="field-control" value={opening} onChange={setOpening} /></Field>
-      </div>
-    </Drawer>
-  )
+export default function AccountsPageGuarded() {
+  const { can } = useAuth()
+  if (!can('accounts')) return <NoAccess what="Accounts" />
+  return <AccountsPage />
 }

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth, type Perm } from '@/auth/AuthContext';
 import { NoAccess, ToastProvider } from '@/components/ui';
 import { BRAND_CONFIG } from '@/config/brand';
+import { DataProvider } from '@/data/DataProvider';
 
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
 const AppShell = lazy(() => import('@/components/AppShell'));
@@ -14,14 +15,18 @@ const AccountsPage = lazy(() => import('@/pages/AccountsPage'));
 const CashFlowPage = lazy(() => import('@/pages/CashFlowPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const ComingSoon = lazy(() => import('@/pages/ComingSoon'));
+const LedgerPage = lazy(() => import('@/pages/LedgerPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 
 /** Shown while the session is being restored. Never redirects: a refresh on /sales must stay on /sales. */
 function Splash() {
+  const { sessionError } = useAuth();
   return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--layer)' }}>
       <div style={{ textAlign: 'center', color: 'var(--ink)', fontFamily: 'var(--font)' }}>
         <div style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px' }}>{BRAND_CONFIG.name}</div>
-        <div style={{ fontSize: '13px', color: 'var(--ink-2)' }}>Opening your shop...</div>
+        <div style={{ fontSize: '13px', color: 'var(--ink-2)' }}>{sessionError || 'Opening your shop...'}</div>
+        {sessionError && <button className="btn" onClick={() => window.location.reload()}>Retry</button>}
       </div>
     </div>
   );
@@ -60,7 +65,7 @@ export default function App() {
         <Suspense fallback={<Splash />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
+            <Route path="/" element={<RequireAuth><DataProvider><AppShell /></DataProvider></RequireAuth>}>
               <Route index element={<Home />} />
               <Route path="sales" element={<Guard perm="sales" what="Sales"><SalesPage /></Guard>} />
               <Route path="purchases" element={<Guard perm="purchases" what="Purchases"><PurchasesPage /></Guard>} />
@@ -70,7 +75,8 @@ export default function App() {
               <Route path="cashflow" element={<Guard perm="cashflow" what="Cash Flow"><CashFlowPage /></Guard>} />
               <Route path="daybook" element={soon('Day book', 'daybook')} />
               <Route path="calendar" element={soon('Calendar', 'calendar')} />
-              <Route path="settings" element={soon('Settings', 'settings')} />
+              <Route path="ledger" element={<Guard perm="reports" what="Ledger"><LedgerPage /></Guard>} />
+              <Route path="settings" element={<Guard perm="settings" what="Settings"><SettingsPage /></Guard>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

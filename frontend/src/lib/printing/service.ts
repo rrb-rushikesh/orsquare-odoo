@@ -10,6 +10,7 @@
  * this module only answers "how does a job reach paper". Keeping those two
  * questions apart is what lets one setting drive every print path.
  */
+import { printBill, printProvisional } from '../print'
 import { loadPrefs } from '../prefs'
 import { receiptToDoc, type ReceiptData } from '../receipt'
 import { BridgeError, ensurePrinter, getBridgeSnapshot, sendRaw, setStatusChangeHandler, startBridge, stopBridge, subscribeBridge } from './bridge'
@@ -198,7 +199,15 @@ export function beginPrint(): PrintHandle {
 }
 
 /** Convenience for a ReceiptData (sale, reprint, credit note, open-bill preview). */
-export function printReceipt(r: ReceiptData, o: SubmitOptions): Promise<PrintOutcome> {
+export async function printReceipt(r: ReceiptData, o: SubmitOptions): Promise<PrintOutcome> {
+  if (r.nativeOrderId) {
+    const result = await printBill(r.nativeOrderId, o.label);
+    return result === 'failed' ? 'error' : result === 'dialog' ? 'browser' : 'queued';
+  }
+  if (r.provisional) {
+    const result = printProvisional('OR²', r.items, r.total);
+    return result === 'failed' ? 'blocked' : 'browser';
+  }
   const prefs = loadPrefs()
   return beginPrint().submit(receiptToDoc(prefs.invoice, r, prefs.print), o)
 }

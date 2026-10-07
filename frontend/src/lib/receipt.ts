@@ -11,6 +11,7 @@ export interface ReceiptLine {
 }
 
 export interface ReceiptData {
+  nativeOrderId?: number;
   billNo: string | number
   date: number
   customerName: string
@@ -44,6 +45,7 @@ export interface ReceiptData {
 /** Minimal structural view of a persisted sale (see PSale in repo.ts) so the
  *  receipt builder stays decoupled from the API layer. */
 export interface SaleReceiptSource {
+  id?: string;
   billNo: string | number
   date: string | number
   customerName: string
@@ -69,6 +71,7 @@ export function saleToReceipt(s: SaleReceiptSource): ReceiptData {
       ? [...new Set(pays.map((p) => p.method))].join(' + ')
       : s.method
   return {
+    nativeOrderId: s.id ? Number(s.id) : undefined,
     billNo: s.billNo,
     date: typeof s.date === 'number' ? s.date : new Date(s.date).getTime(),
     customerName: s.customerName,

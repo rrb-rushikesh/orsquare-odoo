@@ -4,6 +4,12 @@
 > Then read `AGENTS.md`, `context.md`, `docs/` (all of it) before deciding anything. Do not redesign locked decisions.
 > The owner is a **product designer, not a developer**. Explain simply, give reasons and trade-offs, ask before architecture changes.
 
+## Current restoration checkpoint — 2026-10-07
+
+The owner subsequently authorized importing the original retailer frontend and proceeding without questions. The rejected main retailer screens have now been replaced with source from `production-hot-fix`, preserving the original styling and layout. Core online sale, purchase and stock transfer were verified in the local browser. Read [docs/retailer-restoration.md](docs/retailer-restoration.md) for native mappings, test evidence and explicit gaps. `frontend/DESIGN.md` is the unchanged original design philosophy.
+
+The earlier rebuild instructions below are historical context; **do not replace these restored screens with new designs**. Latest full native suite: 210 passing; final accounts/reports follow-up: 16 passing; frontend build and 103 tests pass (1 hardware case skipped). This is a working core baseline, not full parity or production readiness.
+
 ## 0. THE ONE THING THAT MATTERS MOST
 
 **The retailer frontend must be a MIRROR of the original live app, not a redesign.**
@@ -60,7 +66,7 @@ Known gaps vs the old app (state them honestly in the UI work): Sheet/WineStock 
 - Landing: leave `landing/` as is; wire Caddy (`deploy/Caddyfile`) to serve its `dist/` at `/srv/landing`.
 
 ## 7. Open items / honest status
-- Frontend: needs the mirror rebuild described above. Nothing in `frontend/src/pages` should be trusted visually.
+- Frontend: original source restoration and core Odoo connection completed. Full visual/interaction parity and remaining adapters are pending; see `docs/retailer-restoration.md`. Preserve this restored baseline.
 - Platform HTTP verification pending (section 2).
 - Console UI not built.
 - Full backend suite was last confirmed green (208) before the platform module; re-run `scripts/run_tests.sh` after any backend change (platform change touched `controllers/main.py`: me/login/guard/dispatcher).

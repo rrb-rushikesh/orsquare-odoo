@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import { BRAND_CONFIG } from '@/config/brand'
@@ -7,35 +7,55 @@ import { Btn, Field } from '@/components/ui'
 import { ApiError } from '@/lib/api'
 
 export default function LoginPage() {
-  const { signIn, me } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
-  const [shop, setShop] = useState(() => {
-    try { return localStorage.getItem('or2_shop') || '' } catch { return '' }
-  })
-  const [login, setLogin] = useState('')
+  const [email, setEmail] = useState('')
+  const [shop, setShop] = useState(() => localStorage.getItem('or2_shop') || '')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
+  const [suspendedMsg, setSuspendedMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (me) navigate('/', { replace: true })
-  }, [me, navigate])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setErr('')
+    setSuspendedMsg(null)
     setBusy(true)
     try {
-      await signIn(shop, login, pw)
-      navigate('/', { replace: true })
-    } catch (ex) {
-      setErr(
-        ex instanceof ApiError && ex.status === 429
-          ? 'Too many attempts. Please wait a few minutes and try again.'
-          : ex instanceof ApiError && ex.network
-            ? 'Cannot reach the server. Check your connection.'
-            : 'Wrong shop code, login or password.',
-      )
+      const me = await signIn(shop, email.trim(), pw)
+      {
+        const tabGrants = me.tabs
+        const hasDashboard = tabGrants.includes('dashboard')
+
+        if (hasDashboard) {
+          navigate('/')
+        } else {
+          // Route employee to first accessible tab
+          const tabToRoute: Record<string, string> = {
+            sales: '/sales',
+            stock: '/stock',
+            purchases: '/purchases',
+            products: '/products',
+            accounts: '/accounts',
+            cashflow: '/cashflow',
+            daybook: '/daybook',
+            settings: '/settings',
+          }
+          const target = tabGrants.map((t) => tabToRoute[t]).find(Boolean) || '/sales'
+          navigate(target)
+        }
+      }
+    } catch (ex: any) {
+      const isSuspended =
+        (ex instanceof ApiError && (ex.code === 'account_suspended' || ex.data?.code === 'account_suspended' || ex.data?.detail?.code === 'account_suspended')) ||
+        (ex?.message && typeof ex.message === 'string' && ex.message.toLowerCase().includes('suspended'));
+
+      if (isSuspended) {
+        const msg = (ex instanceof ApiError ? (ex.data?.message || ex.data?.detail?.message) : null) || (ex?.message || 'This account has been suspended.');
+        setSuspendedMsg(msg)
+      } else {
+        setErr(ex?.message || 'Sign-in failed. Please verify your credentials.')
+      }
     } finally {
       setBusy(false)
     }
@@ -69,26 +89,21 @@ export default function LoginPage() {
             <h1 className="login-title">Sign in to {BRAND_CONFIG.name}</h1>
           </div>
           {err && <div className="alert" role="alert">{err}</div>}
+          {suspendedMsg && <div className="alert" role="alert">{suspendedMsg}</div>}
 
           <form onSubmit={submit} className="stack" style={{ gap: 16 }}>
             <Field label="Shop code">
-              <input
-                className="field-control"
-                autoComplete="organization"
-                autoFocus={!shop}
-                value={shop}
-                onChange={(e) => setShop(e.target.value.trim().toLowerCase())}
-                placeholder="orsquare_myshop"
-                required
-              />
+              <input className="field-control" value={shop} onChange={e => setShop(e.target.value)} autoComplete="organization" required />
             </Field>
             <Field label="Login">
               <input
                 className="field-control"
+                type="text"
                 autoComplete="username"
-                autoFocus={!!shop}
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@shop.in"
                 required
               />
             </Field>
@@ -101,6 +116,7 @@ export default function LoginPage() {
                 onChange={(e) => setPw(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={6}
               />
             </Field>
             <Btn variant="primary" type="submit" block disabled={busy}>

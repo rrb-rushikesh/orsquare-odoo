@@ -16,6 +16,7 @@ const BASE = import.meta.env.VITE_API_URL || '';
 const TIMEOUT_MS = 30_000;
 
 export class ApiError extends Error {
+  data: any;
   code: string;
   status: number;
   /** True when the request never reached the server (offline, timeout): the caller may queue it. */
@@ -25,6 +26,7 @@ export class ApiError extends Error {
     this.code = code;
     this.status = status;
     this.network = network;
+    this.data = { code, message };
   }
 }
 
@@ -113,7 +115,7 @@ export interface WireProduct {
 
 export interface WireStock {
   product_id: number; name: string; uom: string; godown: number; counter: number; opened_ml: number;
-  total: number; low: boolean;
+  total: number; low: boolean; value?: number;
 }
 
 export interface WireCustomer {

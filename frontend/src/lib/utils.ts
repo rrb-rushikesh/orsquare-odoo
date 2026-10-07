@@ -6,6 +6,7 @@ const nf0 = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
 export const num = (n: number): string => nf.format(Number.isFinite(n) ? n : 0)
 export const num0 = (n: number): string => nf0.format(Number.isFinite(n) ? n : 0)
 export const money = (n: number): string => {
+  if (n == null || !Number.isFinite(n)) return "—";
   const v = Number.isFinite(n) ? n : 0
   if (v < 0) return `-₹ ${num(Math.abs(v))}`
   return `₹ ${num(v)}`
@@ -17,6 +18,7 @@ export const money0 = (n: number): string => {
 }
 
 export const compact = (n: number): string => {
+  if (n == null || !Number.isFinite(n)) return "—";
   const neg = n < 0
   const a = Math.abs(n)
   if (a >= 1e7) return `${neg ? '-₹ ' : '₹ '}${(a / 1e7).toFixed(2)} Cr`

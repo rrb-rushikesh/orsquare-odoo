@@ -1,262 +1,676 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
-import { useWorkspace, type CounterProduct } from '@/data/workspace'
-import { call } from '@/lib/api'
-import { refreshNow, submitQueued } from '@/lib/sync'
-import { searchProducts } from '@/lib/search'
-import { downloadCsv, money, num } from '@/lib/utils'
-import { Btn, Drawer, EmptyState, NumInput, Panel, Tag, Tile, useToast } from '@/components/ui'
+import { useData } from '@/data/DataProvider'
+import * as repo from '@/lib/repo'
+import type { PProduct, StockOverview } from '@/lib/repo'
+import { downloadCsv, formatDate, money, num0 } from '@/lib/utils'
+import { searchProducts, searchGeneric } from '@/lib/search'
+import {
+  NoAccess,
+  Btn,
+  Drawer,
+  EmptyState,
+  Panel,
+  Tag,
+  Tile,
+} from '@/components/ui'
+import { DataTable, type DTCol } from '@/components/DataTable'
+import { IconHistory, IconLowStock, IconPin, IconPinFilled, IconSheet, IconTransfer } from '@/components/icons'
+import { StockTransferDrawer, StockMovementHistory } from '@/components/stock'
+import { usePinnedSorting, sortWithPinned } from '@/lib/pinnedSorting'
+import { CompactSortHeader, PinManagementModal } from '@/components/CompactSortHeader'
+import '@/styles/sheet-register.css'
 
-/**
- * Stock on hand, straight from Odoo's stock quants.  The screen reads the synced snapshot and sends the cashier's
- * intent (move 6 bottles to the counter); Odoo validates it, moves the stock and the new levels come back.
- */
+function StockPage() {
+  const { activeShop, seesValuation, user, isOwner, featureOn } = useAuth()
+  const d = useData()
+  const shopId = activeShop?.id ?? ''
 
-interface Movement { date: string; kind: string; qty: number; from: string; to: string; ref: string; origin: string }
-type Direction = 'godown_to_counter' | 'counter_to_godown'
-
-const KIND_LABEL: Record<string, string> = {
-  intake: 'Purchase received', transfer: 'Transfer', sale: 'Sold', return: 'Customer return', open: 'Bottle opened',
-  scrap: 'Scrapped', adjustment: 'Adjustment', supplier_return: 'Returned to supplier',
-}
-
-export default function StockPage() {
-  const { seesValuation, featureOn, can } = useAuth()
-  const ws = useWorkspace()
-  const toast = useToast()
+  // Kitchen is a first-class stock view, gated on the shop's Kitchen feature.
+  // It is a subtab, not a filter: kitchen stock never mixes into the retail
+  // levels table, and the two share the same ordering and pinning standard.
   const kitchenEnabled = featureOn('kitchen')
-
-  const [search, setSearch] = useState('')
-  const q = useDeferredValue(search)
-  const [lowOnly, setLowOnly] = useState(false)
   const [kitchenOnly, setKitchenOnly] = useState(false)
-  const [category, setCategory] = useState('')
-  const [value, setValue] = useState<{ godown: number; counter: number; opened: number } | null>(null)
-  const [transfer, setTransfer] = useState<{ open: boolean; product?: CounterProduct }>({ open: false })
-  const [history, setHistory] = useState<{ product: CounterProduct; rows: Movement[] | null } | null>(null)
-
+  // A shop that has the feature switched off mid-session must not stay on an
+  // empty Kitchen tab.
   useEffect(() => { if (!kitchenEnabled) setKitchenOnly(false) }, [kitchenEnabled])
 
-  // Valuation is only requested for roles that may see it (Odoo answers null otherwise).
+  // Owner control layer: a multi-shop owner's Stock tab opens on the
+  // network-wide by-retailer matrix instead of a single shop's locations.
+  const isMultiShopOwner = isOwner && (user?.shops?.length ?? 0) > 1
+
+  const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const [lowOnly, setLowOnly] = useState(false)
+  const [category, setCategory] = useState('')
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<PProduct | null>(null)
+  const [transferProductId, setTransferProductId] = useState<string | undefined>(undefined)
+
+  const productTransfers = useMemo(() => {
+    if (!selectedProduct) return []
+    return (d.transfers || []).filter(
+      (t) => (t.productId && t.productId === selectedProduct.id) || t.productName === selectedProduct.name
+    )
+  }, [selectedProduct, d.transfers])
+
+  const [mode, setMode] = useState<'network' | 'levels' | 'history'>(isMultiShopOwner ? 'network' : 'levels')
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+
+  // Persistent sorting & pinning hook
+  const {
+    sortMode,
+    toggleSortMode,
+    pinnedKeys,
+    pinnedSet,
+    pinItem,
+    unpinItem,
+    movePinnedItem,
+  } = usePinnedSorting('stock_products', 'most-sold')
+
+  const [overview, setOverview] = useState<{ loading: boolean; error: string | null; data: StockOverview | null }>({
+    loading: true,
+    error: null,
+    data: null,
+  })
+  const [showAllNetwork, setShowAllNetwork] = useState(false)
+  const NETWORK_CAP = 300
+
+  const loadOverview = useCallback(async () => {
+    if (!shopId) return
+    setOverview((s) => ({ ...s, loading: true, error: null }))
+    try {
+      const data = await repo.fetchStockOverview(shopId)
+      setOverview({ loading: false, error: null, data })
+    } catch (e) {
+      setOverview({
+        loading: false,
+        error: e instanceof Error && e.message ? e.message : 'Could not load stock.',
+        data: null,
+      })
+    }
+  }, [shopId])
+
   useEffect(() => {
-    if (!seesValuation) return
-    call('stock', 'stock_value_by_location').then(setValue).catch(() => setValue(null))
-  }, [seesValuation, ws.seq])
+    if (isMultiShopOwner) void loadOverview()
+  }, [mode, isMultiShopOwner, loadOverview])
 
-  const stocked = useMemo(() => ws.counterProducts.filter((p) => p.active), [ws.counterProducts])
-  const categories = useMemo(() => [...new Set(stocked.map((p) => p.category).filter(Boolean))].sort(), [stocked])
-
-  const rows = useMemo(() => {
-    const base = stocked.filter((p) => {
-      if (p.isKitchen !== kitchenOnly) return false
-      if (lowOnly && !p.lowStock) return false
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim()
+    const base = d.products.filter((p) => {
+      // Kitchen is a first-class stock view, not a hidden filter: it is its own
+      // subtab, and only offered when the shop has the feature on.
+      if (Boolean(p.isKitchen) !== kitchenOnly) return false
+      if (lowOnly && p.godownPcs + p.counterPcs > p.lowLevel) return false
       if (category && p.category !== category) return false
       return true
     })
-    return q.trim() ? searchProducts(base, q) : base
-  }, [stocked, kitchenOnly, lowOnly, category, q])
-
-  const lowCount = stocked.filter((p) => !p.isKitchen && p.lowStock).length
-  const outCount = stocked.filter((p) => !p.isKitchen && p.totalPcs <= 0).length
-
-  const openHistory = async (product: CounterProduct) => {
-    setHistory({ product, rows: null })
-    try {
-      const rows = await call<Movement[]>('stock', 'movement_history', { product_id: product.productId, limit: 100 })
-      setHistory({ product, rows })
-    } catch (e) {
-      setHistory(null)
-      toast(e instanceof Error ? e.message : 'Could not load the history.', 'err')
+    let list = base
+    if (q) {
+      list = searchProducts(base, q)
     }
+
+    // Pinned first, then the app-wide ordering standard: rolling 4-business-day
+    // sold quantity including today, tie-broken by most recent sale, then by
+    // the backend's stable name order.
+    return sortWithPinned({
+      items: list,
+      keyExtractor: (p) => p.id,
+      pinnedKeys,
+      sortMode,
+      salesValueExtractor: (p) => p.sold4d || 0,
+      recencyValueExtractor: (p) => Date.parse(p.orderLastSoldAt || '') || 0,
+      alphaValueExtractor: (p) => p.name,
+    })
+  }, [d.products, deferredSearch, lowOnly, category, sortMode, pinnedKeys, kitchenOnly])
+
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>()
+    for (const p of d.products) {
+      if (Boolean(p.isKitchen) !== kitchenOnly) continue
+      const c = (p.category || '').trim()
+      if (c && c !== '-' && !seen.has(c)) seen.add(c)
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b))
+  }, [d.products, kitchenOnly])
+
+  const cols = useMemo<DTCol<PProduct>[]>(() => {
+    const c: DTCol<PProduct>[] = [
+      {
+        key: 'name',
+        label: 'Product',
+        headerRender: () => (
+          <CompactSortHeader
+            label="Product"
+            sortMode={sortMode}
+            onToggleSort={toggleSortMode}
+            pinnedCount={pinnedKeys.length}
+            onOpenPinModal={() => setPinModalOpen(true)}
+          />
+        ),
+        render: (p) => {
+          const isPinned = pinnedSet.has(p.id)
+          const size = p.unit && p.unit !== '-' ? p.unit : ''
+          const sub = [size, p.barcode].filter(Boolean).join(' · ')
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                className={`rg-row-pin-btn ${isPinned ? 'pinned' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (isPinned) unpinItem(p.id)
+                  else pinItem(p.id)
+                }}
+                title={isPinned ? 'Unpin product' : 'Pin product to top'}
+                aria-label={isPinned ? 'Unpin product' : 'Pin product to top'}
+              >
+                {isPinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
+              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span className="cell-main">{p.name}</span>
+                {sub && <span className="cell-sub num">{sub}</span>}
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        key: 'category',
+        label: 'Category',
+        sortValue: (p) => p.category.toLowerCase(),
+        render: (p) =>
+          p.category && p.category !== '-' ? (
+            <Tag kind="gray">{p.category.toUpperCase()}</Tag>
+          ) : (
+            <span className="td-muted">—</span>
+          ),
+      },
+      {
+        key: 'godown',
+        label: 'Godown',
+        align: 'center',
+        sortValue: (p) => p.godownPcs,
+        hideMobile: true,
+        render: (p) => <span className="num">{num0(p.godownPcs)}</span>,
+      },
+      {
+        key: 'counter',
+        label: 'Counter',
+        align: 'center',
+        sortValue: (p) => p.counterPcs,
+        hideMobile: true,
+        render: (p) => <span className="num">{num0(p.counterPcs)}</span>,
+      },
+      {
+        key: 'total',
+        label: 'Total',
+        align: 'center',
+        sortValue: (p) => p.godownPcs + p.counterPcs,
+        render: (p) => (
+          <span className="num" style={{ fontWeight: 600 }}>{num0(p.godownPcs + p.counterPcs)}</span>
+        ),
+      },
+    ]
+    if (seesValuation) {
+      c.push({
+        key: 'value',
+        label: 'Value',
+        align: 'center',
+        sortValue: (p) => p.stockValue ?? NaN,
+        hideMobile: true,
+        render: (p) => <span className="num">{money(p.stockValue ?? NaN)}</span>,
+      })
+    }
+    c.push({
+      key: 'status',
+      label: 'Status',
+      sortValue: (p) => {
+        const t = p.godownPcs + p.counterPcs
+        return t === 0 ? 'Out' : t <= p.lowLevel ? 'Low' : 'OK'
+      },
+      render: (p) => {
+        const total = p.godownPcs + p.counterPcs
+        return total === 0 ? (
+          <Tag kind="red">Out</Tag>
+        ) : total <= p.lowLevel ? (
+          <Tag kind="warn">Low</Tag>
+        ) : (
+          <Tag kind="green">OK</Tag>
+        )
+      },
+    })
+    return c
+  }, [seesValuation, sortMode, toggleSortMode, pinnedKeys, pinnedSet, pinItem, unpinItem])
+
+  const stockProducts = useMemo(() => d.products.filter((p) => !p.isKitchen), [d.products])
+
+  const summary = useMemo(() => {
+    let value = 0
+    let godownPcs = 0
+    let counterPcs = 0
+    let low = 0
+    stockProducts.forEach((p) => {
+      const total = p.godownPcs + p.counterPcs
+      void value
+      godownPcs += p.godownPcs
+      counterPcs += p.counterPcs
+      if (total <= p.lowLevel) low++
+    })
+    return { value: d.stockValue ?? NaN, godownPcs, counterPcs, low }
+  }, [stockProducts, d.stockValue])
+
+  // ----- Owner network matrix (control-layer view) -----
+  const godownShopId = user?.shops?.[0]?.id ?? ''
+  const networkShops = overview.data?.shops ?? []
+
+  const networkRows = useMemo(() => {
+    const rows = overview.data?.products ?? []
+    const q = deferredSearch.trim()
+    if (!q) return rows
+    return searchGeneric(rows, q, [
+      { get: (r) => r.name, weight: 2.0 },
+      { get: (r) => r.code, weight: 2.5, isCode: true },
+    ])
+  }, [overview.data, deferredSearch])
+  const shownNetwork = showAllNetwork ? networkRows : networkRows.slice(0, NETWORK_CAP)
+
+  const networkTotals = useMemo(() => {
+    let godown = 0
+    let retailers = 0
+    for (const r of overview.data?.products ?? []) {
+      for (const s of overview.data?.shops ?? []) {
+        const v = r.per_shop[s.id]?.total ?? 0
+        if (s.id === godownShopId) godown += v
+        else retailers += v
+      }
+    }
+    return { godown, retailers, products: overview.data?.products.length ?? 0 }
+  }, [overview.data, godownShopId])
+
+  function exportNetworkCsv() {
+    const rows = networkRows.map((r) => ({
+      Product: r.name || r.code,
+      MRP: Number(r.mrp) || 0,
+      'Owner Godown': godownShopId ? r.per_shop[godownShopId]?.total ?? 0 : 0,
+      ...Object.fromEntries(networkShops.filter((s) => s.id !== godownShopId).map((s) => [s.name, r.per_shop[s.id]?.total ?? 0])),
+      Total: r.total,
+    }))
+    downloadCsv(`network-stock-${new Date().toISOString().slice(0, 10)}.csv`, rows)
+  }
+
+  function openTransfer() {
+    setTransferOpen(true)
   }
 
   return (
-    <div className="stack" style={{ gap: 16 }}>
-      <div className="tile-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-        <Tile label="Products" value={stocked.filter((p) => !p.isKitchen).length} />
-        <Tile label="Low stock" value={lowCount} tone={lowCount ? 'amber' : 'neutral'} onClick={() => { setLowOnly(true); setKitchenOnly(false) }} />
-        <Tile label="Out of stock" value={outCount} tone={outCount ? 'red' : 'neutral'} />
-        {value && <Tile label="Stock value (cost)" value={money(value.godown + value.counter + value.opened)}
-          sub={`Godown ${money(value.godown)} · Counter ${money(value.counter)} · Open ${money(value.opened)}`} />}
-        {ws.discrepanciesOpen > 0 && <Tile label="Stock to verify" value={ws.discrepanciesOpen} tone="red" sub="Offline sales that exceeded stock" />}
-      </div>
-
-      <Panel
-        title={kitchenOnly ? 'Kitchen items' : 'Stock levels'}
-        subtitle="Godown = storage · Counter = ready to sell"
-        actions={
-          <div className="row" style={{ gap: 8 }}>
-            {kitchenEnabled && (
-              <Btn sm variant={kitchenOnly ? 'primary' : 'tertiary'} onClick={() => setKitchenOnly((v) => !v)}>Kitchen</Btn>
-            )}
-            <Btn sm variant="tertiary" onClick={() => downloadCsv('stock.csv', rows.map((p) => ({
-              Product: p.name, Unit: p.unit, Godown: p.godownPcs, Counter: p.counterPcs, Total: p.totalPcs,
-            })))}>Export CSV</Btn>
-            {can('stock') && <Btn sm variant="primary" onClick={() => setTransfer({ open: true })}>Transfer stock</Btn>}
-          </div>
-        }
-      >
-        <div className="row" style={{ gap: 8, padding: 12, flexWrap: 'wrap' }}>
-          <input className="field-control" style={{ flex: '1 1 240px' }} placeholder="Search by name, code or barcode…"
-            value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search stock" />
-          <select className="field-control" style={{ width: 180 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
-            <option value="">All categories</option>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <Btn sm variant={lowOnly ? 'primary' : 'tertiary'} aria-pressed={lowOnly} onClick={() => setLowOnly((v) => !v)}>Low stock only</Btn>
+    <>
+      {/* Kitchen subtab. Retail stock and kitchen stock are different products
+          with different movement rules (a kitchen line never touches counter
+          stock), so they get their own tab rather than a mixed table. */}
+      {kitchenEnabled && mode === 'levels' && !isMultiShopOwner && (
+        <div className="seg" role="tablist" aria-label="Stock view" style={{ marginBottom: 12 }}>
+          <button type="button" role="tab" aria-selected={!kitchenOnly}
+            className={`seg-btn ${!kitchenOnly ? 'active' : ''}`} onClick={() => setKitchenOnly(false)}>
+            Retail
+          </button>
+          <button type="button" role="tab" aria-selected={kitchenOnly}
+            className={`seg-btn ${kitchenOnly ? 'active' : ''}`} onClick={() => setKitchenOnly(true)}>
+            Kitchen
+          </button>
         </div>
-
-        {rows.length === 0 ? (
-          <EmptyState title="No products to show" hint={ws.status === 'loading' ? 'Loading stock…' : 'Try a different search or filter.'} />
-        ) : (
-          <div className="tbl-scroll">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Product</th><th>Unit</th>
-                  <th className="td-right">Godown</th><th className="td-right">Counter</th>
-                  {!kitchenOnly && <th className="td-right">Open (ml)</th>}
-                  <th className="td-right">Total</th><th style={{ width: 150 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const total = p.totalPcs
-                  return (
-                    <tr key={p.productId}>
-                      <td>
-                        <span className="cell-main">{p.name}</span>{' '}
-                        {p.lowStock && <Tag kind="amber">LOW</Tag>}{' '}
-                        {!p.isKitchen && total <= 0 && <Tag kind="red">OUT</Tag>}
-                        <div className="t-caption">{p.barcode || p.code}</div>
-                      </td>
-                      <td className="td-muted">{p.unit}</td>
-                      <td className="td-right num">{p.isKitchen ? '—' : num(p.godownPcs)}</td>
-                      <td className="td-right num">{p.isKitchen ? '—' : num(p.counterPcs)}</td>
-                      {!kitchenOnly && <td className="td-right num">{p.openedMl > 0 ? num(p.openedMl) : '—'}</td>}
-                      <td className="td-right num"><strong>{p.isKitchen ? '—' : num(total)}</strong></td>
-                      <td className="td-right">
-                        <Btn sm onClick={() => void openHistory(p)}>History</Btn>{' '}
-                        {!p.isKitchen && <Btn sm onClick={() => setTransfer({ open: true, product: p })}>Move</Btn>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      )}
+      {isMultiShopOwner && (
+        <>
+          <div className="tiles">
+            <Tile label="Central Godown" value={num0(networkTotals.godown)} note="Pieces in your main godown" />
+            <Tile label="Retailer shops" value={num0(networkTotals.retailers)} note="Godown + counter combined" />
+            <Tile label="Total across business" value={num0(networkTotals.godown + networkTotals.retailers)} note="All locations" />
+            <Tile label="Products" value={num0(networkTotals.products)} note={networkShops.length > 1 ? `${networkShops.length} shops` : undefined} />
           </div>
-        )}
-      </Panel>
 
-      {ws.openBottles.length > 0 && !kitchenOnly && (
-        <Panel title="Open bottles" subtitle="Oldest first: pour these before opening a new one">
-          <div className="tbl-scroll">
-            <table className="tbl">
-              <thead><tr><th>Bottle</th><th>Product</th><th className="td-right">Left (ml)</th><th className="td-right">Full</th></tr></thead>
-              <tbody>
-                {ws.openBottles.map((b) => (
-                  <tr key={b.id}>
-                    <td>{b.label}</td><td>{b.product}</td>
-                    <td className="td-right num">{num(b.remaining_ml)} / {num(b.capacity_ml)}</td>
-                    <td className="td-right num">{Math.round(b.percent)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+          <Panel>
+            <div className="panel-head">
+              <div className="panel-title-group">
+                <h3 className="panel-title" style={{ margin: 0 }}>Stock by retailer</h3>
+                <span className="t-caption">{shownNetwork.length} shown</span>
+              </div>
+              <div className="panel-actions">
+                <div className="toolbar-grow search-box">
+                  <input className="field-control" placeholder="Search product…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <Btn
+                  variant="ghost"
+                  className="btn-icon"
+                  style={{ width: 40, height: 40 }}
+                  aria-label="Stock movement history"
+                  disabled title="Stock movement history is not available yet."
+                  data-tooltip="Stock movement history"
+                  onClick={() => setMode('history')}
+                >
+                  <IconHistory size={16} />
+                </Btn>
+                <Btn
+                  variant="ghost"
+                  className="btn-icon"
+                  style={{ width: 40, height: 40 }}
+                  aria-label="Export to spreadsheet"
+                  data-tooltip="Export to spreadsheet"
+                  onClick={exportNetworkCsv}
+                >
+                  <IconSheet size={16} />
+                </Btn>
+                <Btn variant="primary" disabled={stockProducts.length === 0} onClick={openTransfer}>
+                  <IconTransfer /> Transfer stock
+                </Btn>
+              </div>
+            </div>
+
+            {overview.loading ? (
+              <div className="skeleton" style={{ height: 240 }} />
+            ) : overview.error ? (
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
+                <div className="alert" role="alert">{overview.error}</div>
+                <Btn sm variant="secondary" onClick={() => void loadOverview()}>Retry</Btn>
+              </div>
+            ) : networkRows.length === 0 ? (
+              <EmptyState title="No stock rows" hint="Purchase stock into your central godown first." />
+            ) : (
+              <>
+                <div className="tbl-scroll">
+                  <table className="tbl" aria-label="Stock by retailer">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th className="td-right">Total</th>
+                        {networkShops.map((s) => (
+                          <th key={s.id} className="td-right" style={{ fontWeight: s.id === godownShopId ? 600 : 400 }}>
+                            {s.id === godownShopId ? `${s.name} (godown)` : s.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shownNetwork.map((r) => (
+                        <tr key={r.code}>
+                          <td>
+                            <span className="cell-main">{r.name || r.code}</span>
+                            <span className="cell-sub num">{r.code}</span>
+                          </td>
+                          <td className="td-right num" style={{ fontWeight: 600 }}>{num0(r.total)}</td>
+                          {networkShops.map((s) => (
+                            <td key={s.id} className={`td-right num ${s.id === godownShopId ? '' : 'td-muted'}`}>
+                              {num0(r.per_shop[s.id]?.total ?? 0)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!showAllNetwork && networkRows.length > NETWORK_CAP && (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 16px' }}>
+                    <Btn sm variant="secondary" onClick={() => setShowAllNetwork(true)}>
+                      Show all {networkRows.length}
+                    </Btn>
+                  </div>
+                )}
+              </>
+            )}
+          </Panel>
+        </>
       )}
 
-      <TransferDrawer
-        open={transfer.open}
-        product={transfer.product}
-        products={stocked.filter((p) => !p.isKitchen)}
-        onClose={() => setTransfer({ open: false })}
-        onDone={() => { setTransfer({ open: false }); void refreshNow() }}
-      />
+      {!isMultiShopOwner && mode === 'levels' && (
+        <>
+          <div className="tiles tiles-4" style={{ marginBottom: 16 }}>
+            <Tile
+              label="Total stock value"
+              value={seesValuation ? money(summary.value) : '—'}
+              note="Combined valuation"
+            />
+            <Tile
+              label="Godown stock"
+              value={`${num0(summary.godownPcs)} pcs`}
+              note="In warehouse storage"
+            />
+            <Tile
+              label="Counter stock"
+              value={`${num0(summary.counterPcs)} pcs`}
+              note="Front retail display"
+            />
+            <Tile
+              label="Below minimum"
+              value={`${num0(summary.low)} items`}
+              note={summary.low > 0 ? 'Requires restock' : 'Levels adequate'}
+            />
+          </div>
 
-      <Drawer open={!!history} onClose={() => setHistory(null)} title={history ? `${history.product.name}: stock movements` : ''} wide>
-        {!history?.rows ? <div className="skeleton" style={{ minHeight: 120 }} /> : history.rows.length === 0 ? (
-          <EmptyState title="No movements yet" />
-        ) : (
-          <table className="tbl">
-            <thead><tr><th>When</th><th>What</th><th className="td-right">Qty</th><th>From → To</th><th>Ref</th></tr></thead>
-            <tbody>
-              {history.rows.map((m, i) => (
-                <tr key={i}>
-                  <td className="td-muted">{new Date(m.date).toLocaleString('en-IN')}</td>
-                  <td>{KIND_LABEL[m.kind] ?? m.kind}</td>
-                  <td className="td-right num">{num(m.qty)}</td>
-                  <td className="td-muted">{m.from} → {m.to}</td>
-                  <td className="td-muted">{m.ref}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Panel>
+            <div className="panel-head">
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <h3 className="panel-title" style={{ margin: 0 }}>On hand</h3>
+                <span className="t-caption">{filtered.length} shown</span>
+              </div>
+              <div className="panel-actions">
+                {categoryOptions.length > 0 && (
+                  <select
+                    className="field-control"
+                    style={{ width: 170 }}
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    aria-label="Filter by category"
+                  >
+                    <option value="">All categories</option>
+                    {categoryOptions.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="toolbar-grow search-box">
+                  <input className="field-control" placeholder="Search product or barcode…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  {search !== '' && (
+                    <button
+                      type="button"
+                      className="search-clear"
+                      aria-label="Clear search"
+                      title="Clear search"
+                      onClick={() => setSearch('')}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <Btn
+                  variant="ghost"
+                  className="btn-icon"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    ...(lowOnly ? { background: 'var(--blue)', borderColor: 'var(--blue)', color: '#ffffff' } : {}),
+                  }}
+                  aria-label="Filter low stock only"
+                  aria-pressed={lowOnly}
+                  title="Filter low stock only"
+                  data-tooltip={lowOnly ? 'Showing low stock only' : 'Filter low stock only'}
+                  onClick={() => setLowOnly((v) => !v)}
+                >
+                  <IconLowStock size={16} />
+                </Btn>
+                <Btn
+                  variant="ghost"
+                  className="btn-icon"
+                  style={{ width: 40, height: 40 }}
+                  aria-label="Stock movement history"
+                  disabled title="Stock movement history is not available yet."
+                  data-tooltip="Stock movement history"
+                  onClick={() => setMode('history')}
+                >
+                  <IconHistory size={16} />
+                </Btn>
+                <Btn variant="primary" disabled={stockProducts.length === 0} onClick={openTransfer}>
+                  <IconTransfer /> Transfer stock
+                </Btn>
+              </div>
+            </div>
+
+            {stockProducts.length === 0 ? (
+              <EmptyState title="No stock rows" hint="Add products first." />
+            ) : (
+              <DataTable
+                cols={cols}
+                rows={filtered}
+                manualSort={true}
+                onRowClick={(p) => setSelectedProduct(p)}
+                ariaLabel="Stock on hand"
+                empty={<EmptyState title="No stock rows" hint="Nothing matches this filter." />}
+              />
+            )}
+          </Panel>
+        </>
+      )}
+
+      {mode === 'history' && (
+        <StockMovementHistory
+          shopId={shopId}
+          seesValuation={seesValuation}
+          onBack={() => setMode(isMultiShopOwner ? 'network' : 'levels')}
+        />
+      )}
+
+      <Drawer
+        open={Boolean(selectedProduct)}
+        title="Product stock details"
+        onClose={() => setSelectedProduct(null)}
+      >
+        {selectedProduct && (
+          <div className="stack" style={{ gap: 16 }}>
+            <div style={{ borderBottom: '1px solid var(--line)', paddingBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{selectedProduct.name}</h3>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {selectedProduct.category && <Tag kind="gray">{selectedProduct.category}</Tag>}
+                    {selectedProduct.barcode && <span className="t-caption">Barcode: {selectedProduct.barcode}</span>}
+                    {selectedProduct.code && <span className="t-caption">Code: {selectedProduct.code}</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>{money(selectedProduct.rate || selectedProduct.mrp)}</div>
+                  {selectedProduct.mrp > selectedProduct.rate && (
+                    <div className="t-caption">MRP: {money(selectedProduct.mrp)}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="tiles tiles-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              <Tile
+                label="Godown storage"
+                value={`${num0(selectedProduct.godownPcs)} pcs`}
+                note={selectedProduct.unit ? `Unit: ${selectedProduct.unit}` : undefined}
+              />
+              <Tile
+                label="Counter display"
+                value={`${num0(selectedProduct.counterPcs)} pcs`}
+                note={selectedProduct.counterPcs <= selectedProduct.lowLevel ? 'At or below minimum' : 'Normal level'}
+              />
+              <Tile
+                label="Total stock"
+                value={`${num0(selectedProduct.godownPcs + selectedProduct.counterPcs)} pcs`}
+                note={seesValuation ? `Value: ${money(selectedProduct.stockValue ?? NaN)}` : undefined}
+              />
+              <Tile
+                label="Minimum alert level"
+                value={`${num0(selectedProduct.lowLevel)} pcs`}
+                note={selectedProduct.counterPcs + selectedProduct.godownPcs <= selectedProduct.lowLevel ? 'Restock needed' : 'Sufficient'}
+              />
+            </div>
+
+            <div>
+              <Btn
+                variant="primary"
+                sm
+                block
+                onClick={() => {
+                  setTransferProductId(selectedProduct.id)
+                  setTransferOpen(true)
+                }}
+              >
+                <IconTransfer /> Transfer stock
+              </Btn>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 600 }}>Transfer history</h4>
+              {productTransfers.length === 0 ? (
+                <EmptyState title="No transfers recorded" hint="No transfers between godown and counter for this product." />
+              ) : (
+                <div className="tbl-scroll" style={{ maxHeight: 280 }}>
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Direction</th>
+                        <th className="td-right">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productTransfers.map((t) => (
+                        <tr key={t.id}>
+                          <td className="num">{t.date ? formatDate(t.date) : '—'}</td>
+                          <td>
+                            <Tag kind={t.from === 'godown' ? 'purple' : 'blue'}>
+                              {t.from === 'godown' ? 'Godown → Counter' : 'Counter → Godown'}
+                            </Tag>
+                          </td>
+                          <td className="td-right num" style={{ fontWeight: 600 }}>
+                            {t.qty} pcs
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </Drawer>
-    </div>
+
+      <StockTransferDrawer
+        open={transferOpen}
+        onClose={() => {
+          setTransferOpen(false)
+          setTransferProductId(undefined)
+        }}
+        initialProductId={transferProductId}
+        shopId={shopId}
+        products={d.products}
+        onSuccess={() => d.refresh()}
+      />
+
+      <PinManagementModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        title="Pinned Products Priority"
+        pinnedKeys={pinnedKeys}
+        allItems={stockProducts.map((p) => ({
+          key: p.id,
+          label: p.name,
+          sublabel: [p.unit && p.unit !== '-' ? p.unit : '', p.category].filter(Boolean).join(' · '),
+          soldText: `${p.soldCount || 0} sold`,
+        }))}
+        onMovePinned={movePinnedItem}
+        onPin={pinItem}
+        onUnpin={unpinItem}
+      />
+    </>
   )
 }
 
-function TransferDrawer({ open, product, products, onClose, onDone }: {
-  open: boolean
-  product?: CounterProduct
-  products: CounterProduct[]
-  onClose: () => void
-  onDone: () => void
-}) {
-  const toast = useToast()
-  const [direction, setDirection] = useState<Direction>('godown_to_counter')
-  const [productId, setProductId] = useState<number | ''>('')
-  const [qty, setQty] = useState(0)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (open) { setProductId(product?.productId ?? ''); setQty(0); setDirection('godown_to_counter') }
-  }, [open, product])
-
-  const chosen = products.find((p) => p.productId === productId)
-  const have = chosen ? (direction === 'godown_to_counter' ? chosen.godownPcs : chosen.counterPcs) : 0
-
-  const submit = async () => {
-    if (!chosen || qty <= 0) return
-    setBusy(true)
-    try {
-      const res = await submitQueued('stock_transfer', { direction, quantities: { [chosen.productId]: qty } })
-      toast(res.queued ? 'Saved on this device. The stock will move when the connection returns.' : `Moved ${qty} × ${chosen.name}`, res.queued ? 'info' : 'ok')
-      onDone()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not move the stock.', 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Drawer open={open} onClose={onClose} title="Transfer stock"
-      footer={<Btn variant="primary" block disabled={busy || !chosen || qty <= 0 || qty > have} onClick={() => void submit()}>
-        {busy ? 'Moving…' : 'Move stock'}
-      </Btn>}>
-      <div className="stack" style={{ gap: 16 }}>
-        <div className="pay-seg" role="group" aria-label="Direction">
-          <button type="button" className={`pay-seg-btn ${direction === 'godown_to_counter' ? 'on' : ''}`} onClick={() => setDirection('godown_to_counter')}>Godown → Counter</button>
-          <button type="button" className={`pay-seg-btn ${direction === 'counter_to_godown' ? 'on' : ''}`} onClick={() => setDirection('counter_to_godown')}>Counter → Godown</button>
-        </div>
-        <div>
-          <div className="micro-label">Product</div>
-          <select className="field-control" style={{ marginTop: 8 }} value={productId} onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}>
-            <option value="">Choose a product…</option>
-            {products.map((p) => <option key={p.productId} value={p.productId}>{p.name}</option>)}
-          </select>
-        </div>
-        {chosen && <div className="t-caption">Available to move: <strong className="num">{num(have)}</strong> {chosen.unit}</div>}
-        <div>
-          <div className="micro-label">Quantity</div>
-          <NumInput className="field-control" style={{ marginTop: 8 }} value={qty} onChange={setQty} placeholder="0" aria-label="Quantity to move" />
-          {qty > have && chosen && <div className="alert" style={{ marginTop: 8 }}>Only {num(have)} available in the source location.</div>}
-        </div>
-      </div>
-    </Drawer>
-  )
+export default function StockPageGuarded() {
+  const { can } = useAuth()
+  if (!can('stock')) return <NoAccess what="Stock" />
+  return <StockPage />
 }

@@ -1502,10 +1502,3 @@
     padding: 12px;
   }
 }
-
-
-
-/* Segmented control with any number of options (the base .pay-seg is a fixed two-column grid). */
-.pay-seg.flow { display: inline-flex; flex-wrap: wrap; grid-template-columns: none; }
-.pay-seg.flow .pay-seg-btn { height: 36px; padding: 0 14px; }
-.pay-seg.flow .pay-seg-btn:not(:first-child) { border-left: 1px solid var(--line); }
