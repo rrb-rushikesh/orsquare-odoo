@@ -7,6 +7,13 @@ from odoo.tools import float_compare
 from .security_utils import require_staff
 
 
+def uom_options(tmpl):
+    """Units a product can be bought in: its own and the bigger packs (cases) of the same category."""
+    cat = tmpl.uom_id.category_id
+    return tmpl.uom_id | tmpl.uom_po_id | tmpl.env['uom.uom'].search(
+        [('category_id', '=', cat.id), ('uom_type', '=', 'bigger')], limit=12)
+
+
 class OrsquareCatalogService(models.AbstractModel):
     _name = 'orsquare.catalog.service'
     _description = "ORSquare Catalog Masters Service"
@@ -210,6 +217,8 @@ class OrsquareCatalogService(models.AbstractModel):
                 'price': t.list_price, 'mrp': t.orsquare_mrp or None, 'uom': t.uom_id.name, 'capacity_ml': t.orsquare_capacity_ml,
                 'kind': 'kitchen' if t.is_kitchen else ('retail' if t.is_storable else 'consumable'),
                 'brand': t.orsquare_brand_id.name or '', 'regime': t.orsquare_tax_regime_id.name or '',
+                'uom_id': t.uom_id.id, 'po_uom_id': t.uom_po_id.id,
+                'uoms': [{'id': u.id, 'name': u.name} for u in uom_options(t)], 'brand_id': t.orsquare_brand_id.id, 'regime_id': t.orsquare_tax_regime_id.id,
                 'can_open': t.orsquare_can_open, 'active': t.active and t.available_in_pos,
                 'taxes': [{'name': x.name, 'amount': x.amount, 'amount_type': x.amount_type,
                            'price_include': x.price_include} for x in t.taxes_id],

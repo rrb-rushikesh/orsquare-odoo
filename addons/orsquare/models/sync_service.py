@@ -91,6 +91,7 @@ class OrsquareSyncService(models.AbstractModel):
             'day': day.summary() if (day and money) else ({'id': day.id, 'date': str(day.date), 'state': day.state}
                                                          if day else None),
             'customers': env['orsquare.accounts.service'].directory('customers', limit=1000)['rows'],
+            'suppliers': env['orsquare.accounts.service'].directory('suppliers', limit=1000)['rows'],
             'payment_modes': ['cash', 'upi', 'khata'],
             'floors': catalog.floors() if company.orsquare_feature_tables else [],
             'tables': env['orsquare.tab.service'].table_status() if company.orsquare_feature_tables else [],
@@ -132,8 +133,9 @@ class OrsquareSyncService(models.AbstractModel):
             changed = self.env['orsquare.catalog.service'].list_products(changed_since=overlap, limit=5000)
             if changed:
                 patches['products'] = changed
-        if types & {'payment_recorded', 'sale_settled'}:
+        if types & {'payment_recorded', 'sale_settled', 'purchase_recorded', 'purchase_returned'}:
             patches['customers'] = self.env['orsquare.accounts.service'].directory('customers', limit=1000)['rows']
+            patches['suppliers'] = self.env['orsquare.accounts.service'].directory('suppliers', limit=1000)['rows']
         return {
             'seq': events[-1]['seq'] if events else since_seq, 'events': events, 'patches': patches,
             'has_more': len(events) >= limit, 'server_ts': fields.Datetime.to_string(fields.Datetime.now()),

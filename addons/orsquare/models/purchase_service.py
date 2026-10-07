@@ -173,7 +173,10 @@ class OrsquarePurchaseService(models.AbstractModel):
         base = gross - discounts + charges
         tcs_rate = self._tcs_rate(payload, company, lines)
         tcs_calc = float_round(base * tcs_rate / 100.0, precision_rounding=company.currency_id.rounding)
-        return {'gross': gross, 'discounts': discounts, 'charges': charges, 'tax': tax,
+        return {'lines': [{'product_id': lv['product_id'], 'qty': lv['product_qty'], 'rate': lv['price_unit'],
+                           'amount': float_round(lv['product_qty'] * lv['price_unit'] * (1 - lv['discount'] / 100.0),
+                                                 precision_rounding=company.currency_id.rounding)} for lv in lines],
+                'gross': gross, 'discounts': discounts, 'charges': charges, 'tax': tax,
                 'tcs_rate': tcs_rate, 'tcs_calculated': tcs_calc,
                 'total': float_round(base + tax + (payload.get('tcs', {}).get('amount', tcs_calc)),
                                      precision_rounding=company.currency_id.rounding)}
@@ -336,6 +339,49 @@ class OrsquarePurchaseService(models.AbstractModel):
             'landed_cost': landed.name if landed else False, 'duplicate': duplicate,
             'business_date': str(order.orsquare_business_date),
         }
+
+    # ------------------------------------------------------------------ bill finder (read-only)
+    @api.model
+    def list_bills(self, search=None, date_from=None, date_to=None, supplier_id=None, limit=50, offset=0):
+        """Posted vendor bills and credit notes, newest first (Bill Finder + purchase register)."""
+        self._check_access()
+        env, company = self.sudo().env, self.env.company
+        domain = [('company_id', '=', company.id), ('move_type', 'in', ('in_invoice', 'in_refund')),
+                  ('state', '=', 'posted')]
+        if date_from:
+            domain.append(('orsquare_business_date', '>=', date_from))
+        if date_to:
+            domain.append(('orsquare_business_date', '<=', date_to))
+        if supplier_id:
+            domain.append(('partner_id', '=', int(supplier_id)))
+        if search:
+            domain += ['|', '|', ('name', 'ilike', search), ('ref', 'ilike', search), ('partner_id.name', 'ilike', search)]
+        moves = env['account.move'].search(domain, order='orsquare_business_date desc, id desc',
+                                           limit=min(int(limit), 200), offset=int(offset))
+        return [{
+            'id': m.id, 'number': m.name, 'supplier_id': m.partner_id.id, 'supplier': m.partner_id.name,
+            'supplier_invoice_no': m.ref or '', 'date': str(m.orsquare_business_date), 'type': m.move_type,
+            'untaxed': m.amount_untaxed, 'tax': m.amount_tax, 'total': m.amount_total,
+            'payment_state': m.payment_state, 'amount_due': m.amount_residual,
+        } for m in moves]
+
+    @api.model
+    def bill_detail(self, bill_id):
+        """One bill with its stock lines and how much of each can still be returned."""
+        self._check_access()
+        env = self.sudo().env
+        bill = env['account.move'].browse(int(bill_id)).exists()
+        if not bill or bill.company_id != self.env.company or bill.move_type not in ('in_invoice', 'in_refund'):
+            raise UserError(_("Bill not found."))
+        lines = []
+        for l in bill.invoice_line_ids.filtered(lambda x: x.product_id):
+            lines.append({'product_id': l.product_id.id, 'name': l.product_id.display_name, 'qty': l.quantity,
+                          'uom': l.product_uom_id.name, 'rate': l.price_unit, 'discount': l.discount,
+                          'total': l.price_total})
+        return {'id': bill.id, 'number': bill.name, 'supplier': bill.partner_id.name, 'type': bill.move_type,
+                'date': str(bill.orsquare_business_date), 'supplier_invoice_no': bill.ref or '',
+                'total': bill.amount_total, 'amount_due': bill.amount_residual, 'payment_state': bill.payment_state,
+                'tp_no': getattr(bill, 'orsquare_tp_no', '') or '', 'lines': lines}
 
     # ------------------------------------------------------------------ returns & exchanges
     @api.model

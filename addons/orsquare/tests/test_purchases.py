@@ -226,3 +226,23 @@ class TestPurchases(OrsquareCase):
         self.assertEqual(round(out['net_payable_change'], 2), round(new_bill.amount_total - credit.amount_total, 2))
         # the two documents were reconciled against each other on the payable account
         self.assertTrue(credit.payment_state in ('paid', 'in_payment', 'partial') or new_bill.payment_state in ('paid', 'in_payment', 'partial'))
+
+
+@tagged('post_install', '-at_install', 'orsquare')
+class TestBillFinder(OrsquareCase):
+    """list_bills / bill_detail feed the Purchases screen's finder and the return flow."""
+
+    def test_finder_lists_and_details_a_recorded_bill(self):
+        purchases = self.env['orsquare.purchase.service']
+        supplier = self.env['res.partner'].create({'name': 'Finder Wines', 'supplier_rank': 1})
+        item = self.make_product('Finder Item', cost=1.0, price=50.0)
+        res = purchases.record_bill({
+            'client_ref': self.ref(), 'supplier_id': supplier.id, 'supplier_invoice_no': 'FW-1',
+            'lines': [{'product_id': item.id, 'qty': 10, 'rate': 30.0}]})
+        rows = purchases.list_bills(search='Finder')
+        self.assertEqual([r['id'] for r in rows], [res['bill_id']])
+        self.assertEqual(rows[0]['supplier_invoice_no'], 'FW-1')
+        detail = purchases.bill_detail(res['bill_id'])
+        self.assertEqual(detail['lines'][0]['product_id'], item.id)
+        self.assertEqual(detail['lines'][0]['qty'], 10)
+        self.assertFalse(purchases.list_bills(search='no such supplier'))
