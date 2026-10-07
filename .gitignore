@@ -43,7 +43,6 @@ wheels/
 
 # Node / React
 node_modules/
-dist/
 .output/
 .turbo/
 
@@ -52,10 +51,6 @@ scratch/*.py
 scratch/*.log
 tmp/
 *.tmp
-__pycache__/
-*.pyc
-scratch/*.py
-scratch/*.log
 scratch/*.json
 scratch/*.txt
 scratch/*.out
