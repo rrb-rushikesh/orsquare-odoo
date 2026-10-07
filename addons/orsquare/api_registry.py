@@ -3,7 +3,7 @@
 dispatcher refuses unknown services/methods, so adding a model method never silently exposes it."""
 
 API_REGISTRY = {
-    'sales': ('orsquare.sale.service', {'settle'}),
+    'sales': ('orsquare.sale.service', {'settle', 'quote'}),
     'purchases': ('orsquare.purchase.service', {'record_bill', 'preview_bill', 'return_to_supplier'}),
     'stock': ('orsquare.stock.reports', {
         'set_opening_stock', 'adjust_stock', 'resolve_discrepancy', 'stock_position', 'stock_value_by_location',

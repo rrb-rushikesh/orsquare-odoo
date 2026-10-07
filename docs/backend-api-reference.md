@@ -211,6 +211,10 @@ Sales register (customer invoices + counter bills) or purchase register (vendor 
 
 Model: `orsquare.sale.service`
 
+### `sales.quote(payload)`
+
+Price a basket exactly as ``settle`` would, without posting or locking anything.
+
 ### `sales.settle(payload)`
 
 Bill a sale, a return, or an exchange (return + sale on one request).
@@ -318,4 +322,4 @@ Step 1: what will be cleared and what is preserved (counts from the live databas
 ### `wipe.wipe_shop(confirm_name, password)`
 
 ---
-*86 methods across 16 services.*
+*87 methods across 16 services.*

@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 
 from .common import OrsquareCase
@@ -223,3 +223,35 @@ class TestAutoOpenDay(OrsquareCase):
         self.assertEqual(stale.state, 'open')
         with self.assertRaisesRegex(Exception, "still open"):
             self.Day.open_day(0.0)
+
+
+@tagged('post_install', '-at_install', 'orsquare')
+class TestQuote(OrsquareCase):
+    """The counter's live numbers come from ``sales.quote`` - it must agree with ``settle`` to the paisa."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.whisky = cls.make_product('Quote Whisky 750ml', cost=1000.0, price=1500.0, uom_xmlid='orsquare.uom_shop_750ml')
+        cls.stock_in(cls.whisky, 30, cls.counter)
+
+    def test_quote_matches_settle_and_writes_nothing(self):
+        lines = [{'product_id': self.whisky.id, 'qty': 3}]
+        before = self.env['pos.order'].search_count([])
+        for discount in (None, {'kind': 'percent', 'value': 7.5}, {'kind': 'amount', 'value': 123.45}):
+            payload = {'lines': lines, 'bill_discount': discount}
+            quote = self.sales.quote(payload)
+            self.assertEqual(self.env['pos.order'].search_count([]), before, "A quote creates no order")
+            res = self.sales.settle(dict(payload, client_ref='Q-%s' % (discount or {}).get('value', 0),
+                                         payments=[{'method': 'cash', 'amount': quote['total']}]))
+            self.assertEqual(quote['total'], res['total'])
+            self.assertEqual(quote['tax'], res['tax'])
+            before += 1
+
+    def test_quote_needs_cashier_role(self):
+        keeper = self.env['res.users'].create({
+            'name': 'Keeper', 'login': 'keeper_q', 'password': 'KeeperPass#123',
+            'groups_id': [(6, 0, [self.env.ref('orsquare.group_orsquare_stockkeeper').id,
+                                  self.env.ref('base.group_user').id])]})
+        with self.assertRaises(AccessError):
+            self.sales.with_user(keeper).quote({'lines': [{'product_id': self.whisky.id, 'qty': 1}]})

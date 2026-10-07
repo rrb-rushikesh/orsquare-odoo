@@ -173,6 +173,45 @@ class OrsquareSaleService(models.AbstractModel):
                                                  lv['discount'], partner, fpos, currency)
             lv['price_subtotal'], lv['price_subtotal_incl'] = excl, incl
 
+    # ------------------------------------------------------------------ quote (read-only pricing)
+    @api.model
+    def quote(self, payload):
+        """Price a basket exactly as ``settle`` would, without posting or locking anything.
+
+        The counter shows these numbers while the cashier builds the bill, so the screen never does its own
+        tax or discount arithmetic.  Same code path as billing: line pricing, bill discount / promo, taxes.
+        """
+        if not (self.env.su or self.env.user.has_group('orsquare.group_orsquare_cashier')):
+            raise AccessError(_("You are not allowed to bill at the counter."))
+        env = self.sudo().env
+        company = self.env.company
+        currency = company.currency_id
+        partner = env['res.partner'].browse(int(payload['partner_id'])).exists()             if payload.get('partner_id') else env['res.partner']
+        fpos = partner.property_account_position_id
+        line_vals, _sealed, _peg = self._prepare_lines(env, payload, None, partner, fpos, currency, False)
+        bill_discount = payload.get('bill_discount')
+        if payload.get('promo_code'):
+            if bill_discount:
+                raise UserError(_("Use either a promo code or a manual discount, not both."))
+            gross_base = sum(l['qty'] * l['price_unit'] * (1 - l['discount'] / 100.0) for l in line_vals)
+            promo = env['orsquare.promo'].lookup(payload['promo_code'])
+            bill_discount = {'kind': 'amount',
+                             'value': promo._evaluate(gross_base, fields.Date.context_today(self))}
+        gross_before = sum(l['qty'] * l['price_unit'] * (1 - l['discount'] / 100.0) for l in line_vals)
+        self._apply_bill_discount(line_vals, bill_discount, currency, env, partner, fpos)
+        total = float_round(sum(l['price_subtotal_incl'] for l in line_vals), precision_rounding=currency.rounding)
+        untaxed = sum(l['price_subtotal'] for l in line_vals)
+        tax = float_round(total - untaxed, precision_rounding=currency.rounding)
+        concession = max(0.0, float(payload.get('settlement_concession') or 0.0))
+        return {
+            'lines': [{'product_id': l['product_id'], 'qty': l['qty'], 'untaxed': l['price_subtotal'],
+                       'total': l['price_subtotal_incl'], 'name': l['full_product_name']} for l in line_vals],
+            'subtotal': float_round(gross_before, precision_rounding=currency.rounding),
+            'discount': float_round(gross_before - untaxed, precision_rounding=currency.rounding)
+            if bill_discount else 0.0,
+            'tax': tax, 'total': total, 'concession': concession, 'payable': total - concession,
+        }
+
     # ------------------------------------------------------------------ main entry
     @api.model
     def settle(self, payload):
