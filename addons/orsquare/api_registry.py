@@ -10,7 +10,7 @@ API_REGISTRY = {
         'movement_history', 'opened_shelf', 'needs_attention_stock'}),
     'bottles': ('orsquare.opened_bottle', {'tray'}),
     'accounts': ('orsquare.accounts.service', {
-        'directory', 'create_party', 'statement', 'receive_payment', 'pay_supplier', 'employee_voucher',
+        'directory', 'create_party', 'lookup_gstin', 'statement', 'receive_payment', 'pay_supplier', 'employee_voucher',
         'employee_advance_balance'}),
     'cashflow': ('orsquare.cashflow.service', {'new_entry', 'register'}),
     'reports': ('orsquare.reports.service', {
@@ -27,6 +27,9 @@ API_REGISTRY = {
     'day': ('orsquare.api.facade', {
         'day_open', 'day_current', 'day_seal', 'day_reaudit', 'transfer', 'open_bottle', 'finish_bottle',
         'discrepancies', 'bill_lookup', 'bill_detail'}),
+    'tabs': ('orsquare.tab.service', {
+        'table_status', 'tab_open', 'tab_get', 'tab_save', 'tab_transfer', 'tab_cancel', 'tab_kot'}),
+    'promos': ('orsquare.promo', {'list_promos', 'create_promo', 'set_promo_active', 'check_promo'}),
     'bills': ('orsquare.bill.service', {'bill_document', 'thermal_text', 'escpos'}),
     'realtime': ('orsquare.realtime.service', {'token'}),
     'sync': ('orsquare.sync.service', {'bootstrap', 'delta', 'flush'}),

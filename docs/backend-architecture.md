@@ -1,6 +1,6 @@
 # ORSquare Backend Architecture (as built)
 
-**Status:** Milestone 1 backend is built and verified. 182 automated tests pass on both an incrementally upgraded
+**Status:** Milestone 1 backend is built and verified. 206 automated tests pass on both an incrementally upgraded
 database and a pristine from-scratch install; the concurrency, gateway and benchmark scripts run against real
 PostgreSQL/Odoo/Caddy. This document describes what exists, not what was planned. Decisions and the reasons behind
 them are in [`backend-decisions.md`](backend-decisions.md); the method-by-method API is in the generated
@@ -39,6 +39,8 @@ React SPA ──HTTPS──▶ Caddy ──▶ Odoo 18 Community (module `orsqua
 | Back office | `accounts_service.py`, `cashflow_service.py`, `reports_service.py`, `stock_reports.py` | Khata/suppliers/employees, cash diary, dashboard, ledger, stock |
 | Catalog | `catalog_service.py`, `product.py` | Units (two-tier), brands, categories, products, pegs, portions, margin rules, tables |
 | Printing | `bill_service.py` | Bill document, thermal text, ESC/POS, UPI QR |
+| Restaurant | `tabs_service.py` | Shared table tabs (draft orders), merge/transfer, KOT tickets, table board |
+| Promotions | `promo.py` | Promo codes as pre-tax discounts, race-safe usage counts |
 | Sync | `sync_service.py`, `event.py` | bootstrap / delta / flush, domain events |
 | Safety | `wipe_service.py`, `login_throttle.py`, `security_utils.py` | Data wipe + backup, brute-force guard, role gates |
 | Tenant | `shop_bootstrap.py` | Idempotent per-shop setup, `configure_shop`, accounts, POS config |
@@ -136,6 +138,21 @@ Advanced bill adds `supplier_invoice_no`, `tp_no/tp_date`, item discounts (`disc
 * `return_to_supplier` = return picking Godown → Vendor + Vendor Credit Note linked to the bill (with proportional TCS).
   With `exchange` the replacement is a separate bill (own rates/taxes) reconciled against the credit note on the
   supplier ledger.
+
+### 4.4b Restaurant tabs, promos, wholesale paperwork
+
+* **Tabs** (`tabs.*`): a tab is a native *draft* `pos.order` on a `restaurant.table` — no stock, no ledger until paid, so
+  several waiters on several devices share it (needs the server; not part of the offline outbox). Lines carry a client
+  `key`, which is how `tab_kot` prints only what is **new** (and what was **cancelled**) since the last ticket, per
+  station (`kitchen` = dishes, `bar` = the rest). Tabs can be moved or merged; cancelling after a KOT needs a reason.
+  `sales.settle({table_id, payments})` turns the tab into the paid order and removes the draft in one transaction.
+* **Promos** (`promos.*`): `PROMO10` / `FLAT50` style codes (percent with optional cap, flat amount, minimum bill, dates,
+  max uses). A promo only generates the same *pre-tax prorated discount* a cashier could type, so tax/returns need no special
+  case. Usage is counted under a row lock and rolls back with a failed sale. An *offline* bill keeps its promo even if the
+  code was exhausted by sync time (the customer was promised it).
+* **GSTIN** (`accounts.lookup_gstin`): offline format + state + PAN + mod-36 check-character validation (proves well-formed,
+  not that the taxpayer is active). **B2B invoices** accept `transport {vehicle_no, lr_no, eway_bill_no}` and `due_days`;
+  `settle` returns `warnings: ["eway_bill_required"]` above ₹50,000 without an e-Way bill number.
 
 ### 4.5 Tax regimes
 

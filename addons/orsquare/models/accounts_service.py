@@ -69,6 +69,39 @@ class OrsquareAccountsService(models.AbstractModel):
             return 'supplier'
         return 'customer'
 
+    # ------------------------------------------------------------------ GSTIN
+    GSTIN_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+    @api.model
+    def lookup_gstin(self, gstin):
+        """Validate an Indian GSTIN offline: format, state code, embedded PAN and the mod-36 check character.
+
+        This proves the number is *well-formed*, not that the taxpayer is active (that needs the GST portal).
+        """
+        import re
+        g = (gstin or '').strip().upper()
+        result = {'gstin': g, 'valid': False, 'state_code': g[:2], 'state': '', 'pan': g[2:12] if len(g) == 15 else '',
+                  'reason': ''}
+        if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$', g):
+            result['reason'] = 'Not a valid GSTIN format (15 characters: state, PAN, entity, Z, check).'
+            return result
+        state = self.sudo().env['res.country.state'].search(
+            [('country_id.code', '=', 'IN'), ('l10n_in_tin', '=', g[:2])], limit=1)
+        if not state:
+            result['reason'] = 'Unknown state code %s.' % g[:2]
+            return result
+        total, factor = 0, 2          # Luhn mod-36: weights alternate 2,1,2,1... from the rightmost of the 14 chars
+        for ch in reversed(g[:14]):
+            digit = factor * self.GSTIN_CHARS.index(ch)
+            total += digit // 36 + digit % 36
+            factor = 1 if factor == 2 else 2
+        check = self.GSTIN_CHARS[(36 - total % 36) % 36]
+        if check != g[14]:
+            result['reason'] = 'The check character does not match (a digit is probably mistyped).'
+            return result
+        result.update({'valid': True, 'state': state.name})
+        return result
+
     # ------------------------------------------------------------------ directory
     @api.model
     def directory(self, kind='all', search=None, limit=80, offset=0):

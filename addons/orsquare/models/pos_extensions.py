@@ -29,6 +29,7 @@ class PosOrder(models.Model):
         string="Settlement Concession", copy=False, readonly=True, currency_field='currency_id',
         help="Post-tax short-payment written off to the Cash Settlement Difference ledger.")
     orsquare_flagged = fields.Boolean(string="Has Stock Discrepancy", copy=False, readonly=True)
+    orsquare_promo_id = fields.Many2one('orsquare.promo', string="Promo Used", copy=False, readonly=True)
 
     _sql_constraints = [
         ('orsquare_client_ref_unique', 'unique(orsquare_client_ref, company_id)',

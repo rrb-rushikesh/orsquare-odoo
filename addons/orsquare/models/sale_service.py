@@ -276,9 +276,29 @@ class OrsquareSaleService(models.AbstractModel):
             if payload.get('partner_id') else env['res.partner']
         fpos = partner.property_account_position_id or config.default_fiscal_position_id
 
+        # A table tab (draft order) supplies the lines when the client does not send them.
+        tab = env['pos.order']
+        table = env['restaurant.table']
+        if payload.get('table_id'):
+            table = env['restaurant.table'].browse(int(payload['table_id'])).exists()
+            tab = env['pos.order'].search([('table_id', '=', table.id), ('state', '=', 'draft'),
+                                           ('company_id', '=', company.id)], limit=1)
+            if tab and not payload.get('lines'):
+                payload = dict(payload, lines=self._tab_lines(tab))
+            if tab and not payload.get('partner_id') and tab.partner_id:
+                partner = tab.partner_id
+
         line_vals, sealed_need, peg_need = self._prepare_lines(
             env, payload, config, partner, fpos, currency, offline)
-        self._apply_bill_discount(line_vals, payload.get('bill_discount'), currency, env, partner, fpos)
+        promo = env['orsquare.promo']
+        bill_discount = payload.get('bill_discount')
+        if payload.get('promo_code'):
+            if bill_discount:
+                raise UserError(_("Use either a promo code or a manual discount, not both."))
+            gross_base = sum(l['qty'] * l['price_unit'] * (1 - l['discount'] / 100.0) for l in line_vals)
+            promo, promo_amount = env['orsquare.promo'].consume(payload['promo_code'], gross_base, strict=not offline)
+            bill_discount = {'kind': 'amount', 'value': promo_amount}
+        self._apply_bill_discount(line_vals, bill_discount, currency, env, partner, fpos)
 
         amount_total = float_round(sum(l['price_subtotal_incl'] for l in line_vals), precision_rounding=currency.rounding)
         amount_tax = float_round(amount_total - sum(l['price_subtotal'] for l in line_vals),
@@ -364,7 +384,9 @@ class OrsquareSaleService(models.AbstractModel):
             'lines': [(0, 0, lv) for lv in line_vals],
             'uuid': str(uuid.uuid4()),
             'orsquare_client_ref': ref, 'orsquare_offline': offline,
-            'orsquare_concession': concession,
+            'orsquare_concession': concession, 'orsquare_promo_id': promo.id or False,
+            'table_id': table.id or False,
+            'customer_count': int(payload.get('covers') or (tab.customer_count if tab else 0) or 0),
             'general_note': payload.get('note') or False,
         })
         for key, amount in payments:
@@ -388,6 +410,9 @@ class OrsquareSaleService(models.AbstractModel):
             except RedirectWarning as warning:
                 # e.g. l10n_in needs the shop's address AND state before it can post a tax invoice
                 raise UserError(_("%s\nOpen Settings > Business details to complete it.", warning.args[0]))
+            self._apply_invoice_extras(order, payload)
+        if tab:
+            tab.unlink()      # the draft tab becomes this paid order, in the same transaction
         bottles.refresh_if_drained()
 
         # ---- offline physical conflicts are accepted and flagged ---------------------------------
@@ -398,9 +423,55 @@ class OrsquareSaleService(models.AbstractModel):
             'business_date': str(business_date), 'flagged': bool(flagged)}, money={'total': amount_total})
         result = self._result(env, order, transfer_picking=transfer_picking, flagged=flagged)
         result['rolled_forward'] = rolled_forward
+        result['warnings'] = self._warnings(order)
+        if promo:
+            result['promo'] = promo.code
         return result
 
     # ------------------------------------------------------------------ pieces
+    @api.model
+    def _tab_lines(self, tab):
+        """A draft table tab expressed as settle() lines (priced as saved on the tab)."""
+        out = []
+        for l in tab.lines:
+            if l.orsquare_opened_bottle_id:
+                out.append({'peg': {'bottle_id': l.orsquare_opened_bottle_id.id, 'ml': l.orsquare_peg_ml},
+                            'price': l.price_unit * l.qty, 'discount': l.discount})
+            else:
+                out.append({'product_id': l.product_id.id, 'qty': l.qty, 'price': l.price_unit,
+                            'discount': l.discount})
+        return out
+
+    @api.model
+    def _apply_invoice_extras(self, order, payload):
+        """Wholesale paperwork on the tax invoice: transport details, e-way bill, credit due date."""
+        move = order.account_move
+        if not move:
+            return
+        vals = {}
+        transport = payload.get('transport') or {}
+        for key, field in (('vehicle_no', 'orsquare_vehicle_no'), ('lr_no', 'orsquare_lr_no'),
+                           ('eway_bill_no', 'orsquare_eway_bill_no')):
+            if transport.get(key):
+                vals[field] = str(transport[key])
+        if payload.get('due_days'):
+            vals['invoice_date_due'] = fields.Date.add(move.invoice_date or fields.Date.context_today(self),
+                                                       days=int(payload['due_days']))
+        if vals:
+            move.write(vals)
+
+    EWAY_THRESHOLD = 50000.0
+
+    @api.model
+    def _warnings(self, order):
+        """Soft warnings the UI should surface (never block a legal sale)."""
+        out = []
+        move = order.account_move
+        if move and move.move_type == 'out_invoice' and order.amount_total > self.EWAY_THRESHOLD \
+                and not move.orsquare_eway_bill_no:
+            out.append('eway_bill_required')
+        return out
+
     @api.model
     def _check_credit_limit(self, env, partner, amount, offline):
         company = env.company

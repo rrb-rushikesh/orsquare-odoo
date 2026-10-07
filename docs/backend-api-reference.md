@@ -18,6 +18,10 @@ Model: `orsquare.accounts.service`
 
 advance (asset), recovery (reduces the asset) or wage (expense) through the cash/bank journal.
 
+### `accounts.lookup_gstin(gstin)`
+
+Validate an Indian GSTIN offline: format, state code, embedded PAN and the mod-36 check character.
+
 ### `accounts.pay_supplier(partner_id, amount, method='cash', note=None)`
 
 ### `accounts.receive_payment(partner_id, amount, method='cash', note=None)`
@@ -143,6 +147,20 @@ Search counter bills, invoices and returns by number, customer or amount.
 
 ### `day.transfer(direction, quantities, origin=None)`
 
+## `promos`
+
+Model: `orsquare.promo`
+
+### `promos.check_promo(code, bill_total)`
+
+Preview for the cashier: what would this code take off a bill of ``bill_total``?
+
+### `promos.create_promo(code, kind, value, name=None, min_bill=0.0, max_discount=0.0, date_from=None, date_to=None, max_uses=0)`
+
+### `promos.list_promos()`
+
+### `promos.set_promo_active(promo_id, active)`
+
 ## `purchases`
 
 Model: `orsquare.purchase.service`
@@ -156,6 +174,12 @@ Bi-directional rate engine + TCS suggestion for the Advanced Bill drawer (read-o
 ### `purchases.return_to_supplier(payload)`
 
 Vendor Credit Note + Godown->Vendor return picking; optional paired replacement bill.
+
+## `realtime`
+
+Model: `orsquare.realtime.service`
+
+### `realtime.token()`
 
 ## `reports`
 
@@ -255,6 +279,34 @@ Model: `orsquare.sync.service`
 
 Apply the offline outbox. Returns one result per mutation, in order.
 
+## `tabs`
+
+Model: `orsquare.tab.service`
+
+### `tabs.tab_cancel(table_id, reason=None)`
+
+Discard an unpaid tab. Needs a reason once anything has gone to the kitchen/bar.
+
+### `tabs.tab_get(table_id)`
+
+### `tabs.tab_kot(table_id, station=None)`
+
+Print what is NEW (and what was cancelled) since the last ticket for a station.
+
+### `tabs.tab_open(table_id, covers=None)`
+
+### `tabs.tab_save(table_id, lines, covers=None)`
+
+Replace the tab's items with ``lines`` (each with a stable ``key``), priced by the server.
+
+### `tabs.tab_transfer(from_table_id, to_table_id)`
+
+Move a tab to another table; if the target already has one, the two are merged.
+
+### `tabs.table_status()`
+
+Spatial grid data: every table with free/occupied state, running total and age.
+
 ## `wipe`
 
 Model: `orsquare.wipe.service`
@@ -266,4 +318,4 @@ Step 1: what will be cleared and what is preserved (counts from the live databas
 ### `wipe.wipe_shop(confirm_name, password)`
 
 ---
-*73 methods across 13 services.*
+*86 methods across 16 services.*

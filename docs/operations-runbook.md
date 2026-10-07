@@ -7,7 +7,7 @@ the repository root and Git Bash. **Docker Desktop must be running** (it is not 
 
 | Claim | Evidence (re-run any time) |
 |---|---|
-| Business logic, accounting, permissions (182 tests) | `scripts/run_tests.sh` (dev DB) — and on a **pristine from-scratch install**: `scripts/build_template.sh` → clone → `scripts/run_tests.sh /orsquare <clone>` |
+| Business logic, accounting, permissions (206 tests) | `scripts/run_tests.sh` (dev DB) — and on a **pristine from-scratch install**: `scripts/build_template.sh` → clone → `scripts/run_tests.sh /orsquare <clone>` |
 | Zero overselling / exactly-once under real concurrency | `scripts/concurrency_test.sh` |
 | Landing-page / refresh / cookie guardrails with a real proxy | `scripts/e2e_gateway.sh` (14 assertions) |
 | Realtime delivery + channel authorisation over WebSocket | `scripts/e2e_realtime.sh` (8 assertions) |

@@ -93,6 +93,8 @@ class OrsquareSyncService(models.AbstractModel):
             'customers': env['orsquare.accounts.service'].directory('customers', limit=1000)['rows'],
             'payment_modes': ['cash', 'upi', 'khata'],
             'floors': catalog.floors() if company.orsquare_feature_tables else [],
+            'tables': env['orsquare.tab.service'].table_status() if company.orsquare_feature_tables else [],
+            'promos': [p for p in env['orsquare.promo'].list_promos() if p['active']],
             'discrepancies_open': env['orsquare.stock_discrepancy'].search_count([('state', '=', 'open')]),
         }
         return bundle
@@ -118,6 +120,8 @@ class OrsquareSyncService(models.AbstractModel):
                 ('company_id', '=', company.id), ('date', '=', company.orsquare_effective_business_date())], limit=1)
             if day and (self.env.su or self.env.user.has_group('orsquare.group_orsquare_can_see_money')):
                 patches['day'] = day.summary()
+        if 'tab_changed' in types and company.orsquare_feature_tables:
+            patches['tables'] = self.env['orsquare.tab.service'].table_status()
         if 'settings_changed' in types:
             patches['me'] = self.env['orsquare.staff.service'].me()
         if since_ts:

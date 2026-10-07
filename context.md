@@ -12,7 +12,7 @@
   rule "wait for explicit approval before each stage" in `AGENTS.md` is satisfied by that standing grant for backend work;
   it still applies to **changing the locked architecture, the frontend, or anything outside the backend scope**.
 * Backend status: all Milestone 1 scope plus the back-office, API, sync, security, provisioning and printing layers are
-  built. **182 automated tests** pass on an upgraded and on a from-scratch database; concurrency, gateway and realtime are
+  built. **206 automated tests** pass on an upgraded and on a from-scratch database; concurrency, gateway and realtime are
   proven by scripts against real PostgreSQL / Odoo / Caddy / Centrifugo. Start here:
   [`docs/backend-architecture.md`](docs/backend-architecture.md) → [`docs/backend-decisions.md`](docs/backend-decisions.md)
   (what changed versus the specs and why — **please review §3**) → [`docs/operations-runbook.md`](docs/operations-runbook.md).

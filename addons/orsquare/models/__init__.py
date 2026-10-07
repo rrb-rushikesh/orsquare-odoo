@@ -11,6 +11,8 @@ from . import event
 from . import opened_bottle
 from . import pos_extensions
 from . import sale_service
+from . import promo
+from . import tabs_service
 from . import tax_regime
 from . import purchase_service
 from . import stock_reports

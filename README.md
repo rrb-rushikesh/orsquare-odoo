@@ -10,7 +10,7 @@ Working rules for agents: [`AGENTS.md`](AGENTS.md).
 
 ## State
 
-Milestone 1 (backend) is built and verified — 182 automated tests (also green on a from-scratch install), real-concurrency,
+Milestone 1 (backend) is built and verified — 206 automated tests (also green on a from-scratch install), real-concurrency,
 gateway and realtime proofs, measured benchmarks. The React app, Astro site and Developer Console UI are not started.
 
 ## Quick start (Windows + Docker Desktop)
@@ -28,7 +28,7 @@ scripts/benchmark.sh                                 # measured performance base
 ## Layout
 
 ```
-addons/orsquare/   the Odoo module (models = services, controllers = HTTP, tests = 182)
+addons/orsquare/   the Odoo module (models = services, controllers = HTTP, tests = 206)
 deploy/            Caddy gate, compose, Odoo prod config, Centrifugo (templates; Caddyfile validated)
 docs/              specs (docs/tabs), architecture, decisions, runbook, benchmarks, generated API reference
 scripts/           test / provision / upgrade / benchmark / end-to-end proof scripts
