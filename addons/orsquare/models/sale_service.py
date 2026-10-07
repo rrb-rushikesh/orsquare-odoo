@@ -128,6 +128,10 @@ class OrsquareSaleService(models.AbstractModel):
                 qty = float(raw['qty'])
                 if float_is_zero(qty, precision_digits=6):
                     raise UserError(_("Quantity cannot be zero."))
+                if qty < 0:
+                    # a return must name the bill line it reverses (refund_of_line_id); a bare negative quantity
+                    # would pay cash out and add stock with no original sale behind it
+                    raise UserError(_("Quantity must be positive. Use Return on the original bill to take goods back."))
                 price_unit = float(raw['price']) if raw.get('price') is not None and override_ok \
                     else product.lst_price
                 name = product.display_name

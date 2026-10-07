@@ -115,6 +115,11 @@ class TestSales(OrsquareCase):
         with self.assertRaisesRegex(UserError, "Unknown payment"):
             self.sell([{'product_id': self.whisky.id, 'qty': 1}], payments=[{'method': 'bitcoin', 'amount': 1500.0}])
 
+    def test_07b_bare_negative_quantity_is_not_a_return(self):
+        """A refund must name the bill line it reverses; a bare negative qty would pay cash out with no sale."""
+        with self.assertRaisesRegex(UserError, "must be positive"):
+            self.sell([{'product_id': self.whisky.id, 'qty': -1}], payments=[{'method': 'cash', 'amount': -1500.0}])
+
     def test_08_cash_change_records_net_cash_only(self):
         res = self.sell([{'product_id': self.whisky.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': 2000.0}])
         order = self.env['pos.order'].browse(res['order_id'])

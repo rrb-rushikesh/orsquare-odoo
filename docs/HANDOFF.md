@@ -58,7 +58,7 @@ Noise you can ignore in the logs: `duplicate key ... orsquare_brand_name_unique`
 6. **Settings -> Data Control** (shift-cutoff view, wipe, restore) and **Settings -> Tables** (floors/table generator). Backend exists: `wipe.preview/wipe_shop`, `catalog.floors/create_floor/bulk_create_tables`, [data-control-and-wipe.md](data-control-and-wipe.md). The old panels still call stubs.
 7. Daybook and Calendar screens (placeholders), table/KOT and open-bottle (peg) screens need mapping to the original UI and manual proof.
 
-**C. Correctness work before real shops**
+**C. Correctness work before real shops** (a core audit on 2026-10-08 fixed four small issues and logged five open ones: see [audit-2026-10-08.md](audit-2026-10-08.md); items A-D there, notably the purchase double-post and the cashier price override, belong here)
 8. Offline: the device sequence counter is in `localStorage` and not atomic with the IndexedDB enqueue; purchase retries create a new client reference (double-post risk on an ambiguous response); prove reconnect, rejection recovery, multi-tab sequencing and the physical-stock conflict flow through the restored screens.
 9. Role isolation end to end in the browser for cashier and stock keeper (the API gate is tested; the screens are not all exercised).
 10. A browser test for `/dev` (sign-in, enrolment, provision, studio, staff) so the console cannot regress silently. Playwright was removed from dependencies in the earlier cleanup; add it back deliberately.

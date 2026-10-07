@@ -221,7 +221,7 @@ class OrsquareApi(http.Controller):
             else:
                 http.root.session_store.save(session)
             request.future_response.set_cookie(
-                'session_id', session.sid, max_age=http.get_session_max_inactivity(env), httponly=True)
+                'session_id', session.sid, max_age=http.get_session_max_inactivity(env), httponly=True, samesite='Lax')
 
     def _identity(self, registry, uid, db):
         with registry.cursor() as cr:
@@ -274,7 +274,7 @@ class OrsquareApi(http.Controller):
             with registry.cursor() as cr:
                 throttle = self._throttle(api.Environment(cr, SUPERUSER_ID, {}))
                 if throttle is not None:
-                    throttle.clear(login, ip)
+                    throttle.clear(auth_login, ip)
 
             if request.session.uid is None and request.session.get('pre_uid'):
                 # Password was right but the account has an authenticator: hold a short-lived pre-session
@@ -425,12 +425,29 @@ class OrsquareApi(http.Controller):
 
     @http.route('/api/sync/delta', type='http', auth='none', methods=['GET'], csrf=False, readonly=False)
     def delta(self, since_seq='0', since_ts=None, **kw):
-        return self._guard(lambda: request.env['orsquare.sync.service'].delta(int(since_seq), since_ts))
+        def handler():
+            try:
+                seq = int(since_seq)
+            except (TypeError, ValueError):
+                raise UserError("since_seq must be a whole number.")
+            return request.env['orsquare.sync.service'].delta(seq, since_ts)
+        return self._guard(handler)
 
     @http.route('/api/sync/flush', type='http', auth='none', methods=['POST'], csrf=False, readonly=False)
     def flush(self, **kw):
-        return self._guard(lambda: request.env['orsquare.sync.service'].flush(self._json_body().get('mutations', [])),
-                           mutating=True)
+        def handler():
+            body = self._json_body()
+            mutations = body.get('mutations', []) if isinstance(body, dict) else None
+            if not isinstance(mutations, list) or not all(
+                    isinstance(m, dict) and {'id', 'device_id', 'device_seq'} <= m.keys() for m in mutations):
+                raise UserError("mutations must be a list of objects with id, device_id and device_seq.")
+            try:
+                for m in mutations:
+                    int(m['device_seq'])
+            except (TypeError, ValueError):
+                raise UserError("device_seq must be a whole number.")
+            return request.env['orsquare.sync.service'].flush(mutations)
+        return self._guard(handler, mutating=True)
 
     # ------------------------------------------------------------------ generic whitelisted calls
     @http.route('/api/call', type='http', auth='none', methods=['POST'], csrf=False, readonly=False)
