@@ -2,7 +2,7 @@
 
 > **Status review — 2026-10-07:** This describes the Odoo foundation. Original React screens and the Astro site now exist; many UI workflows remain incomplete. Shop API availability does not imply frontend support. See [current status](../STATUS.md).
 
-**Status:** Milestone 1 backend is built and verified. Latest recorded full development regression: 210 tests passed. Earlier 206-test proof covered both an incrementally upgraded
+**Status:** Milestone 1 backend is built and verified. Latest recorded full development regression: 250 tests passed (2026-10-08; the platform module has its own 24). Earlier 206-test proof covered both an incrementally upgraded
 database and a pristine from-scratch install; the concurrency, gateway and benchmark scripts run against real
 PostgreSQL/Odoo/Caddy. This document describes what exists, not what was planned. Decisions and the reasons behind
 them are in [`backend-decisions.md`](backend-decisions.md); the method-by-method API is in the generated
@@ -32,7 +32,8 @@ React SPA ──HTTPS──▶ Caddy ──▶ Odoo 18 Community (module `orsqua
 
 | Area | Files | What it owns |
 |---|---|---|
-| Shop settings | `models/res_company.py`, `staff_service.py` | Business Studio toggles, cutoff hour, cost policy, bill branding; Staff Access |
+| Shop settings | `models/res_company.py`, `staff_service.py`, `presets.py` | Business Studio (tabs, features, views, version lock, versioned presets), cutoff hour, cost policy, bill branding; Staff Access (roles, flags, tab-grant groups, plan limits) |
+| Governance | `models/governance.py`, `directory.py`, `security_utils.py`, `api_registry.py` | Append-only change log, the platform sign-in directory client, the server-side API gate (`API_GATES`, `MUTATION_TABS`) |
 | Topology | `stock_warehouse.py`, `stock_service.py` | `WH/Stock/{Godown,Counter,Opened}`, transfers, row locks, Auto-Godown |
 | Checkout | `sale_service.py`, `pos_extensions.py` | `settle()`: sale / return / exchange, idempotent, atomic |
 | Open bottles | `opened_bottle.py` | Peg sales, per-bottle location, finish/scrap |
@@ -44,7 +45,7 @@ React SPA ──HTTPS──▶ Caddy ──▶ Odoo 18 Community (module `orsqua
 | Restaurant | `tabs_service.py` | Shared table tabs (draft orders), merge/transfer, KOT tickets, table board |
 | Promotions | `promo.py` | Promo codes as pre-tax discounts, race-safe usage counts |
 | Sync | `sync_service.py`, `event.py` | bootstrap / delta / flush, domain events |
-| Safety | `wipe_service.py`, `login_throttle.py`, `security_utils.py` | Data wipe + backup, brute-force guard, role gates |
+| Safety | `wipe_service.py`, `login_throttle.py`, `security_utils.py` | Data wipe + backup, brute-force guard (shared with the platform), role and tab gates |
 | Tenant | `shop_bootstrap.py` | Idempotent per-shop setup, `configure_shop`, accounts, POS config |
 | HTTP | `controllers/main.py`, `api_registry.py`, `api_facade.py` | Routes, whitelist, ID-based wrappers |
 
@@ -211,12 +212,23 @@ runbook). A push failure never affects the business transaction; devices recover
 ## 8. Security model
 
 Roles are native groups: *Owner*, *Cashier*, *Stockkeeper* + three flags (`can_see_money`, `can_see_valuation`,
-`can_manage_returns`). Tab grants intersect the shop's enabled tabs. Every service re-checks its role (services run
+`can_manage_returns`) + **one group per tab** (tab grants are groups, not text). Effective tabs = granted AND switched on
+for the shop AND allowed by the plan, and **every API call and offline mutation is gated on them server-side**
+(`API_GATES`). Two-step sign-in (TOTP) is available to all and mandatory for platform operators. Every service re-checks its role (services run
 privileged *after* the check, keeping the real caller as `create_uid`). Passwords ≥ 8 chars; the template's `admin`
 password is randomised on provisioning; staff cannot remove their own owner access. See decisions D14–D16.
 
 ## 9. What is intentionally *not* built (per the locked scope)
 
-Closing Stock Audit & Reconciliation, WineStock matrix / Sheet register, Product Master Library & importer (skipped),
-the platform Developer Console UI. React/Astro now exist; the restored retailer UI is only partially connected. Their data hooks exist where cheap (e.g.
+Closing Stock Audit & Reconciliation, Sheet register, Product Master Library & importer (skipped),
+the Sheet register's own backend. React/Astro and the Developer Console UI now exist; the restored retailer UI is only partially connected. The WineStock matrix is a per-shop *view* of the same stock data (no new backend). Their data hooks exist where cheap (e.g.
 `stock_discrepancy`, `bill_document.excise_matrix`).
+
+## 10. Platform and governance (added 2026-10-08)
+
+The platform database (`orsquare_platform`, module `orsquare_platform`) holds the fleet registry, plans, the global sign-in
+directory, platform operators (levels *admin* and *support*) and the append-only audit trail. It never reads shop business
+data; it clones the template to provision and acts on a shop only through that shop's own services. The whole model,
+the measured 10,000-shop timings and the open decisions are in [governance.md](governance.md). The operator-facing
+screens are specified in [tabs/dev-console.md](tabs/dev-console.md).
+

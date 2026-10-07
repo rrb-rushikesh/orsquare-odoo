@@ -237,11 +237,19 @@ Bill a sale, a return, or an exchange (return + sale on one request).
 
 Model: `orsquare.staff.service`
 
-### `staff.apply_preset(name)`
+### `staff.apply_preset(name, expected_version=None)`
 
-Apply a shop preset (tabs + feature toggles). Everything stays adjustable afterwards.
+Apply a shop preset (tabs, features, stock view). Everything stays adjustable afterwards; nothing is deleted.
+Features/tabs outside the plan are left off.
 
-### `staff.create_staff(name, login, password, roles, flags=None, tabs=None)`
+### `staff.audit_log(limit=50, offset=0, kind=None, target=None)`
+
+### `staff.create_staff(name, login, password, roles, flags=None, tabs=None, phone=None)`
+
+### `staff.get_experience()`
+
+Everything the Business Studio screen needs in one call: current choices, what the plan allows, the catalog of
+tabs/variants/presets and the version to send back when saving.
 
 ### `staff.get_settings()`
 
@@ -251,7 +259,16 @@ Apply a shop preset (tabs + feature toggles). Everything stays adjustable afterw
 
 ### `staff.me()`
 
-### `staff.update_settings(values)`
+### `staff.reset_staff_mfa(user_id)`
+
+Owner removes a staff member's authenticator (lost phone). They can enrol a new one at next sign-in.
+
+### `staff.reset_staff_password(user_id, new_password)`
+
+Owner sets a new password for a staff member. Their other sessions end (the session token follows the
+password).
+
+### `staff.update_settings(values, expected_version=None)`
 
 ### `staff.update_staff(user_id, roles=None, flags=None, tabs=None, active=None)`
 
@@ -336,6 +353,6 @@ Step 1: what will be cleared and what is preserved (counts from the live databas
 ### `wipe.wipe_shop(confirm_name, password)`
 
 ---
-*90 methods across 16 installed services.*
+*94 methods across 16 installed services.*
 
 Optional services absent from this database and omitted: platform. Generate against their installed database for their signatures.

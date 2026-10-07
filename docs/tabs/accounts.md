@@ -1,6 +1,6 @@
 # Tab Specification: Accounts
 
-> **Status review — 2026-10-07:** Native statements and balances are connected; account edits and selected-bill allocation are unavailable. The rest of this document describes requirements; see [current status](../../STATUS.md).
+> **Status review — 2026-10-08:** The tab has two per-shop views chosen in Business Studio (standard, and the **Advanced workspace** with parties beside the ledger, using Receivable/Payable wording). Native statements and balances are connected; account edits and selected-bill allocation are unavailable. The rest of this document describes requirements; see [current status](../../STATUS.md).
 
 **Route:** `/accounts`  
 **Purpose:** The central party directory managing everyone the business interacts with: Customers, Suppliers, Employees, and Others.  

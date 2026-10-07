@@ -22,8 +22,9 @@ Kept: Odoo services and platform module, Astro landing, API cookie client, Dexie
 | Cash Flow | `cashflow.register`, `new_entry`, native supplier payments | Rows and running balances come from Odoo; expense and payment types distinguished |
 | Ledger | native trial balance, P&L, balance sheet, cash register | Read adapters connected; unsupported control-account cards show a dash |
 | Dashboard | native dashboard projection | Trading and cash/party cards connected; category insights unavailable |
-| Settings | original device preferences and existing offline tools | Appearance and receipt/device choices retained; unconnected shop controls disabled |
-| Login/shell | Odoo session cookie and `staff.me` | Original UI retained with required shop-code field; deep-link hydration splash preserved |
+| Settings | device preferences; **Business Studio, Team & Access and Security & activity** (2026-10-08, shared with the Developer Console) | Appearance and receipt/device choices retained; Tables and Data Control remain disconnected |
+| Login/shell | Odoo session cookie and `staff.me` | Original UI; **no shop code any more** (the platform directory finds the shop); two-step code when enabled; deep-link hydration splash preserved |
+| Stock / Accounts variants | `WineStockPage` (brand x size matrix) and `AdvancedAccountsPage`, ported from the live repo | Chosen per shop in Business Studio; same data, different view |
 
 `lib/contracts.ts` contains original UI types. `lib/repo.ts` is a thin Odoo adapter. `lib/unavailable.ts` explicitly rejects unmapped operations; it does not implement legacy backend services or return invented success/data. The duplicate `_pending` tree and disconnected Sheet/PDF helpers were removed during cleanup after import-graph inspection. Earlier source remains recoverable in Git history and the external visual source repository.
 
@@ -49,7 +50,7 @@ This is a partially connected restoration, not a complete parity or production r
 
 - Returns/exchanges, purchase editing and histories, stock movement history, product opening stock in this form, box packing, flavor/variants, product import/deletion, account edits, purchase notes, tips, selected-bill payment allocation are unavailable in these adapters. Key controls are disabled with an explanation; remaining unmapped operations throw `not_available` before writing.
 - Native Odoo already supports several of those capabilities. Connect the existing service to the original control next; do not replace the UI or recreate ledger logic.
-- Settings Features, Tables, Team & Access and cutoff save are disabled until correctly connected. Wipe/restore are unavailable. Device preference choices remain device-local; account synchronization is not claimed.
+- Settings Tables and the old Data Control (cutoff view, wipe, restore) are disabled until correctly connected. Features, Team & Access and Security are connected (2026-10-08). Wipe/restore are unavailable. Device preference choices remain device-local; account synchronization is not claimed.
 - Table/KOT and open-bottle/peg frontend workflows are not fully mapped or manually verified. They must not be advertised as complete. Category insights/top sellers, some search/detail fields and cash-account cards need native read adapters.
 - Daybook and Calendar remain deferred placeholders by the owner's earlier instruction. Sheet/WineStock, AI, master importer, distribution/multi-shop remain outside this restoration. Multi-shop is canceled. Developer Console restoration and platform HTTP checks remain separate open work; its visual source remains the Tryton Developer Console, not the legacy retailer console widgets.
 - The original frontend still contains unreachable/unmapped historical math in deferred workflows. Supported online financial totals use native Odoo results; finish removing old math as each remaining workflow is mapped.

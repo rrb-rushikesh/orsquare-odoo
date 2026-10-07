@@ -8,16 +8,16 @@
 
 ---
 
-## 0. Where we are (2026-10-07)
+## 0. Where we are (2026-10-08)
 
 * The product owner granted **full autonomy to build the whole backend** (no per-stage approval needed). The earlier
   rule "wait for explicit approval before each stage" in `AGENTS.md` is satisfied by that standing grant for backend work;
   it still applies to **changing the locked architecture, the frontend, or anything outside the backend scope**.
 * Backend status: all Milestone 1 scope plus the back-office, API, sync, security, provisioning and printing layers are
-  built. Latest recorded full development regression: **210 tests passed**; earlier pristine-install proof: **206 tests**. Concurrency, gateway and realtime have local script evidence against PostgreSQL / Odoo / Caddy / Centrifugo; this does not prove the restored UI or production readiness. Start here:
+  built. Latest recorded full development regression: **250 shop tests** and **24 platform tests** passed (2026-10-08); earlier pristine-install proof: 206 tests. Concurrency, gateway and realtime have local script evidence against PostgreSQL / Odoo / Caddy / Centrifugo; this does not prove the restored UI or production readiness. Start here:
   [`docs/backend-architecture.md`](docs/backend-architecture.md) → [`docs/backend-decisions.md`](docs/backend-decisions.md)
   (what changed versus the specs and why — **please review §3**) → [`docs/operations-runbook.md`](docs/operations-runbook.md).
-* React and Astro now exist. Original retailer screens are partially connected; many controls remain unavailable. The platform Developer Console UI is connected to orsquare_platform with fleet management, shop drawers, audit logs, and diagnostics. Closing Stock Audit, WineStock/Sheet register and Product Master Library remain unfinished/deferred. Current gaps and evidence are maintained in [STATUS.md](STATUS.md).
+* React and Astro now exist. Original retailer screens are partially connected; many controls remain unavailable. The Developer Console (`/dev`) is complete against `orsquare_platform`: fleet with server paging, shop drawer (health, subscription, Business Studio, staff, activity, archive/delete), plans and entitlements, operators (admin/support, authenticator required), audit and system views. Governance is enforced on the server ([docs/governance.md](docs/governance.md)). The WineStock stock view and Advanced accounts view exist as per-shop variants; the Sheet register, AI, Closing Stock Audit and the Product Master Library remain deferred/excluded. The pick-up guide with everything still left is [docs/HANDOFF.md](docs/HANDOFF.md). Current gaps and evidence are maintained in [STATUS.md](STATUS.md).
 * Specifications below describe requirements, not a completion checklist. Native reports currently replace planned OCA reporting modules (decision D12); OCA is not installed. Latency/capacity figures are targets unless backed by a recorded benchmark.
 
 ## 1. Executive Summary & Product Vision

@@ -54,3 +54,21 @@ products do not contend.
 * Hot-SKU contention (e.g. one popular bottle at festival rush) is serialized; if it ever matters, the lever is
   reducing the work inside the lock (valuation/accounting) — measure first.
 * No HTTP/TLS/proxy time and no real-network latency are included.
+
+## Platform registry at 10,000 shops (2026-10-08)
+
+`scripts/bench_platform.py`: 10,000 shops, 300,000 audit rows and 30,000 sign-in keys are seeded inside one transaction, the
+console's calls are timed (7 runs, median), and the transaction is rolled back. Single local PostgreSQL, warm cache.
+
+| Call | Median |
+|---|---|
+| Fleet first page (50), page 100, filters (expiring, trial, plan), sort by expiry or name | 2.6 - 3.9 ms |
+| Fleet search by name fragment / phone fragment / no result | 20.6 / 21.9 / 21.0 ms |
+| Audit first page / one shop / action + date range | 22.9 / 14.7 / 21.4 ms |
+| Audit free-text search over 300,000 rows | 155 ms |
+| System diagnostics, plans with shop counts | 18.8 ms, 1.3 ms |
+| Sign-in directory lookup (one key of 30,000) | 0.18 ms |
+
+Honest limits: this measures the registry, not 10,000 *databases*. Memory per loaded Odoo registry, backup/upgrade time per
+database and worker-pool sizing are not measured and are the open capacity question (see [governance.md](governance.md)).
+

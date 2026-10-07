@@ -4,6 +4,8 @@ type: note
 permalink: orsquare/checkpoints/audit-checkpoint-2026-10-07
 ---
 
+> **Superseded 2026-10-08.** Test counts and the "console UI unfinished" statements below are out of date. Current state: [[Governance and Developer Console Build 2026-10-08]] and [[Project Handoff 2026-10-08]].
+
 # Audit Checkpoint: Repository Status 2026-10-07
 
 ## What is Complete & Verified

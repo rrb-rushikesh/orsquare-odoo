@@ -1,6 +1,6 @@
 # Tab Specification: Settings
 
-> **Status review — 2026-10-07:** Device preferences exist. Shop features, Team & Access, tables/cutoff save and wipe/restore are disconnected. The rest of this document describes requirements; see [current status](../../STATUS.md).
+> **Status review — 2026-10-08:** Device preferences exist. **Business Studio** (presets, tabs, features, stock/accounts views, sales-register switches, day cutoff hour), **Team & Access** (roles, data switches, tab grants, password and authenticator reset, plan staff limit) and **Security & activity** (own two-step sign-in, who-changed-what log) are connected and shared with the Developer Console ([governance](../governance.md)). Tables setup and the old Data Control page (cutoff view, wipe, restore) are still disconnected. The rest of this document describes requirements; see [current status](../../STATUS.md).
 
 **Route:** `/settings`  
 **Purpose:** Master shop configuration, hardware integration, billing templates, staff permissions, and operational data controls.  

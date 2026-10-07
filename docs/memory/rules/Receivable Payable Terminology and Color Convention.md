@@ -1,3 +1,9 @@
+---
+title: Receivable Payable Terminology and Color Convention
+type: note
+permalink: orsquare/rules/receivable-payable-terminology-and-color-convention
+---
+
 # Receivable & Payable Terminology and Color Convention
 
 ## Core Business Rule

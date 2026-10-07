@@ -1,3 +1,9 @@
+---
+title: Developer Auth Session Leak and Hydration Crashes
+type: note
+permalink: orsquare/bugs/developer-auth-session-leak-and-hydration-crashes
+---
+
 # Developer Auth Session Leak and Hydration Crashes
 
 ## Problem
@@ -16,4 +22,3 @@
 1. All dev servers and Docker containers were stopped by user instruction on 2026-10-07 23:31 IST.
 2. When restarting Vite dev server, run with cache bust: `rm -rf node_modules/.vite && npm run dev`.
 3. In the browser, perform a hard refresh (`Ctrl + Shift + R`) to ensure the tab executes the newly built client bundle with normalized `readCached()`.
-

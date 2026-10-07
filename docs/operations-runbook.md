@@ -94,3 +94,32 @@ scripts/drop_shop.sh orsquare_shop1                         # destructive; shop/
 | `FileNotFoundError … filestore` in a cloned DB | cloned with raw `CREATE DATABASE … TEMPLATE`; clone with `provision_shop.sh` |
 | Tests fail on a new DB with chart/account errors | template built without the India chart first: use `build_template.sh` |
 | "Opening a read/write test cursor from a readonly one" | a new HTTP route that writes needs `readonly=False` |
+
+## 8. Developer Console and governance operations (added 2026-10-08)
+
+```bash
+bash scripts/upgrade_shops.sh                  # template + every shop (after a module change). Python is not hot-reloaded: docker restart odoo18-spike-web
+bash scripts/run_platform_tests.sh             # upgrades orsquare_platform in the platform DB, then runs its 24 tests
+docker exec -i odoo18-spike-web odoo shell -c /etc/odoo/odoo.conf -d orsquare_platform --no-http < scripts/bench_platform.py
+```
+
+* **Order of a deploy:** upgrade the template and every shop, upgrade the platform database, restart Odoo, then in the console
+  open System and press *Rebuild directory* once (new shops are indexed automatically).
+* **Operators:** created in Console -> Operators (admin only). Each must set up an authenticator at first sign-in. To let a
+  developer machine skip it: system parameter `orsquare.platform.require_mfa = 0` in the platform database (never in production).
+  Lost phone: Console -> Operators -> *Reset authenticator*, or `UPDATE res_users SET totp_secret = NULL WHERE login = '...'`.
+* **Plans:** edit in Console -> Plans, then *Apply to shops* (slices of 25; repeat safely). A shop's own entitlement is the
+  parameter `orsquare.entitlements`.
+* **Retire a shop:** Archive (blocks it, keeps everything), then Delete permanently (type the code). Delete drops the database
+  and files and frees its sign-in keys; the audit trail keeps the record. Take a backup first if there is any doubt.
+* **Adopt a database** that exists but is not in the fleet: Console -> System -> *Add to fleet* (only databases that have the
+  ORSquare module installed are accepted).
+
+| Symptom | Cause |
+|---|---|
+| Login says "Wrong shop, login or password" for a valid user | the directory has no key for it: Console -> System -> Rebuild directory |
+| 429 on login or on the code step | brute-force throttle (5 wrong in 5 minutes); wait, or clear the row in `orsquare_login_throttle` / `orsquare_platform_throttle` |
+| Console shows only "Set up your authenticator" | the operator has no authenticator yet (intended) |
+| `relation "orsquare_platform_login" does not exist` in a shop-side log | the platform module has not been upgraded yet |
+| 409 `version_conflict` when saving Business Studio | someone else saved first; reload and repeat |
+

@@ -1,6 +1,6 @@
 # Tab Specification: Stock
 
-> **Status review — 2026-10-07:** One Godown-to-Counter transfer has local browser proof. Movement history, closing audit and conflict reconciliation are incomplete. The rest of this document describes requirements; see [current status](../../STATUS.md).
+> **Status review — 2026-10-08:** The tab has two per-shop views chosen in Business Studio: the standard list and the **WineStock brand x size matrix** (ported from the live repo; it reads the same stock data). One Godown-to-Counter transfer has local browser proof. Movement history, closing audit and conflict reconciliation are incomplete. The rest of this document describes requirements; see [current status](../../STATUS.md).
 
 **Route:** `/stock`  
 **Purpose:** Physical inventory register showing quantities, location split, valuations, and internal movements.  

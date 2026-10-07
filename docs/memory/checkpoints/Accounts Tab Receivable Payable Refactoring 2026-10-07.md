@@ -1,3 +1,9 @@
+---
+title: Accounts Tab Receivable Payable Refactoring 2026-10-07
+type: note
+permalink: orsquare/checkpoints/accounts-tab-receivable-payable-refactoring-2026-10-07
+---
+
 # Accounts Tab Receivable/Payable Refactoring Checkpoint (2026-10-07)
 
 ## What Was Done

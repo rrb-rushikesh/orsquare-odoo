@@ -1,6 +1,6 @@
 # Agent Operating Rules & Architecture Protocol
 
-> **Repository status — 2026-10-07:** Read [STATUS.md](STATUS.md) alongside [context.md](context.md) before work. The original retailer UI is partially connected; preserve [frontend/DESIGN.md](frontend/DESIGN.md). The owner explicitly authorized the current documentation/dead-code cleanup and grouped commits/push; this does not authorize unrelated architecture or UI redesign.
+> **Repository status — 2026-10-08:** Read [STATUS.md](STATUS.md), [docs/HANDOFF.md](docs/HANDOFF.md) (pick-up guide: what exists, what is left, traps) and [context.md](context.md) before work. The original retailer UI is partially connected; preserve [frontend/DESIGN.md](frontend/DESIGN.md). The owner explicitly authorized the current documentation/dead-code cleanup and grouped commits/push; this does not authorize unrelated architecture or UI redesign.
 
 > **AI knowledge tools (mandatory, automatic):** Follow [Section 7](#7-autonomous-knowledge-protocol-mandatory-runs-without-being-asked) at session start, during work, and at every checkpoint, without being asked. This file and `CLAUDE.md` must stay identical ([Section 8](#8-mirror-rule-agentsmd-and-claudemd-are-identical)). Setup: [docs/ai-knowledge-tools.md](docs/ai-knowledge-tools.md).
 
@@ -106,6 +106,12 @@ This document outlines mandatory rules, engineering guidelines, and protocols fo
   * **Settled:** Zero balance. Always displayed as neutral/muted (`var(--muted)`).
   * **Advance:** Reverse prepayment held on an account. Always displayed as blue (`var(--adv-fg, #0f62fe)`).
 * **Underlying Double-Entry Math Preserved:** This rule applies strictly to the presentation/UI layer. Underlying double-entry journals, Odoo account moves, GL ledgers, and wire payload schemas (`opening_balance_type: 'Debit' | 'Credit'`) remain completely authoritative and intact.
+
+### 15. Governance Is Enforced On The Server (No Cosmetic Permissions)
+* **A hidden tab or button is never a permission.** Tabs, features and roles are enforced in `api_registry.API_GATES` / `MUTATION_TABS` and in each service; tab grants are native `res.groups`, never free text. Every new API method must be added to a service gate (or to the explicit open list in `TestRegistryCoverage`) in the same change; that test fails otherwise.
+* **Settings changes are version-locked and logged.** Write them through `staff.update_settings` (whitelist, `expected_version`, `orsquare.config_audit`); never write governance fields directly.
+* **Platform operators need an authenticator and one of two levels (admin / support).** A sign-in key (login, e-mail, mobile) belongs to exactly one shop through the platform directory: never scan shop databases to find a user, and never decide the surface from `me.company`.
+* **Lists must scale to 10,000 shops:** server-side paging/search/sort from indexed columns, counts in one grouped query, no per-row access to shop databases. Re-run `scripts/bench_platform.py` after changing a console query. Details: [docs/governance.md](docs/governance.md).
 
 ---
 

@@ -113,6 +113,41 @@ grouped query. Bootstrap at 2,000 products: 716 → 203 ms. See `benchmarks.md`.
 
 ---
 
+### D20 — Permissions are enforced on the server, per tab and per feature
+The first design stored per-user tabs as text and only the UI read it. Now each tab is a native group, `API_GATES` maps every
+service method to the tabs (any-of, because screens share calls) and features that may call it, and the same applies to each
+offline mutation when the outbox is flushed. A switched-off tab closes its API for everyone. A test fails if a service is
+added without a decision. Why: a hidden button is not a permission.
+
+### D21 — Business Studio is versioned and logged
+Shop settings change only through `staff.update_settings`: whitelist, `expected_version` (a stale save is HTTP 409), no-op writes
+nothing, and every change goes to `orsquare.config_audit` with before and after. Presets are versioned code, never delete data,
+and never exceed the plan. The Settings tab cannot be switched off.
+
+### D22 — Own governance log instead of OCA `auditlog`
+`auditlog` is Beta, patches the ORM for every write and needs a separate download. The services already know the intent
+("role changed to cashier"), so they write one small append-only row. Same information, no cost on ordinary reads and writes.
+
+### D23 — Plans are ceilings, pushed to the shop
+A plan (features, tabs, staff limit; empty/0 = no limit) is written into the shop as `orsquare.entitlements`. Effective =
+enabled AND entitled; nothing is deleted when a plan shrinks. Built-in plans ship without limits: what a plan allows is a
+commercial decision for the owner. Pushing a plan to many shops runs in slices of 25 and can be repeated.
+
+### D24 — One sign-in directory, no scanning
+A sign-in key (login, e-mail, mobile) belongs to exactly one shop (`orsquare_platform_login`), claimed before the user is
+created. `_resolve_db` asks the directory (0.18 ms) instead of scanning shop databases (O(shops), and it loaded other
+registries mid-request). A stale shop code from the browser can never override the directory.
+
+### D25 — Two-step sign-in on Odoo's own TOTP
+Password, then a 6-digit code (`/api/session/mfa`), same throttle as passwords. Optional for shops, mandatory for platform
+operators (`orsquare.platform.require_mfa`). Operators have their own throttle because the platform database does not run the
+shop module. Identity providers (Keycloak, Zitadel) are deferred: another critical online service against the offline-first mandate.
+
+### D26 — Platform lists scale by construction
+Fleet and audit are paged, searched, filtered and sorted in SQL on indexed (trigram where needed) columns; counts come from one
+grouped query; a test asserts the query count does not grow with page size. Measured at 10,000 shops / 300,000 audit rows:
+fleet page ~3 ms, search ~21 ms. This says nothing about 10,000 *databases* on one cluster, which is an open capacity decision.
+
 ## 2. Findings from verification (things that would have shipped broken)
 
 | Found by | Defect | Fix |
