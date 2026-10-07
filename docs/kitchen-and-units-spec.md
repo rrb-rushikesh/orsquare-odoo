@@ -47,9 +47,9 @@ In ORSquare, **Kitchen is not a separate application or parallel database**. It 
 ```
 
 ### B. Odoo 18 Native Mapping: "Infinite Stock" via Consumables
-In standard Odoo 18 Community, every product defines a field `detailed_type`:
-* `'product'` (Storable Product): Odoo tracks physical quants in locations (`WH/Stock/Counter`, `WH/Stock/Godown`). Selling deductions and delivery pickings are enforced.
-* `'consu'` (Consumable Product): Odoo treats the item as a tangible good whose stock levels are **not tracked**. 
+In Odoo 18 Community a product is described by `type` and `is_storable` (the `detailed_type` field of Odoo 17 no longer exists):
+* `type='consu'` + `is_storable=True` (Storable Product): Odoo tracks physical quants in locations (`WH/Stock/Counter`, `WH/Stock/Godown`). Selling deductions and delivery pickings are enforced.
+* `type='consu'` + `is_storable=False` (Consumable Product): Odoo treats the item as a tangible good whose stock levels are **not tracked**. 
   - Stock levels are never counted, tracked, or blocked.
   - When billed on a POS or customer invoice, **no stock picking or stock move is generated**.
   - Billing succeeds infinitely, exactly matching the business requirement.
@@ -59,11 +59,11 @@ In standard Odoo 18 Community, every product defines a field `detailed_type`:
 Retail shops frequently sell non-kitchen consumables such as packaged peanuts, cashews, soda, chips, water bottles, and disposable glasses.
 ORSquare accommodates both commercial practices cleanly:
 1. **Tracked Counter Snacks:** Packaged goods purchased from distributors in cases and sold at MRP.
-   - Type: `detailed_type = 'product'` (Storable).
+   - Type: `type = 'consu'` + `is_storable = True` (Storable).
    - Stock: Deducted from Counter stock per sale.
    - Units: `Pack` or `Piece`.
 2. **Untracked Counter Snacks / Complimentary Munchies:** Bulk-purchased nuts or snacks served without individual packet tracking.
-   - Type: `detailed_type = 'consu'` (Consumable), `is_kitchen = False`.
+   - Type: `type = 'consu'` + `is_storable = False` (Consumable), `is_kitchen = False`.
    - Stock: Infinite stock at counter.
    - Units: `Plate`, `Bowl`, `Pack`, `Piece`.
 
@@ -267,7 +267,8 @@ erDiagram
     PRODUCT_TEMPLATE {
         int id PK
         string name "Dish or Retail Item"
-        string detailed_type "consu (Kitchen) / product (Retail)"
+        string type "consu"
+        boolean is_storable "False (Kitchen) / True (Retail)"
         boolean is_kitchen "True / False"
         float list_price "Standard Rate"
         int uom_id FK

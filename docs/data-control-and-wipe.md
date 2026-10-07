@@ -85,6 +85,8 @@ sequenceDiagram
 
 ---
 
+> **As built:** the purge uses ordered SQL `DELETE` statements (children first), not ORM `unlink` and never `TRUNCATE … CASCADE` (it would reach `res_company` through `account_opening_move_id`). The backup is a verified `pg_dump` zip with its SHA-256 recorded in an immutable audit row. See decision D9 and `orsquare/models/wipe_service.py`. The sketch below is the original design intent.
+
 ## 4. Odoo Relational Integrity Purge Sequence
 
 In Odoo, deleting records must follow a precise topological dependency order to prevent foreign key errors:

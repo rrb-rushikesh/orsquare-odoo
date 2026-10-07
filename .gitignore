@@ -56,3 +56,8 @@ __pycache__/
 *.pyc
 scratch/*.py
 scratch/*.log
+scratch/*.json
+scratch/*.txt
+scratch/*.out
+scratch/*.sql
+scratch/Caddyfile.e2e

@@ -2,7 +2,7 @@
 
 **Route:** `/sales`  
 **Purpose:** High-traffic retail checkout billing counter. Highest performance requirement in the platform.  
-**Underlying Engine:** Atomic `orsquare` retail sale service orchestrating Odoo `account.move`, `account.payment`, and `stock.picking` from `WH/Stock/Counter`.
+**Underlying Engine:** Atomic `orsquare.sale.service.settle()` orchestrating a native Odoo `pos.order` (taxes, payments, `stock.picking` from `WH/Stock/Counter`, session accounting, optional GST invoice). See `docs/backend-decisions.md` D1.
 
 ---
 
@@ -15,7 +15,7 @@
      - *Retail Consumables & Kitchen:* Standard Indian GST (`l10n_in`: 0%, 5%, 12%, 18%, 28%).
    * **Counter Stock Validation:** Retail items consume `WH/Stock/Counter`.
    * **Auto-Godown Transfer (Transaction Atomic & Concurrency Protected):** If `auto_godown_transfer` is ON and counter quantity is insufficient, an internal stock transfer is executed inside the **same atomic Odoo database transaction** as the sale using PostgreSQL row-level locks on `stock.quant` and native stock reservation (`_action_assign()`). Competing cashier transactions queue safely; maintaining zero overselling and zero negative stock is a core invariant proven through concurrent integration tests, with Odoo's reservation machinery acting as the sole authority.
-   * **Kitchen Dishes (`detailed_type = 'consu'`):** Displays infinite availability badge (`∞`).
+   * **Kitchen Dishes (`type = 'consu'` + `is_storable = False`):** Displays infinite availability badge (`∞`).
 3. **Quantity, Rate & Portion Selection:**
    * Adjust quantity; optional authorized price override.
    * **Portion Selection (Full / Half):** For dishes with portion variants, cashier selects `[Full]` or `[Half]` directly from search or line item.

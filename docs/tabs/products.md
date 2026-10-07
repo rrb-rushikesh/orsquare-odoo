@@ -23,8 +23,8 @@ ORSquare enforces standard product nomenclature to prevent retail inventory erro
 
 ### A. Product Form & Catalog Fields
 * **Classification & Multi-Tax Regimes:**
-  * **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter.
-  * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings.
+  * **Retail Product:** Physical storable inventory (`type = 'consu'` + `is_storable = True`). Tracked in Godown and Counter.
+  * **Kitchen Dish (Universal Extension):** Infinite stock consumable (`type = 'consu'` + `is_storable = False`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings.
   * **Shop Consumables (Packaged snacks, peanuts):** Configurable as tracked storables or untracked counter consumables.
   * **Tax Regime / Tax Mapping Configuration:**
     - Products map to configurable statutory tax regimes rather than relying on a rigid, static boolean flag, because items can participate in different tax treatments based on transaction context, customer/vendor state, date, or statutory classification.

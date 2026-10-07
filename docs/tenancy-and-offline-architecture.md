@@ -44,6 +44,8 @@ graph TD
 | **PostgreSQL Resource Overhead** | 🟡 **Moderate.** PostgreSQL handles 50–200 small databases effortlessly with connection pooling. Shared buffers are shared across databases. | 🟢 **Slightly Lower Memory.** Only one database schema in memory. |
 | **Module Migrations & Upgrades** | 🟡 **Requires Iterative Scripts.** Upgrading `orsquare` requires running an upgrade loop across tenant databases. | 🟢 **Single Command.** One migration updates all tenants at once. |
 
+> **As built:** shops are provisioned by cloning a template database with Odoo's `duplicate_database` (SQL **and filestore**): measured ≈1.8 s per shop, ≈4 s fully configured; schema upgrades are a loop over all shop databases (`scripts/upgrade_shops.sh`). See `docs/operations-runbook.md` and `docs/benchmarks.md`.
+
 ### Verdict & Architectural Recommendation
 **Option A (Separate Database per Shop) is strongly recommended.**
 

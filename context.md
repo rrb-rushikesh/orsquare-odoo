@@ -1,10 +1,23 @@
 # ORSquare Project Context & Architecture
 
 **Project:** ORSquare (OR²)  
-**Current Phase:** Architecture & Research Phase  
+**Current Phase:** Milestone 1 (Odoo backend) **built and verified**; frontend not started  
 **Locked Baseline:** Odoo 18.0 Community Edition Engine + Mature OCA Modules + Thin Custom `orsquare` Module + Custom React Frontend + Separate Static Astro Marketing Landing Page.
 
 ---
+
+## 0. Where we are (2026-10-07)
+
+* The product owner granted **full autonomy to build the whole backend** (no per-stage approval needed). The earlier
+  rule "wait for explicit approval before each stage" in `AGENTS.md` is satisfied by that standing grant for backend work;
+  it still applies to **changing the locked architecture, the frontend, or anything outside the backend scope**.
+* Backend status: all Milestone 1 scope plus the back-office, API, sync, security, provisioning and printing layers are
+  built. **182 automated tests** pass on an upgraded and on a from-scratch database; concurrency, gateway and realtime are
+  proven by scripts against real PostgreSQL / Odoo / Caddy / Centrifugo. Start here:
+  [`docs/backend-architecture.md`](docs/backend-architecture.md) → [`docs/backend-decisions.md`](docs/backend-decisions.md)
+  (what changed versus the specs and why — **please review §3**) → [`docs/operations-runbook.md`](docs/operations-runbook.md).
+* Not built (by scope): the React app, the Astro site, the platform Developer Console UI, Closing Stock Audit,
+  WineStock/Sheet register, Product Master Library.
 
 ## 1. Executive Summary & Product Vision
 
@@ -76,10 +89,10 @@ ORSquare is a high-speed retail operations platform designed specifically for bo
 ### F. Kitchen Universal Extension (Infinite Stock)
 * **Status:** Locked Decision.
 * **Architecture:** Universal toggle inside Business Studio. Does not introduce a separate subsystem or parallel database.
-* **Native Odoo Mapping:** Kitchen dishes map to standard Odoo consumables (`detailed_type = 'consu'`, `is_kitchen = True`).
+* **Native Odoo Mapping:** Kitchen dishes map to standard Odoo consumables (`type = 'consu'` + `is_storable = False`, `is_kitchen = True`).
   - Selling kitchen dishes at POS posts revenue and tax accounts normally, but **bypasses stock delivery pickings and quant deductions** ("infinite stock").
   - Recipes, raw materials, BOMs, kitchen inventory, and costing are excluded at this stage.
-  - Non-kitchen shop consumables (peanuts, cashews, snacks) are supported as tracked storables (`detailed_type = 'product'`) or untracked counter items (`detailed_type = 'consu'`).
+  - Non-kitchen shop consumables (peanuts, cashews, snacks) are supported as tracked storables (`type = 'consu'` + `is_storable = True`) or untracked counter items (`type = 'consu'` + `is_storable = False`).
 
 ### G. Two-Tier Unit Standardization System & Portion Variants
 * **Status:** Locked Decision.
@@ -179,6 +192,13 @@ graph TD
 * [`docs/tabs/daybook.md`](docs/tabs/daybook.md) — Daily cash drawer session, opening float, expected cash, drawer count, and cash materiality threshold. (Closing stock audit marked as Future Scope).
 * [`docs/tabs/calendar.md`](docs/tabs/calendar.md) — Historical business days, cutoff hour lock-in, frozen snapshots, audited Re-Audit.
 * [`docs/tabs/settings.md`](docs/tabs/settings.md) — Appearance, bill/invoice format, three-tier thermal printing, redesigned restaurant tables setup, Business Studio, Staff Access data masking, and data control.
+
+### Backend as built (`docs/`)
+* [`docs/backend-architecture.md`](docs/backend-architecture.md) — modules, invariants, payload shapes, HTTP API, sync, security.
+* [`docs/backend-decisions.md`](docs/backend-decisions.md) — every decision, the defects verification caught, spec changes to confirm.
+* [`docs/backend-api-reference.md`](docs/backend-api-reference.md) — generated list of all 73+ API methods.
+* [`docs/operations-runbook.md`](docs/operations-runbook.md) — provisioning, upgrades, deploy, backups, troubleshooting, what is/isn't verified.
+* [`docs/benchmarks.md`](docs/benchmarks.md) — measured performance and concurrency results.
 
 ### Deep Architecture Research (`docs/`)
 * [`docs/features-and-capabilities-spec.md`](docs/features-and-capabilities-spec.md) — Single master specification for all 16 operational capabilities, settings switches, and hardware drivers.

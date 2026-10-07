@@ -69,6 +69,8 @@ A critical failure mode in previous iterations was treating custom models or vol
 In ORSquare, **Odoo stock quantities (`stock.quant`), stock moves (`stock.move`), stock valuation layers (`stock.valuation.layer`), and double-entry accounting ledgers are the sole authoritative truth for stock and valuation.**
 
 ### A. The Single Inventory Authority Invariant
+> **As built:** each opened bottle gets its own child location of `WH/Stock/Opened` (e.g. `RC #01`); its remaining volume is the quant in that location × capacity. This is the only way to keep per-bottle ml *derived* (a shared quant could not). See decision D4.
+
 * The operational model `orsquare.opened_bottle` is strictly an operational tracking and UI presentation record.
 * It references the underlying stock item and location, facilitating UI display (active bottle cards, visual fill level, ml remaining).
 * **`remaining_volume_ml` must never become a second inventory authority.** Physical volume remaining is derived directly from (or validated against) the authoritative stock quant in the Opened location (`WH/Stock/Opened`).

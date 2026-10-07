@@ -17,7 +17,7 @@ The Dashboard is an operational summary screen answering three critical question
 It is strictly a **read-only** view; it never mutates transactions directly. Every card provides a 1-click drill-down to the tab owning the underlying records.
 
 ### Metrics & Data Sourcing
-* **Today's Total Sales:** Sum of all customer invoices (`account.move` with `move_type='out_invoice'`) where `orsquare_business_date = current_business_date`.
+* **Today's Total Sales:** Net of all bills (`pos.order`, including those that also carry a customer invoice, minus returns) where `orsquare_business_date = current_business_date`.
 * **Payment Breakdown:**
   * **Cash:** Sum of `account.payment` linked to Cash Journal.
   * **UPI / Online:** Sum of `account.payment` linked to Bank/UPI Journal.
@@ -105,9 +105,9 @@ In beverage and bottle retail, confusing variants, brands, and bottle sizes caus
 * **SKU (`product.product`):** The exact barcode-bearing sellable item (e.g. *Royal Stag 750ml*).
 
 ### Product Classification
-* **Retail Product:** Physical storable inventory (`detailed_type = 'product'`). Tracked in Godown and Counter with quants, low-stock alerts, and internal transfers.
-* **Kitchen Dish (Universal Extension):** Infinite stock consumable (`detailed_type = 'consu'`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings. No recipes, BOMs, or kitchen costing at this stage.
-* **Shop Consumables (Packaged snacks, peanuts, cashews):** Can be configured as tracked storables (`detailed_type = 'product'`) or untracked counter items (`detailed_type = 'consu'`) with standard units (`Piece`, `Pack`, `Plate`).
+* **Retail Product:** Physical storable inventory (`type = 'consu'` + `is_storable = True`). Tracked in Godown and Counter with quants, low-stock alerts, and internal transfers.
+* **Kitchen Dish (Universal Extension):** Infinite stock consumable (`type = 'consu'` + `is_storable = False`, `is_kitchen = True`). Sold directly at POS without inventory deductions or delivery pickings. No recipes, BOMs, or kitchen costing at this stage.
+* **Shop Consumables (Packaged snacks, peanuts, cashews):** Can be configured as tracked storables (`type = 'consu'` + `is_storable = True`) or untracked counter items (`type = 'consu'` + `is_storable = False`) with standard units (`Piece`, `Pack`, `Plate`).
 
 ### Two-Tier Unit Standardization System
 To guarantee exact liquid volume calculations for excise/statutory reporting and eliminate fragile string regexes, units follow a strict two-tier hierarchy:
@@ -143,8 +143,8 @@ The high-traffic point-of-sale checkout counter. Must be instantaneous, keyboard
 ### Checkout Sequence
 1. **Product Scan / Search:** Cashier scans barcode or types product short code / name.
 2. **Stock Validation vs. Infinite Kitchen Stock:**
-   * **Retail Products (`detailed_type = 'product'`):** Instant visual feedback verifying availability in `WH/Stock/Counter`.
-   * **Kitchen Dishes & Consumables (`detailed_type = 'consu'`):** Bypasses physical stock check; displays an infinite availability badge (`∞`).
+   * **Retail Products (`type = 'consu'` + `is_storable = True`):** Instant visual feedback verifying availability in `WH/Stock/Counter`.
+   * **Kitchen Dishes & Consumables (`type = 'consu'` + `is_storable = False`):** Bypasses physical stock check; displays an infinite availability badge (`∞`).
 3. **Line Customization, Portions & Open Bottle Pegs:**
    * Adjust quantity; apply permitted discount or price override.
    * **Portion Selection:** For kitchen dishes with portion rates, cashier selects `[Full: ₹200]` or `[Half: ₹120]` chips directly.

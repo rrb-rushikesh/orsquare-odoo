@@ -2,13 +2,13 @@
 
 **Route:** `/`  
 **Purpose:** Executive operational overview answering three questions in seconds: *How is today performing? What is our payment split? What is our stock worth?*  
-**Underlying Engine:** Projections of Odoo `account.move`, `account.payment`, and `stock.quant`. Strictly read-only; mutates no transactions.
+**Underlying Engine:** Projections of Odoo `pos.order` / `pos.payment`, `account.move`, `account.payment` and `stock.quant` (counter bills are POS orders; an invoice exists only when requested). Strictly read-only; mutates no transactions.
 
 ---
 
 ## 1. Key Metrics & Widgets
 
-* **Today's Total Sales:** Total billed customer invoices on current business date (`orsquare_business_date`).
+* **Today's Total Sales:** Net of all bills (counter bills + tax invoices − returns) on the current business date (`orsquare_business_date`).
 * **Payment Breakdown:**
   * **Cash:** Sum of payments reconciled against the Cash journal.
   * **UPI / Online:** Sum of payments reconciled against the Bank/UPI journal.

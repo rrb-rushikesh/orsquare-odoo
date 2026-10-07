@@ -93,7 +93,7 @@ Because ORSquare runs on **Odoo Community**, we must identify Enterprise feature
 
 | Enterprise Feature | Community Limitation | ORSquare Solution / OCA Replacement | Evaluation |
 |---|---|---|---|
-| **`account_accountant` & Dynamic Reports** | Community lacks dynamic interactive financial drill-downs (P&L, Balance Sheet, Aged Receivables, General Ledger). | **OCA `account_financial_report`** (from `OCA/account-financial-reporting` 18.0). Provides complete interactive Balance Sheet, P&L, Trial Balance, Partner Ledger, and Aged Balance. | 🟢 100% feature parity; zero code to maintain. |
+| **`account_accountant` & Dynamic Reports** (**as built:** native read-projection services cover trial balance, P&L, balance sheet, GST and registers — decision D12; OCA remains optional) | Community lacks dynamic interactive financial drill-downs (P&L, Balance Sheet, Aged Receivables, General Ledger). | **OCA `account_financial_report`** (from `OCA/account-financial-reporting` 18.0). Provides complete interactive Balance Sheet, P&L, Trial Balance, Partner Ledger, and Aged Balance. | 🟢 100% feature parity; zero code to maintain. |
 | **Bank Reconciliation Widget** | Community has basic bank statement lines but lacks the interactive AI match widget. | Handled in custom UI: simple match of bank statements against open customer/supplier invoices via standard Odoo `account.payment` reconciliation. | 🟢 Clean, tailored to retail. |
 | **Fiscal Year / Period Lock** | Community locks dates globally; lacks granular period closing. | **OCA `account_fiscal_year`** (from `OCA/account-closing` 18.0). Allows defining fiscal years and sealing closed dates. | 🟢 Standardized accounting practice. |
 | **Barcode App** | Enterprise has a mobile barcode scanning web app. | **Handled in ORSquare React Frontend.** The React app directly interfaces with USB/Bluetooth barcode scanners (keyboard wedge) and camera scanners. No Odoo web client barcode app needed! | 🟢 Faster and completely offline-tolerant. |
@@ -125,16 +125,17 @@ Following our prime engineering principle, the custom `orsquare` module must rem
 * **Implementation:** An audited service on `orsquare.business_day` that recalculates the figures for a specified past business date, updates the snapshot, and records an immutable log entry in `orsquare.day_audit_log` detailing who initiated the re-audit, previous figures, new figures, and reasons.
 
 ### 4. Atomic Retail Sale Orchestration Service
-* **Problem:** A counter sale must simultaneously check counter stock, create an inventory delivery move, post a customer invoice, and reconcile a payment—in a single transaction.
-* **Implementation:** `orsquare.sale.service.action_complete_retail_sale()`:
-  1. Validates that `orsquare_business_date` is not sealed.
-  2. Verifies stock availability in `WH/Stock/Counter`.
-  3. Creates and posts `stock.picking` delivering items from `Counter` to `Customer`.
-  4. Generates and posts `account.move` (Customer Invoice with GST taxes).
-  5. If Cash or UPI: posts `account.payment` and reconciles invoice.
-  6. If Khata: leaves invoice open under the customer's receivable balance.
+> **As built:** the sale is a native `pos.order`, not a hand-built invoice/payment/picking trio (decision D1 in
+> [`backend-decisions.md`](backend-decisions.md)). `orsquare.sale.service.settle()`:
+> 1. resolves the business date and rejects dated documents in a sealed day (live ones roll to the next day);
+> 2. locks the quant rows, verifies Counter stock and pulls the shortfall from the Godown when enabled;
+> 3. creates the `pos.order` with server-computed taxes, then payments (cash/UPI/Khata/concession), delivery
+>    (`Counter → Customer`, pegs from their bottle location) and, on request, the GST invoice;
+> 4. is idempotent on `client_ref`, and rolls everything back together on any failure.
+> Khata leaves the amount on the customer's receivable when the Daybook session closes.
 
 ### 5. Open Bottle Peg Tracking (`orsquare.opened_bottle`)
+> **As built:** the record stores **no volume**; each bottle owns a child location of `Opened` and remaining ml is derived from its quant (D4).
 * Dedicated model to track individual opened bottles transferred from Counter stock to OP Stock.
 * Tracks original volume (ml), remaining volume (ml), status (`active`, `empty`, `wasted`).
 * Dispenses configured portion sizes (30ml, 60ml, 90ml, etc.) and accurately recognizes proportional Cost of Goods Sold (COGS).
