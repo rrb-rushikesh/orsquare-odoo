@@ -205,7 +205,8 @@ class OrsquareCatalogService(models.AbstractModel):
         for t in self.sudo().env['product.template'].with_context(active_test=not changed_since).search(
                 domain, limit=limit, offset=offset, order='name'):
             row = {
-                'id': t.id, 'name': t.name, 'barcode': t.barcode or '', 'short_code': t.orsquare_short_code or '',
+                'id': t.id, 'product_id': t.product_variant_id.id, 'category': t.categ_id.name or '',
+                'category_id': t.categ_id.id, 'low_stock_qty': t.orsquare_low_stock_qty, 'name': t.name, 'barcode': t.barcode or '', 'short_code': t.orsquare_short_code or '',
                 'price': t.list_price, 'mrp': t.orsquare_mrp or None, 'uom': t.uom_id.name, 'capacity_ml': t.orsquare_capacity_ml,
                 'kind': 'kitchen' if t.is_kitchen else ('retail' if t.is_storable else 'consumable'),
                 'brand': t.orsquare_brand_id.name or '', 'regime': t.orsquare_tax_regime_id.name or '',
