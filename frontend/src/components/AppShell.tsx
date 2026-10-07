@@ -114,7 +114,6 @@ export default function AppShell() {
               key={to}
               to={to}
               end={end}
-              title={crumb}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
               <Icon />

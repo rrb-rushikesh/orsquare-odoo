@@ -10,6 +10,9 @@ const SalesPage = lazy(() => import('@/pages/SalesPage'));
 const StockPage = lazy(() => import('@/pages/StockPage'));
 const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
 const PurchasesPage = lazy(() => import('@/pages/PurchasesPage'));
+const AccountsPage = lazy(() => import('@/pages/AccountsPage'));
+const CashFlowPage = lazy(() => import('@/pages/CashFlowPage'));
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const ComingSoon = lazy(() => import('@/pages/ComingSoon'));
 
 /** Shown while the session is being restored. Never redirects: a refresh on /sales must stay on /sales. */
@@ -43,7 +46,7 @@ function Home() {
   const order: Perm[] = ['dashboard', 'sales', 'stock', 'purchases', 'products', 'accounts', 'cashflow', 'daybook', 'calendar', 'settings'];
   const first = order.find((p) => can(p));
   if (!first) return <NoAccess what="this shop" />;
-  return first === 'dashboard' ? <ComingSoon title="Dashboard" /> : <Navigate to={`/${first}`} replace />;
+  return first === 'dashboard' ? <DashboardPage /> : <Navigate to={`/${first}`} replace />;
 }
 
 const soon = (title: string, perm: Perm) => (
@@ -63,8 +66,8 @@ export default function App() {
               <Route path="purchases" element={<Guard perm="purchases" what="Purchases"><PurchasesPage /></Guard>} />
               <Route path="stock" element={<Guard perm="stock" what="Stock"><StockPage /></Guard>} />
               <Route path="products" element={<Guard perm="products" what="Products"><ProductsPage /></Guard>} />
-              <Route path="accounts" element={soon('Accounts', 'accounts')} />
-              <Route path="cashflow" element={soon('Cash Flow', 'cashflow')} />
+              <Route path="accounts" element={<Guard perm="accounts" what="Accounts"><AccountsPage /></Guard>} />
+              <Route path="cashflow" element={<Guard perm="cashflow" what="Cash Flow"><CashFlowPage /></Guard>} />
               <Route path="daybook" element={soon('Day book', 'daybook')} />
               <Route path="calendar" element={soon('Calendar', 'calendar')} />
               <Route path="settings" element={soon('Settings', 'settings')} />

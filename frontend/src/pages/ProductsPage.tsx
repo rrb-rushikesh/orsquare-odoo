@@ -245,7 +245,7 @@ function MastersDrawer({ open, onClose, owner }: { open: boolean; onClose: () =>
 
   return (
     <Drawer open={open} onClose={onClose} title="Catalogue masters" wide>
-      <div className="pay-seg" role="tablist" style={{ marginBottom: 16 }}>
+      <div className="pay-seg flow" role="tablist" style={{ marginBottom: 16 }}>
         {(['categories', 'units', 'brands'] as const).map((t) => (
           <button key={t} type="button" className={`pay-seg-btn ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>))}
       </div>
