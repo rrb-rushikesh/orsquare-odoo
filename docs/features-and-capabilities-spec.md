@@ -1,5 +1,7 @@
 # Master Specification: Retail Capabilities & Operational Features
 
+> **Status review — 2026-10-07:** This is a scope/requirements document, not an implemented-feature list. Preserve the restored original UI; “redesign” labels below do not authorize a new visual direction. See [current status](../STATUS.md).
+
 This document provides the authoritative, locked baseline for all specialized retail features, operational toggles, tax regimes, and hardware integrations across ORSquare, formalizing which capabilities are **Retained (Keep Now)**, **Redesigned**, **Postponed (Future Scope)**, or **Skipped**.
 
 ---

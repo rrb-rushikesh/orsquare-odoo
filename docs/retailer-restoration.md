@@ -1,5 +1,7 @@
 # Original retailer frontend restoration — 2026-10-07
 
+> **Status review — 2026-10-07:** Recorded restoration evidence precedes the owner’s report of nonworking features. It establishes limited local flows only. This cleanup removes dead code and refreshes documentation; it does not resolve those failures. See [current status](../STATUS.md).
+
 ## Scope and source
 
 The owner explicitly authorized replacing the rejected retailer frontend, importing the original source, and continuing without questions. The source is `C:\Users\rushi\Music\production-hot-fix\src`, not the Tryton retailer frontend. Original page/component markup and styles were imported. Changes in active screens are limited to Odoo contracts, native price/report fields, auth, print routing, and honest unavailable states. The source repository was not edited.
@@ -23,7 +25,7 @@ Kept: Odoo services and platform module, Astro landing, API cookie client, Dexie
 | Settings | original device preferences and existing offline tools | Appearance and receipt/device choices retained; unconnected shop controls disabled |
 | Login/shell | Odoo session cookie and `staff.me` | Original UI retained with required shop-code field; deep-link hydration splash preserved |
 
-`lib/contracts.ts` contains original UI types. `lib/repo.ts` is a thin Odoo adapter. `lib/unavailable.ts` explicitly rejects unmapped operations; it does not implement legacy backend services or return invented success/data. The older `_pending` source remains for comparison; it is not routed.
+`lib/contracts.ts` contains original UI types. `lib/repo.ts` is a thin Odoo adapter. `lib/unavailable.ts` explicitly rejects unmapped operations; it does not implement legacy backend services or return invented success/data. The duplicate `_pending` tree and disconnected Sheet/PDF helpers were removed during cleanup after import-graph inspection. Earlier source remains recoverable in Git history and the external visual source repository.
 
 Backend changes are small read projections: directory/statement side fields, vendor totals/line identifiers and uncapped summary, bill lookup date filters, native cash-flow classification and metrics, dashboard summary, stock-value total. Sale quote presentation now uses native untaxed subtotal/discount so `subtotal - discount + tax = payable` for tax-inclusive products. Settlement arithmetic is unchanged. These have native tests.
 
@@ -43,7 +45,7 @@ Local environment: existing Docker Odoo at `127.0.0.1:8088`, Vite at `127.0.0.1:
 
 ## Explicitly unfinished
 
-This is a restored working core baseline, not a complete parity or production release.
+This is a partially connected restoration, not a complete parity or production release. The owner reports multiple failures; the limited evidence above does not disprove those reports.
 
 - Returns/exchanges, purchase editing and histories, stock movement history, product opening stock in this form, box packing, flavor/variants, product import/deletion, account edits, purchase notes, tips, selected-bill payment allocation are unavailable in these adapters. Key controls are disabled with an explanation; remaining unmapped operations throw `not_available` before writing.
 - Native Odoo already supports several of those capabilities. Connect the existing service to the original control next; do not replace the UI or recreate ledger logic.

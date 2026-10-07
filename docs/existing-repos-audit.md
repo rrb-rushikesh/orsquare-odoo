@@ -1,5 +1,7 @@
 # Deep Audit of Existing Repositories
 
+> **Status review — 2026-10-07:** Historical source audit. Legacy reuse is limited to visuals, terminology and requirements; none of the legacy backend designs is an implementation authority. See [current status](../STATUS.md).
+
 **Audited Repositories:**
 1. **Repository 1 (Retailer Application):** `C:\Users\rushi\Music\production-hot-fix`
 2. **Repository 2 (Developer Console & Landing Page):** `C:\Repo\orsquare-tryton`

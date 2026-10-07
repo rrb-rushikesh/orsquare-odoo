@@ -1,5 +1,7 @@
 # Tab Specification: Sales (Counter POS)
 
+> **Status review — 2026-10-07:** One local cash-sale flow has browser proof. Returns/exchanges, table/peg paths and offline/retry correctness remain incomplete. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/sales`  
 **Purpose:** High-traffic retail checkout billing counter. Highest performance requirement in the platform.  
 **Underlying Engine:** Atomic `orsquare.sale.service.settle()` orchestrating a native Odoo `pos.order` (taxes, payments, `stock.picking` from `WH/Stock/Counter`, session accounting, optional GST invoice). See `docs/backend-decisions.md` D1.

@@ -1,5 +1,7 @@
 # Tab Specification: Sheet (Daily Counter Register)
 
+> **Status review — 2026-10-07:** Sheet/WineStock remains deferred; disconnected source helpers were removed. This is a retained requirement, not an active screen. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/sheet`  
 **Purpose:** Daily operational Counter stock register fixture for liquor and beverage retail stores in India, tracking brand-level shelf movements.  
 **Phase Status:** **Postponed to Future Phase (Future Scope).**

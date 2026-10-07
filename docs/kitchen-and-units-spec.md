@@ -1,5 +1,7 @@
 # Architectural Specification: Kitchen Extension & Two-Tier Unit System
 
+> **Status review — 2026-10-07:** Native foundation and unit models exist. Table/KOT and kitchen workflows are not fully connected or manually verified through the restored screens. See [current status](../STATUS.md).
+
 **Document Version:** 1.0  
 **Target Platform:** Odoo 18 Community + Custom React POS  
 **Reference Codebase:** `production-hot-fix` (`CatalogManager.tsx`, `ProductForm.tsx`, `ProductsPage.tsx`)  

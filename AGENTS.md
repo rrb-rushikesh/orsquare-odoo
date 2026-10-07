@@ -1,5 +1,7 @@
 # Agent Operating Rules & Architecture Protocol
 
+> **Repository status — 2026-10-07:** Read [STATUS.md](STATUS.md) alongside [context.md](context.md) before work. The original retailer UI is partially connected; preserve [frontend/DESIGN.md](frontend/DESIGN.md). The owner explicitly authorized the current documentation/dead-code cleanup and grouped commits/push; this does not authorize unrelated architecture or UI redesign.
+
 This document outlines mandatory rules, engineering guidelines, and protocols for all AI agents working on the **ORSquare** project.
 
 ---
@@ -144,7 +146,7 @@ Both previous product iterations (`production-hot-fix` and `orsquare-tryton`) ar
 ## 6. Workflow Checkpoints Before Action
 
 Whenever entering a new stage of work:
-1. Review [`context.md`](file:///C:/Repo/orsquare-odoo/context.md) and relevant files in [`docs/`](file:///C:/Repo/orsquare-odoo/docs).
+1. Review [`context.md`](context.md) and relevant files in [`docs/`](docs/).
 2. Propose the next specific step to the user in plain language.
 3. Detail the expected changes, module additions, or architectural impacts.
 4. **Pause and await the user's explicit go-ahead before executing.**

@@ -1,5 +1,7 @@
 # Odoo Module Architecture & Dependency Blueprint
 
+> **Status review — 2026-10-07:** This is the module selection blueprint. Planned OCA reporting/period modules are not installed; current reports use native Odoo projections under decision D12. Evaluation labels below are historical assessments, not verified feature parity. See [current status](../STATUS.md).
+
 **Project:** ORSquare (OR²)  
 **Target Engine:** Odoo 18.0 Community Edition  
 **Architecture Principle:** Standard Odoo First → Mature OCA Second → Thin Custom `orsquare` Module Last.

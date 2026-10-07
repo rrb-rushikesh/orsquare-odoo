@@ -1,5 +1,7 @@
 # Tenancy and Offline POS Architecture Evaluation
 
+> **Status review — 2026-10-07:** Locked architecture requirements, not full offline acceptance evidence. Restored-screen reconnect/recovery and multi-tab device sequencing remain unproven; the current sequence allocation needs review. See [current status](../STATUS.md).
+
 **Project:** ORSquare (OR²)  
 **Evaluation Scope:** 
 1. Tenancy Model: Separate Database per Shop vs. Single-Database Multi-Company.

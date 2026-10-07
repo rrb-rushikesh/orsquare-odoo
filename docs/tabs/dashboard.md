@@ -1,5 +1,7 @@
 # Tab Specification: Dashboard
 
+> **Status review — 2026-10-07:** Native summary cards are connected; category insights and complete role/period behavior are unfinished. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/`  
 **Purpose:** Executive operational overview answering three questions in seconds: *How is today performing? What is our payment split? What is our stock worth?*  
 **Underlying Engine:** Projections of Odoo `pos.order` / `pos.payment`, `account.move`, `account.payment` and `stock.quant` (counter bills are POS orders; an invoice exists only when requested). Strictly read-only; mutates no transactions.

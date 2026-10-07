@@ -1,38 +1,43 @@
 # ORSquare (OR²)
 
-High-speed retail operations platform for bottle/beverage counters (optional restaurant mode).
-**Odoo 18 Community** is the only accounting/inventory/tax authority; a thin custom module (`addons/orsquare`) adds what is
-unique to the product; a React app (later) talks to it over a JSON API; an Astro site is the public marketing page.
+Retail software for bottle and beverage counters, using Odoo 18 Community as the accounting, tax and stock authority. React serves the retailer app; Astro serves the separate public site.
 
-**Read this first:** [`context.md`](context.md) → [`docs/backend-architecture.md`](docs/backend-architecture.md) →
-[`docs/backend-decisions.md`](docs/backend-decisions.md) → [`docs/operations-runbook.md`](docs/operations-runbook.md).
-Working rules for agents: [`AGENTS.md`](AGENTS.md).
+**The product is incomplete.** The original retailer screens have been restored and partially connected to Odoo. The owner reports that many things do not work. A few successful local flows do not establish full product readiness.
 
-## Direction
-The retailer frontend is to be a **mirror-to-mirror** recreation of the original live app, with Odoo, offline and realtime underneath. See `HANDOVER.md` and `NEXT_WORKER_PROMPT.md`.
+Read [STATUS.md](STATUS.md) first, then [context.md](context.md), [AGENTS.md](AGENTS.md), [frontend/DESIGN.md](frontend/DESIGN.md), and the relevant [architecture](docs/backend-architecture.md), [decisions](docs/backend-decisions.md) and [runbook](docs/operations-runbook.md). Preserve the original UI and design system.
 
-## State
+## Local development
 
-Milestone 1 (backend) is built and verified — 206 automated tests (also green on a from-scratch install), real-concurrency,
-gateway and realtime proofs, measured benchmarks. The React app, Astro site and Developer Console UI are not started.
+PowerShell, with Docker Desktop running:
 
-## Quick start (Windows + Docker Desktop)
+```powershell
+Set-Location scratch/odoo18-spike
+docker compose up -d
+Set-Location ../../frontend
+npm ci
+npm run dev
+```
 
-```bash
-cd scratch/odoo18-spike && docker compose up -d      # Odoo 18 + PostgreSQL 16 (Docker Desktop must be running)
-scripts/run_tests.sh                                 # upgrade the module + run all tests (dev DB: orsquare_dev)
-scripts/concurrency_test.sh                          # zero-overselling proof (real concurrent transactions)
-scripts/build_template.sh                            # shop template database from zero (~45 s)
-scripts/provision_shop.sh orsquare_shop1 "My Shop" owner 'S3cure#Pass'   # one shop = one database
-scripts/e2e_gateway.sh && scripts/e2e_realtime.sh    # proxy + realtime guardrail proofs
-scripts/benchmark.sh                                 # measured performance baseline
+The development frontend is at `http://127.0.0.1:5173`; Vite proxies the API to local Odoo at port 8088. Use an existing provisioned test shop. Backend proof/provisioning scripts require Git Bash; see the runbook before running them. Do not run wipe/drop commands on a working shop.
+
+```powershell
+# From frontend/
+npm run build
+npm test
+# From landing/
+$env:PUBLIC_APP_URL = 'https://app.orsquare.com/login'
+npm run check
 ```
 
 ## Layout
 
-```
-addons/orsquare/   the Odoo module (models = services, controllers = HTTP, tests = 206)
-deploy/            Caddy gate, compose, Odoo prod config, Centrifugo (templates; Caddyfile validated)
-docs/              specs (docs/tabs), architecture, decisions, runbook, benchmarks, generated API reference
-scripts/           test / provision / upgrade / benchmark / end-to-end proof scripts
-```
+| Path | Purpose |
+| --- | --- |
+| `addons/orsquare/` | Native Odoo shop services, controllers, security and tests |
+| `addons/orsquare_platform/` | Platform backend; Developer Console UI remains unfinished |
+| `frontend/` | Original retailer UI with Odoo adapters and offline/realtime foundation |
+| `landing/` | Separate static Astro public site |
+| `deploy/` | Deployment templates; full production environment is not verified |
+| `docs/` | Requirements, architecture, decisions, API reference and recorded evidence |
+| `scripts/` | Test, provisioning, benchmark and gateway/realtime proof tools |
+| `scratch/odoo18-spike/` | Local Docker environment and retained architecture proof harnesses |

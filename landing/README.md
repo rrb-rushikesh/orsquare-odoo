@@ -1,5 +1,7 @@
 # OR² public site (landing)
 
+> **Repository status — 2026-10-07:** The static site exists; production public-domain behavior is not verified. See [current status](../STATUS.md). Optional `scripts/alignment.mjs` requires an externally provided Playwright module via `PLAYWRIGHT_MODULE` and a preview server; Playwright is not a retailer dependency.
+
 Static Astro site: marketing, pricing, FAQ, legal drafts. No analytics, no third-party scripts.
 ```
 npm ci            # install

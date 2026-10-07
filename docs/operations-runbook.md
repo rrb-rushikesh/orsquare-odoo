@@ -1,13 +1,15 @@
 # Operations Runbook
 
-Everything here was run against the local Docker environment (`odoo18-spike-web` / `odoo18-spike-db`). Commands assume
+> **Status review — 2026-10-07:** Development commands and recorded proof are distinguished below. The restored Settings controls are not a usable administration/wipe interface yet; production deployment and recovery remain unverified. See [current status](../STATUS.md).
+
+Recorded proof was run against the local Docker environment; production/recovery procedures remain instructions, not completed proof (`odoo18-spike-web` / `odoo18-spike-db`). Commands assume
 the repository root and Git Bash. **Docker Desktop must be running** (it is not started automatically).
 
 ## 0. What is verified, and how
 
 | Claim | Evidence (re-run any time) |
 |---|---|
-| Business logic, accounting, permissions (206 tests) | `scripts/run_tests.sh` (dev DB) — and on a **pristine from-scratch install**: `scripts/build_template.sh` → clone → `scripts/run_tests.sh /orsquare <clone>` |
+| Business logic, accounting, permissions (latest development run: 210; earlier pristine proof: 206) | `scripts/run_tests.sh` (dev DB) — and on a **pristine from-scratch install**: `scripts/build_template.sh` → clone → `scripts/run_tests.sh /orsquare <clone>` |
 | Zero overselling / exactly-once under real concurrency | `scripts/concurrency_test.sh` |
 | Landing-page / refresh / cookie guardrails with a real proxy | `scripts/e2e_gateway.sh` (14 assertions) |
 | Realtime delivery + channel authorisation over WebSocket | `scripts/e2e_realtime.sh` (8 assertions) |
@@ -33,13 +35,13 @@ not pick it up. The tests print an expected `duplicate key … orsquare_brand_na
 
 ```bash
 scripts/build_template.sh                                   # template from zero (≈45 s): India chart → orsquare
-scripts/provision_shop.sh orsquare_shop1 "Shri Krishna Wines" krishna_owner 'S3cure#Pass' "Krishna Patil" MH wine_shop
+scripts/provision_shop.sh orsquare_shop1 "Shri Krishna Wines" krishna_owner '<unique-owner-password>' "Krishna Patil" MH wine_shop
 scripts/upgrade_shops.sh                                    # every shop + template (run on EVERY deploy, before routing traffic)
 scripts/drop_shop.sh orsquare_shop1                         # destructive; shop/scratch DBs only
 ```
 * Provisioning clones SQL **and filestore** (Odoo's `duplicate_database`), configures the company, creates the owner
   and **randomises the template's default `admin` password**. Database names must match `orsquare_[a-z0-9_]+`.
-* After provisioning, set in the shop (Settings → Business details): address **and state** (GST invoices refuse to post
+* After provisioning, configure through native Odoo administration/services (the restored Settings screen is not connected yet): address **and state** (GST invoices refuse to post
   without them), GSTIN, FSSAI, liquor licence, UPI id, and the **State VAT rate** (`catalog.set_regime_tax_rate`; ships
   at 0 %).
 * `preset` ∈ `wine_shop | bar | restaurant | grocery` (starting toggles only).
@@ -72,7 +74,7 @@ scripts/drop_shop.sh orsquare_shop1                         # destructive; shop/
 
 ## 6. Backups, wipes, restores
 
-* Owner **Data Control → Wipe** (`wipe.preview` then `wipe.wipe_shop(confirm_name, password)`): requires the exact shop
+* Native owner wipe service (restored retailer Data Control UI is unavailable) (`wipe.preview` then `wipe.wipe_shop(confirm_name, password)`): requires the exact shop
   name and the owner's password, creates and verifies a `pg_dump` zip (`<data_dir>/orsquare_backups/pre-wipe-…zip`, SHA-256
   stored in the immutable `orsquare.console_audit`), then clears operational data only (masters, accounts, locations,
   users untouched). Return value includes the `BAK-YYYYMMDD-XXX-NNNN` reference.

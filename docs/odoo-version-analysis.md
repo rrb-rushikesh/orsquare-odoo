@@ -1,5 +1,7 @@
 # Odoo Version Analysis & Selection Report
 
+> **Status review — 2026-10-07:** Historical version-selection research supporting the locked Odoo 18 baseline. Ecosystem/support assertions below have not been freshly verified; planned OCA availability must not be treated as installed functionality. See [current status](../STATUS.md).
+
 **Target Engine Evaluation:** Odoo 16 vs Odoo 17 vs Odoo 18 vs Odoo 19  
 **Target Edition:** Odoo Community Edition  
 **Target Market & Geography:** Retail shops (beverage & bottle retail, food/table service option) in India  

@@ -1,13 +1,15 @@
 # Landing-page quality (applies to `landing/`)
 
+> **Repository status — 2026-10-07:** These visual/content rules remain binding for landing changes. This repository cleanup changes documentation only in `landing/`; it does not establish Lighthouse or visual acceptance. See [current status](../STATUS.md).
+
 Read this before you change anything under `landing/`. It exists because the public site once shipped with content flush against the viewport edge, a disabled contact form, an edge-to-edge proof strip, grids with empty grey cells, and drawn screens with unlabelled numbers. Each of those is now a rule.
 
 ## 1. Scope: the site, and only the site
 1. Site work edits `landing/` only. Never touch `frontend/`, `control-plane/`, `orsquare/`, the dashboard, or any internal tab, and never touch the visual baselines in `frontend/tests/visual/__screenshots__`.
-2. Before you commit: `git diff --name-only master...HEAD`. Anything outside `landing/` (other than a deliberate rule, doc or HANDOVER line the owner asked for) is a defect. Fix it, or revert that file.
-3. One logical change per commit, `[P1]` in the message, so the owner can revert any of them. Never push, merge or rebase.
+2. Before you commit: `git diff --name-only main...HEAD`. Anything outside `landing/` (other than a deliberate rule, doc or status update the owner asked for) is a defect. Fix it, or revert that file.
+3. One logical change per commit, `[P1]` in the message, so the owner can revert any of them. Push only when the owner explicitly requests it; never merge or rebase without authorization.
 
-## 2. Design: `docs/design/DESIGN-ibm.md` is the law
+## 2. Design: [frontend/DESIGN.md](../frontend/DESIGN.md) is the law
 1. 0px corners, 1px hairlines, no shadows, no pills, one chromatic accent (`#0f62fe`), Plex Sans 300 for display and 400/600 below, body tracking `0.16px`, sentence-case labels, no all-caps eyebrows.
 2. Depth comes from surface change (`canvas` → `layer`) and hairlines. The only gradient is the soft blue hero wash; no dot or pattern backgrounds. The only dark surface is the footer; the closing call to action is the blue banner.
 3. Take ideas (layout, explanation order, product demonstrations) from other sites. Never take their radius, shadows, colours or type. If a reference needs a rounded card, redraw it square.
@@ -22,7 +24,7 @@ Read this before you change anything under `landing/`. It exists because the pub
 6. Use `DocLayout` for long text (legal, policies). Use a dedicated layout for About, Contact, Sign-up and the home page.
 
 ## 4. Content clarity
-1. Facts only. Take wording from `docs/tabs/*`, `docs/PRODUCT_RULES.md` and the app's own public pages. No invented customers, counts, certifications, uptime, prices, awards, quotes or integrations.
+1. Facts only. Take wording from `docs/tabs/*`, [current status](../STATUS.md) and the relevant workflow specifications in `docs/` and the app's own public pages. No invented customers, counts, certifications, uptime, prices, awards, quotes or integrations.
 2. Explain the product by showing it: a drawn screen (HTML and CSS, no images, no scripts) next to a sentence in plain words. A visitor must learn what OR² does, who it is for and what the reports and calendar give them within one scroll of the home page.
 3. Any number in a drawn screen is sample data. Label it ("Sample data"), keep the figures internally consistent (rates × quantities = amounts, splits = totals), and mark the drawing `aria-hidden` with the meaning carried by real text beside it.
 4. Name things as the product does (Sheet, Day book, Reports calendar, khata). Active voice, sentence case, buttons say what happens ("Sign in to your workspace", not "Submit").
@@ -39,8 +41,8 @@ Run all of these and read the output. Do not claim a check you did not run.
 1. `cd landing && npm run check` builds the site and runs `scripts/check.mjs`: one `<h1>`, unique titles and descriptions of sensible length, canonical links, parsing JSON-LD, alt text, no third-party origins, no placeholder wording, and every internal link and anchor resolving. It must print `landing check passed`.
 2. Lighthouse, mobile, on `/`, `/about`, `/contact`, `/modules`, `/faq` and one legal page: Performance, Accessibility, Best Practices and SEO each at least 95. Use `npx lighthouse`; never add it to `package.json`. If Accessibility is below 95, fix the real violation. Never disable an audit.
 3. A headless-browser pass at 390, 768 and 1440 px over every page: `document.documentElement.scrollWidth` must equal `clientWidth`, and you must open at least the home page, one document page and one new section as screenshots and look at them.
-4. Claims match the product documents. Every label, figure and sentence in a drawn screen or a feature claim must be checked against `docs/tabs/*`, `docs/PRODUCT_RULES.md` and the app's own screens (for example the dashboard says "Customers owe" and "You owe suppliers", so a drawing says the same). Offline use, printers, GST and calendar content are worded only as far as those documents go.
-5. `git diff --name-only master...HEAD` shows only the paths this rule allows.
+4. Claims match the product documents. Every label, figure and sentence in a drawn screen or a feature claim must be checked against `docs/tabs/*`, [current status](../STATUS.md) and the relevant workflow specifications in `docs/` and the app's own screens (for example the dashboard says "Customers owe" and "You owe suppliers", so a drawing says the same). Offline use, printers, GST and calendar content are worded only as far as those documents go.
+5. `git diff --name-only main...HEAD` shows only the paths this rule allows.
 
 ## 6a. Placement and alignment: decide where it goes before you add it
 Every addition (a line of text, a link, a number, a button, a section) is placed deliberately, never appended wherever there is room. Before writing it:

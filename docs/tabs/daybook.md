@@ -1,5 +1,7 @@
 # Tab Specification: Daybook
 
+> **Status review — 2026-10-07:** The Daybook UI is deferred. Native day services do not establish a complete closing/reconciliation screen. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/daybook`  
 **Purpose:** Manages the daily cash drawer session, opening float, physical cash reconciliation, and end-of-day sealing.  
 **Underlying Engine:** Custom `orsquare.business_day` model tracking expected cash against Odoo Cash Journal, and freezing immutable daily snapshots.

@@ -1,8 +1,10 @@
 # Tab Specification: Ledger
 
+> **Status review — 2026-10-07:** Native report projections are connected. OCA report modules are not installed; some control-account cards remain unavailable. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/ledger`  
 **Purpose:** Business-wide accounting review across all financial accounts.  
-**Underlying Engine:** Standard Odoo `account.move.line` + OCA `account_financial_report` (providing dynamic drill-downs in Odoo Community).
+**Underlying Engine:** Standard Odoo `account.move.line` with native report projections. OCA `account_financial_report` remains an optional future module (decision D12), not an installed dependency.
 
 ---
 

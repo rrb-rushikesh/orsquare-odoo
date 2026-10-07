@@ -1,5 +1,7 @@
 # Tab Specification: Purchases
 
+> **Status review — 2026-10-07:** One native supplier-bill flow has local browser proof. Editing/history and ambiguous-response retry handling remain incomplete. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/purchases`  
 **Purpose:** Manages procurement from suppliers: recording bills, receiving stock into Godown, purchase returns, and supplier payables.  
 **Underlying Engine:** Odoo `purchase.order`, incoming `stock.picking` (`Supplier` $\rightarrow$ `WH/Stock/Godown`), and vendor bills (`account.move` with `move_type='in_invoice'`).

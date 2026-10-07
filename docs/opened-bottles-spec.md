@@ -1,5 +1,7 @@
 # Open Bottles (Portion & Peg Sales) Technical Specification
 
+> **Status review — 2026-10-07:** Opened-bottle backend foundations have local tests. The original peg/open-bottle UI still requires mapping and manual end-to-end proof. See [current status](../STATUS.md).
+
 **Project:** ORSquare (OR²)  
 **Domain:** Portion sales from opened liquor/wine bottles (e.g., 30ml, 60ml, 90ml pegs from 750ml, 375ml, or 180ml bottles)  
 **Reference Designs:** [`C:\Users\rushi\Desktop\ref\01.png`](file:///C:/Users/rushi/Desktop/ref/01.png) and [`C:\Users\rushi\Desktop\ref\02.png`](file:///C:/Users/rushi/Desktop/ref/02.png)  

@@ -1,5 +1,7 @@
 # Backend Decision Log
 
+> **Status review — 2026-10-07:** These decisions describe the implemented backend baseline and supersede conflicting earlier plans. They do not certify complete UI behavior or production readiness. See [current status](../STATUS.md).
+
 Each entry: **what was decided → why → what was rejected → consequence.** Entries marked **⚠ spec change** deviate
 from, or sharpen, an earlier written spec; they are consolidated in §3. Evidence (tests, scripts, measurements) is named
 so each claim can be re-checked.

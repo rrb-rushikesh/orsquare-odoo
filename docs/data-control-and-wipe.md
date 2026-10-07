@@ -1,5 +1,7 @@
 # Data Control & Safe Wipe Architecture
 
+> **Status review — 2026-10-07:** Native wipe services and backend tests exist, but restored retailer wipe/restore controls are unavailable. A restore drill on another host remains pending; do not infer usable UI from this specification. See [current status](../STATUS.md).
+
 **Project:** ORSquare (OR²)  
 **Scope:** Data Lifecycle, Database Integrity, Automated Backups, and Safe Operational Wipe  
 **Engine:** Odoo 18.0 Community / PostgreSQL  

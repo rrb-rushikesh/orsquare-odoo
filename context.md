@@ -1,9 +1,9 @@
 
-> **DIRECTION (read this):** the retailer frontend must be an exact visual/UX mirror of the original live app (`C:\Users\rushi\Music\production-hot-fix`), rebuilt on the Odoo + offline + realtime architecture. The hand-written screens now in `frontend/src/pages` were rejected. See `HANDOVER.md` and `NEXT_WORKER_PROMPT.md`.
+> **DIRECTION (read this):** the retailer frontend must be an exact visual/UX mirror of the original live app (`C:\Users\rushi\Music\production-hot-fix`), rebuilt on the Odoo + offline + realtime architecture. The rejected hand-written frontend has been replaced by original screens with partial Odoo adapters. See [STATUS.md](STATUS.md) and [restoration evidence](docs/retailer-restoration.md). Many workflows remain incomplete; do not redesign the restored screens.
 # ORSquare Project Context & Architecture
 
 **Project:** ORSquare (OR²)  
-**Current Phase:** Milestone 1 (Odoo backend) **built and verified**; frontend not started  
+**Current Phase:** Odoo foundation tested; original retailer UI partially connected; product incomplete
 **Locked Baseline:** Odoo 18.0 Community Edition Engine + Mature OCA Modules + Thin Custom `orsquare` Module + Custom React Frontend + Separate Static Astro Marketing Landing Page.
 
 ---
@@ -14,12 +14,11 @@
   rule "wait for explicit approval before each stage" in `AGENTS.md` is satisfied by that standing grant for backend work;
   it still applies to **changing the locked architecture, the frontend, or anything outside the backend scope**.
 * Backend status: all Milestone 1 scope plus the back-office, API, sync, security, provisioning and printing layers are
-  built. **206 automated tests** pass on an upgraded and on a from-scratch database; concurrency, gateway and realtime are
-  proven by scripts against real PostgreSQL / Odoo / Caddy / Centrifugo. Start here:
+  built. Latest recorded full development regression: **210 tests passed**; earlier pristine-install proof: **206 tests**. Concurrency, gateway and realtime have local script evidence against PostgreSQL / Odoo / Caddy / Centrifugo; this does not prove the restored UI or production readiness. Start here:
   [`docs/backend-architecture.md`](docs/backend-architecture.md) → [`docs/backend-decisions.md`](docs/backend-decisions.md)
   (what changed versus the specs and why — **please review §3**) → [`docs/operations-runbook.md`](docs/operations-runbook.md).
-* Not built (by scope): the React app, the Astro site, the platform Developer Console UI, Closing Stock Audit,
-  WineStock/Sheet register, Product Master Library.
+* React and Astro now exist. Original retailer screens are partially connected; many controls remain unavailable. The platform Developer Console UI, Closing Stock Audit, WineStock/Sheet register and Product Master Library remain unfinished/deferred. Current gaps and evidence are maintained in [STATUS.md](STATUS.md).
+* Specifications below describe requirements, not a completion checklist. Native reports currently replace planned OCA reporting modules (decision D12); OCA is not installed. Latency/capacity figures are targets unless backed by a recorded benchmark.
 
 ## 1. Executive Summary & Product Vision
 

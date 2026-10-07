@@ -1,5 +1,7 @@
 # Architectural & Accounting Specification: Advanced Purchase & Sales Billing System
 
+> **Status review — 2026-10-07:** Billing requirements remain the target. Native backend evidence does not establish restored-screen parity. Follow backend decisions D5–D7 for tax/valuation choices; statutory examples are requirements to verify before release, not fresh legal guidance. See [current status](../STATUS.md).
+
 **Document Version:** 1.0  
 **Target Platform:** Odoo 18.0 Community Edition + Custom React Frontend  
 **Accounting Standard:** Indian Accounting Standards (Ind AS 2 / AS 2 - Inventories), CGST/SGST Act, TCS Sec 206C  

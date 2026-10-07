@@ -1,6 +1,8 @@
 # ORSquare Backend Architecture (as built)
 
-**Status:** Milestone 1 backend is built and verified. 206 automated tests pass on both an incrementally upgraded
+> **Status review — 2026-10-07:** This describes the Odoo foundation. Original React screens and the Astro site now exist; many UI workflows remain incomplete. Shop API availability does not imply frontend support. See [current status](../STATUS.md).
+
+**Status:** Milestone 1 backend is built and verified. Latest recorded full development regression: 210 tests passed. Earlier 206-test proof covered both an incrementally upgraded
 database and a pristine from-scratch install; the concurrency, gateway and benchmark scripts run against real
 PostgreSQL/Odoo/Caddy. This document describes what exists, not what was planned. Decisions and the reasons behind
 them are in [`backend-decisions.md`](backend-decisions.md); the method-by-method API is in the generated
@@ -216,5 +218,5 @@ password is randomised on provisioning; staff cannot remove their own owner acce
 ## 9. What is intentionally *not* built (per the locked scope)
 
 Closing Stock Audit & Reconciliation, WineStock matrix / Sheet register, Product Master Library & importer (skipped),
-the React/Astro frontends, and the platform Developer Console UI. Their data hooks exist where cheap (e.g.
+the platform Developer Console UI. React/Astro now exist; the restored retailer UI is only partially connected. Their data hooks exist where cheap (e.g.
 `stock_discrepancy`, `bill_document.excise_matrix`).

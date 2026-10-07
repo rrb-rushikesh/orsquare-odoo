@@ -1,5 +1,7 @@
 # Retail Operational Workflows & Technical Specification
 
+> **Status review — 2026-10-07:** These are target workflows. Only limited local sale/purchase/transfer flows have recorded browser proof; returns, reconciliation and complete screen behavior remain unfinished. See [current status](../STATUS.md).
+
 **Project:** ORSquare (OR²)  
 **Domain:** Bottle, Beverage & General Retail Operations  
 **Architecture:** Headless Odoo Community 18.0 Engine + Custom React Frontend  

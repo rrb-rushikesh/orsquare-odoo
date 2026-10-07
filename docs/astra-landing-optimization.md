@@ -1,5 +1,7 @@
 # Astro Landing Page Audit & Crawler/SEO Optimization Guide
 
+> **Status review — 2026-10-07:** The Astro site has been imported. This document records the optimization direction; production delivery and public-domain routing remain unverified. See [current status](../STATUS.md).
+
 **Framework:** Astro 5.6.1 (Static Site Generation / Prerendered)  
 **Reference Source:** `C:\Repo\orsquare-tryton\landing`  
 **Goal:** Maximum SEO visibility, zero latency, deep AI/crawler readability, and seamless transition into the ORSquare React application.

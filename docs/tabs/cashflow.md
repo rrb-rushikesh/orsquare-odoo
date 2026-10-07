@@ -1,5 +1,7 @@
 # Tab Specification: Cash Flow
 
+> **Status review — 2026-10-07:** Native cash-register projections are connected. Complete entry/edit/retry behavior still needs focused proof. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/cashflow`  
 **Purpose:** The shop's chronological cash diary: tracking every liquid rupee entering or leaving the business outside standard counter sales.  
 **Underlying Engine:** Projection of standard Odoo `account.move.line` entries posted against Cash and Bank journals (`account.journal`).

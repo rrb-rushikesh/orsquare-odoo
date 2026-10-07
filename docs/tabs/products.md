@@ -1,5 +1,7 @@
 # Tab Specification: Products
 
+> **Status review — 2026-10-07:** Basic catalog create/edit adapters exist. Opening stock, import/deletion, packing and variants are incomplete. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/products`  
 **Purpose:** Master catalog defining sellable products, purchase costs, retail prices, barcodes, units of measure, and portion pricing.  
 **Underlying Engine:** Standard Odoo `product.template`, `product.product`, and `uom.uom`.

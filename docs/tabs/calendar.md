@@ -1,5 +1,7 @@
 # Tab Specification: Calendar
 
+> **Status review — 2026-10-07:** The Calendar UI is a deferred placeholder; this specification is not an implemented calendar. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/calendar`  
 **Purpose:** Historical review of finalized business days, weeks, and months. Read-only by design.  
 **Underlying Engine:** Projection of frozen `orsquare.business_day` snapshots + audited `action_reaudit()` service.

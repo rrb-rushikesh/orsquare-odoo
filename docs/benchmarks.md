@@ -1,5 +1,7 @@
 # Measured Performance (baseline)
 
+> **Status review — 2026-10-07:** Results below are historical local measurements, not a new cleanup benchmark or a production capacity guarantee. The 50–100 shop and fan-out targets still require realistic load proof. See [current status](../STATUS.md).
+
 > Figures are **measured**, not promised. They were taken on a developer laptop (Docker Desktop, WSL2), a single Odoo
 > process (`workers=0`), PostgreSQL 16 in a container, **service-level** (no network/proxy). They are a baseline to
 > compare against, and a reason to re-run `scripts/benchmark.sh` on production-like hardware before quoting any number.

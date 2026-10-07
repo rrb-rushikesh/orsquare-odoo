@@ -1,5 +1,7 @@
 # Tab Specification: Settings
 
+> **Status review — 2026-10-07:** Device preferences exist. Shop features, Team & Access, tables/cutoff save and wipe/restore are disconnected. The rest of this document describes requirements; see [current status](../../STATUS.md).
+
 **Route:** `/settings`  
 **Purpose:** Master shop configuration, hardware integration, billing templates, staff permissions, and operational data controls.  
 **Underlying Engine:** Shop preferences model + native Odoo `res.users`, `res.groups`, and `pos_restaurant` table models.
