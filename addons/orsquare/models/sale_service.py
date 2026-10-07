@@ -264,7 +264,11 @@ class OrsquareSaleService(models.AbstractModel):
             return self._result(env, existing, duplicate=True)
 
         currency = company.currency_id
-        business_date = company.orsquare_business_date_for(created_at)
+        business_date = company.orsquare_business_date_for(created_at) if offline \
+            else company.orsquare_effective_business_date(created_at)
+        rolled_forward = business_date != company.orsquare_business_date_for(created_at)
+        if rolled_forward:
+            env = env(context=dict(env.context, orsquare_event_dt=False))   # let documents take the effective date
         day = env['orsquare.business_day'].ensure_open_day(company, business_date)
         session = day.session_id
         config = session.config_id
@@ -388,7 +392,9 @@ class OrsquareSaleService(models.AbstractModel):
         env['orsquare.event'].publish(company, 'sale_settled', {
             'order_id': order.id, 'name': order.name, 'total': amount_total,
             'business_date': str(business_date), 'flagged': bool(flagged)})
-        return self._result(env, order, transfer_picking=transfer_picking, flagged=flagged)
+        result = self._result(env, order, transfer_picking=transfer_picking, flagged=flagged)
+        result['rolled_forward'] = rolled_forward
+        return result
 
     # ------------------------------------------------------------------ pieces
     @api.model

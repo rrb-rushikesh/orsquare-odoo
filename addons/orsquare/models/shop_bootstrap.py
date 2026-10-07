@@ -26,6 +26,10 @@ ORSQUARE_ACCOUNTS = {
     'discount_allowed': ('210706', 'Discount Allowed', 'expense', False),
     'landed_clearing': ('100906', 'Landed Cost Clearing', 'asset_current', True),
     'state_vat_payable': ('112361', 'State VAT Payable (Liquor)', 'liability_current', False),
+    'opening_equity': ('300100', 'Opening Balance Equity', 'equity', False),
+    'owner_drawings': ('300200', 'Owner Drawings', 'equity', False),
+    'owner_capital': ('300300', 'Owner Capital Introduced', 'equity', False),
+    'misc_income': ('400002', 'Miscellaneous Income', 'income_other', False),
 }
 
 # key: (name, landed_cost_ok, account key used as the product's expense account)
@@ -95,6 +99,23 @@ class OrsquareShopBootstrap(models.AbstractModel):
         for categ in categories.with_company(company):
             categ.write(values)
         company.anglo_saxon_accounting = True
+
+    @api.model
+    def simplify_liquidity(self, company):
+        """Retail cash/UPI payments post straight to the journal's account.
+
+        Odoo's default parks every payment in an 'Outstanding' account until a bank statement is
+        reconciled. A shop's cash drawer and UPI collections have no statement to reconcile, so the
+        payment accounts are the journals' own accounts: cash in hand is one number, payments are 'paid'.
+        """
+        self.journal('upi', company)
+        journals = self.env['account.journal'].search([('company_id', '=', company.id), ('type', 'in', ('cash', 'bank'))])
+        for journal in journals:
+            if not journal.default_account_id:
+                continue
+            for line in journal.inbound_payment_method_line_ids | journal.outbound_payment_method_line_ids:
+                if line.payment_account_id != journal.default_account_id:
+                    line.payment_account_id = journal.default_account_id
 
     # ------------------------------------------------------------------ POS: journals, tenders, config
     @api.model
@@ -266,6 +287,7 @@ class OrsquareShopBootstrap(models.AbstractModel):
         company.point_of_sale_update_stock_quantities = 'real'
         self.scrap_location(company)
         self.pos_config(company)
+        self.simplify_liquidity(company)
         for key in SERVICE_PRODUCTS:
             self.service_product(key, company)
         self.ensure_tax_regimes(company)

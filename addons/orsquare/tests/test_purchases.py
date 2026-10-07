@@ -123,10 +123,16 @@ class TestPurchases(OrsquareCase):
             self.purchases.record_bill(payload)
 
     def test_08_back_dated_purchase_into_sealed_day_rejected(self):
-        self.day.action_seal(1000.0)
+        yesterday = self.company.orsquare_current_business_date() - timedelta(days=1)
+        self.Day.create({'company_id': self.company.id, 'date': yesterday, 'state': 'sealed'})
         with self.assertRaisesRegex(UserError, "sealed"):
-            self.purchases.record_bill(self._anand_payload(
-                bill_date=str(self.company.orsquare_current_business_date())))
+            self.purchases.record_bill(self._anand_payload(bill_date=str(yesterday)))
+
+    def test_08b_live_purchase_after_early_seal_rolls_to_next_day(self):
+        today = self.company.orsquare_current_business_date()
+        self.day.action_seal(1000.0)
+        res = self.purchases.record_bill(self._anand_payload())
+        self.assertEqual(res['business_date'], str(today + timedelta(days=1)))
 
     def test_09_simple_bill_with_gst_input_credit(self):
         tax = self.env['account.tax'].search([('name', '=', '5% GST'), ('type_tax_use', '=', 'purchase'),

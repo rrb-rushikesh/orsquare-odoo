@@ -37,6 +37,18 @@ class ResCompany(models.Model):
     def orsquare_current_business_date(self):
         return self.orsquare_business_date_for(fields.Datetime.now())
 
+    def orsquare_effective_business_date(self, dt=None):
+        """Business date for a LIVE document: if that day is already sealed (the owner closed early but
+        trading continues) the document rolls forward to the next business day instead of failing.
+        Explicitly dated documents (offline bills, back-dated purchases) never roll: they are rejected."""
+        self.ensure_one()
+        date = self.orsquare_business_date_for(dt)
+        sealed = set(self.env['orsquare.business_day'].sudo().search([
+            ('company_id', '=', self.id), ('date', '>=', date), ('state', 'in', ('sealed', 're_audited'))]).mapped('date'))
+        while date in sealed:
+            date += timedelta(days=1)
+        return date
+
     def orsquare_business_day_bounds(self, business_date):
         """UTC [start, end) datetimes (naive) of a business day."""
         self.ensure_one()
@@ -69,8 +81,12 @@ class BusinessDateMixin(models.AbstractModel):
                 continue
             company_id = vals.get('company_id') or self.env.company.id
             company = companies.setdefault(company_id, self.env['res.company'].browse(company_id))
-            vals['orsquare_business_date'] = company.orsquare_business_date_for(
-                self._orsquare_event_datetime(vals))
+            if self.env.context.get('orsquare_event_dt'):
+                vals['orsquare_business_date'] = company.orsquare_business_date_for(
+                    self._orsquare_event_datetime(vals))
+            else:
+                vals['orsquare_business_date'] = company.orsquare_effective_business_date(
+                    self._orsquare_event_datetime(vals))
         records = super().create(vals_list)
         if not self.env.context.get('orsquare_allow_sealed'):
             records._orsquare_check_day_open()

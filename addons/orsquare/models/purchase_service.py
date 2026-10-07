@@ -206,8 +206,14 @@ class OrsquarePurchaseService(models.AbstractModel):
         supplier = env['res.partner'].browse(int(payload['supplier_id'])).exists()
         if not supplier:
             raise UserError(_("Choose a supplier."))
-        business_date = company.orsquare_business_date_for(event_dt)
-        env['orsquare.business_day'].check_day_not_sealed(company, business_date)
+        back_dated = bool(payload.get('bill_date')) and \
+            fields.Date.to_date(payload['bill_date']) != company.orsquare_current_business_date()
+        business_date = company.orsquare_business_date_for(event_dt) if back_dated \
+            else company.orsquare_effective_business_date(event_dt)
+        if back_dated:
+            env['orsquare.business_day'].check_day_not_sealed(company, business_date)
+        else:
+            env = env(context=dict(env.context, orsquare_event_dt=False))
 
         lines, gross = self._prepare_lines(env, payload, company, supplier)
         cap_d, exp_d, cap_c, exp_c = self._adjustments(payload, company)

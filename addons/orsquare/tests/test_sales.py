@@ -160,10 +160,19 @@ class TestSales(OrsquareCase):
         self.assertEqual(disc.qty_short, 10)
         self.assertEqual(disc.state, 'open')
 
-    def test_14_sealed_day_rejects_sale(self):
+    def test_14_sealed_day_rejects_dated_sale_but_live_sale_rolls_forward(self):
+        today = self.company.orsquare_current_business_date()
         self.day.action_seal(self.day.live_expected_cash())
-        with self.assertRaises(UserError):
-            self.sell([{'product_id': self.whisky.id, 'qty': 1}])
+        # An offline bill dated inside the sealed day is rejected...
+        with self.assertRaisesRegex(UserError, "sealed"):
+            self.sales.settle({'client_ref': 'OFF-SEALED', 'offline': True,
+                               'created_at': fields.Datetime.now().isoformat(),
+                               'lines': [{'product_id': self.whisky.id, 'qty': 1}],
+                               'payments': [{'method': 'cash', 'amount': 1500.0}]})
+        # ...but trading that continues live after an early seal goes to the next business day.
+        res = self.sell([{'product_id': self.whisky.id, 'qty': 1}])
+        self.assertTrue(res['rolled_forward'])
+        self.assertEqual(res['business_date'], str(today + timedelta(days=1)))
 
     def test_16_gst_tax_computed_server_side(self):
         tax = self.env['account.tax'].search([('name', '=', '5% GST S'), ('company_id', '=', self.company.id)], limit=1)

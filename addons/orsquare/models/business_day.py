@@ -73,7 +73,7 @@ class OrsquareBusinessDay(models.Model):
         """Open the daybook for the current business date (idempotent)."""
         company = (company or self.env.company)
         self = self.sudo()
-        date = date or company.orsquare_current_business_date()
+        date = date or company.orsquare_effective_business_date()
         day = self.search([('company_id', '=', company.id), ('date', '=', date)], limit=1)
         if day:
             if day.state != 'open':
@@ -102,8 +102,8 @@ class OrsquareBusinessDay(models.Model):
             if day.state != 'open':
                 raise UserError(_("Business day %s is sealed; the sale cannot be recorded on it.", date))
             return day
-        if date == company.orsquare_current_business_date():
-            return self.open_day(0.0, _("Opened automatically by the first sale"), company, auto=True)
+        if date == company.orsquare_effective_business_date():
+            return self.open_day(0.0, _("Opened automatically by the first sale"), company, auto=True, date=date)
         raise UserError(_("No daybook was opened for business date %s.", date))
 
     # ------------------------------------------------------------------ cash

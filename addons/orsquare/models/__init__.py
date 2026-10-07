@@ -13,3 +13,7 @@ from . import pos_extensions
 from . import sale_service
 from . import tax_regime
 from . import purchase_service
+from . import stock_reports
+from . import accounts_service
+from . import cashflow_service
+from . import reports_service
