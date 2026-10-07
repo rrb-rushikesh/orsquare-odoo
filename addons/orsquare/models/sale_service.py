@@ -59,6 +59,22 @@ class OrsquareSaleService(models.AbstractModel):
         return taxes, res['total_excluded'], res['total_included']
 
     @api.model
+    def _price_refund_line(self, env, raw, currency, partner):
+        """A return is always priced at the ORIGINAL line's rate, discount and taxes."""
+        orig = env['pos.order.line'].browse(int(raw['refund_of_line_id'])).exists()
+        if not orig or orig.order_id.company_id != env.company \
+                or orig.order_id.state not in ('paid', 'done', 'invoiced'):
+            raise UserError(_("The bill line being returned was not found."))
+        refundable = orig.qty - orig.refunded_qty
+        qty = refundable if raw.get('full') else float(raw['qty'])
+        if qty <= 0 or float_compare(qty, refundable, precision_digits=6) > 0:
+            raise UserError(_("%(p)s: only %(r)s can still be returned.", p=orig.full_product_name, r=refundable))
+        qty = -qty
+        res = orig.tax_ids_after_fiscal_position.compute_all(
+            orig.price_unit * (1 - orig.discount / 100.0), currency, qty, product=orig.product_id, partner=partner)
+        return orig, qty, res
+
+    @api.model
     def _prepare_lines(self, env, payload, config, partner, fpos, currency, offline):
         """Turn the client's lines into ``pos.order.line`` values + stock requirements."""
         Product = env['product.product']
@@ -94,6 +110,17 @@ class OrsquareSaleService(models.AbstractModel):
                 price_unit = rate / qty
                 name = _("%(p)s Peg %(ml)g ml (%(b)s)", p=product.product_tmpl_id.name, ml=ml, b=bottle.name)
                 extra = {'orsquare_opened_bottle_id': bottle.id, 'orsquare_peg_ml': ml}
+            elif raw.get('refund_of_line_id'):
+                orig, qty, res = self._price_refund_line(env, raw, currency, partner)
+                line_vals.append({
+                    'product_id': orig.product_id.id, 'qty': qty, 'price_unit': orig.price_unit,
+                    'discount': orig.discount, 'tax_ids': [(6, 0, orig.tax_ids.ids)],
+                    'tax_ids_after_fiscal_position': [(6, 0, orig.tax_ids_after_fiscal_position.ids)],
+                    'price_subtotal': res['total_excluded'], 'price_subtotal_incl': res['total_included'],
+                    'full_product_name': _("%s (return)", orig.full_product_name),
+                    'refunded_orderline_id': orig.id,
+                })
+                continue
             else:
                 product = Product.browse(int(raw['product_id'])).exists()
                 if not product:
@@ -149,9 +176,78 @@ class OrsquareSaleService(models.AbstractModel):
     # ------------------------------------------------------------------ main entry
     @api.model
     def settle(self, payload):
+        """Bill a sale, a return, or an exchange (return + sale on one request).
+
+        Transaction-type awareness: a counter (non-invoiced) receipt nets returns and new items on one
+        bill; when the returned goods were sold on a tax invoice, the backend instead issues a paired
+        statutory Credit Note and a new Tax Invoice.  The caller sees one unified operation.
+        """
         user = self.env.user
         if not (self.env.su or user.has_group('orsquare.group_orsquare_cashier')):
             raise AccessError(_("You are not allowed to bill at the counter."))
+        lines = payload.get('lines') or []
+        refund_ids = [int(l['refund_of_line_id']) for l in lines if l.get('refund_of_line_id')]
+        if refund_ids:
+            if not (self.env.su or user.has_group('orsquare.group_orsquare_can_manage_returns')):
+                raise AccessError(_("You are not allowed to process returns."))
+            originals = self.sudo().env['pos.order.line'].browse(refund_ids).exists().mapped('order_id')
+            if any(o.account_move for o in originals) and any(not l.get('refund_of_line_id') for l in lines):
+                return self._settle_invoiced_exchange(payload, originals)
+        return self._settle_single(payload)
+
+    @api.model
+    def _settle_invoiced_exchange(self, payload, originals):
+        """Paired documents: Credit Note (refund order) + new Tax Invoice (sale order)."""
+        ref = payload['client_ref']
+        lines = payload['lines']
+        env0 = self.sudo().env
+        env0.cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [ref])
+        done = env0['pos.order'].search([('orsquare_client_ref', 'in', [ref + ':R', ref + ':S']),
+                                         ('company_id', '=', self.env.company.id)])
+        if len(done) == 2:   # replay of a completed exchange: answer from what was already posted
+            refund_o = done.filtered(lambda o: o.orsquare_client_ref.endswith(':R'))
+            sale_o = done - refund_o
+            r, sl = self._result(env0, refund_o, duplicate=True), self._result(env0, sale_o, duplicate=True)
+            return self._combine_exchange(r, sl, -refund_o.amount_total, 'cash')
+        refund_lines = [l for l in lines if l.get('refund_of_line_id')]
+        sale_lines = [l for l in lines if not l.get('refund_of_line_id')]
+        partner_id = payload.get('partner_id') or originals[:1].partner_id.id
+        base = {k: v for k, v in payload.items() if k not in ('lines', 'payments', 'client_ref', 'bill_discount')}
+        currency = self.env.company.currency_id
+        partner = self.sudo().env['res.partner'].browse(int(partner_id))
+        method = (payload.get('payments') or [{'method': 'cash'}])[0]['method']
+        refund_total = float_round(-sum(
+            self._price_refund_line(self.sudo().env, l, currency, partner)[2]['total_included']
+            for l in refund_lines), precision_rounding=currency.rounding)
+        # The credit note is paid out in full and the new invoice is paid in full: the customer's
+        # tender is the NET (drawer nets the two), each statutory document stays self-consistent.
+        refund = self._settle_single(dict(base, client_ref=ref + ':R', partner_id=partner_id, lines=refund_lines,
+                                          to_invoice=True, payments=[{'method': method, 'amount': refund_total}]))
+        new_payments = [dict(p) for p in (payload.get('payments') or [])]
+        if new_payments:
+            new_payments[0]['amount'] = float(new_payments[0]['amount']) + refund_total
+        else:
+            new_payments = [{'method': method, 'amount': refund_total}]
+        sale = self._settle_single(dict(base, client_ref=ref + ':S', partner_id=partner_id, lines=sale_lines,
+                                        to_invoice=True, payments=new_payments,
+                                        bill_discount=payload.get('bill_discount')))
+        return self._combine_exchange(refund, sale, refund_total, method)
+
+    @api.model
+    def _combine_exchange(self, refund, sale, refund_total, method):
+        return {
+            'order_id': sale['order_id'], 'name': sale['name'], 'state': sale['state'],
+            'total': sale['total'] - refund_total, 'tax': sale['tax'], 'change': sale['change'],
+            'business_date': sale['business_date'], 'invoice_id': sale['invoice_id'],
+            'invoice_name': sale['invoice_name'], 'pickings': refund['pickings'] + sale['pickings'],
+            'auto_godown_transfer': sale['auto_godown_transfer'], 'flagged': sale['flagged'],
+            'duplicate': sale['duplicate'] and refund['duplicate'],
+            'credit_note_id': refund['invoice_id'], 'credit_note_name': refund['invoice_name'],
+            'credit_note_total': refund_total, 'refund_payout': method,
+        }
+
+    @api.model
+    def _settle_single(self, payload):
         ref = (payload.get('client_ref') or '').strip()
         if not ref:
             raise UserError(_("A client reference (idempotency key) is required."))
@@ -188,6 +284,7 @@ class OrsquareSaleService(models.AbstractModel):
         concession = float(payload.get('settlement_concession') or 0.0)
         if concession < 0:
             raise UserError(_("A settlement concession cannot be negative."))
+        refund_mode = float_compare(amount_total, 0.0, precision_rounding=currency.rounding) < 0
         payments, paid_total, change = [], 0.0, 0.0
         due = amount_total - concession
         for pay in payload.get('payments') or []:
@@ -200,15 +297,24 @@ class OrsquareSaleService(models.AbstractModel):
             payments.append((key, amount))
         for key, amount in payments:
             paid_total += amount
-        rounding = config.rounding_method.rounding if config.cash_rounding else currency.rounding
-        if float_compare(paid_total, due, precision_rounding=currency.rounding) > 0:
-            cash_amount = sum(a for k, a in payments if k == 'cash')
-            over = float_round(paid_total - due, precision_rounding=currency.rounding)
-            if float_compare(over, cash_amount, precision_rounding=currency.rounding) > 0:
-                raise UserError(_("Only cash can be over-tendered."))
-            change = over  # change handed back; only the net cash is recorded
-            payments = [(k, (a - over) if k == 'cash' else a) for k, a in payments]
+        if refund_mode:
+            # money goes OUT: payouts (entered positive) are recorded as negative payments
+            if concession:
+                raise UserError(_("A settlement concession applies to a payment, not to a refund."))
+            if float_compare(paid_total, -due, precision_rounding=currency.rounding) != 0:
+                raise UserError(_("The refund of %(due)s must be paid out in full (got %(got)s).",
+                                  due=-due, got=paid_total))
+            payments = [(k, -a) for k, a in payments]
             paid_total = due
+        else:
+            if float_compare(paid_total, due, precision_rounding=currency.rounding) > 0:
+                cash_amount = sum(a for k, a in payments if k == 'cash')
+                over = float_round(paid_total - due, precision_rounding=currency.rounding)
+                if float_compare(over, cash_amount, precision_rounding=currency.rounding) > 0:
+                    raise UserError(_("Only cash can be over-tendered."))
+                change = over  # change handed back; only the net cash is recorded
+                payments = [(k, (a - over) if k == 'cash' else a) for k, a in payments]
+                paid_total = due
         gap = float_round(due - paid_total, precision_rounding=currency.rounding)
         if abs(gap) > (config.rounding_method.rounding / 2.0 if config.cash_rounding else 0.0) \
                 and not float_is_zero(gap, precision_rounding=currency.rounding):
@@ -216,7 +322,7 @@ class OrsquareSaleService(models.AbstractModel):
         if any(k == 'khata' for k, _a in payments):
             if not partner:
                 raise UserError(_("Khata (credit) needs a customer."))
-            self._check_credit_limit(env, partner, sum(a for k, a in payments if k == 'khata'), offline)
+            self._check_credit_limit(env, partner, sum(a for k, a in payments if k == 'khata' and a > 0), offline)
         if payload.get('to_invoice') and not partner:
             raise UserError(_("A tax invoice needs a customer."))
 

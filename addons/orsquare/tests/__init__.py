@@ -5,3 +5,4 @@ from . import test_sales
 from . import test_opened_bottles
 from . import test_daybook
 from . import test_purchases
+from . import test_returns
