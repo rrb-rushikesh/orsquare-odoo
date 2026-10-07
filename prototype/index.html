@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ORSquare prototypes</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+  main { max-width: 980px; margin: 0 auto; padding: 36px 20px 80px; }
+  h1 { font-weight: 300; font-size: 32px; margin: 0 0 6px; } p.lead { color: var(--muted); margin: 0 0 30px; max-width: 640px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 34px 0 12px; }
+  .g { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  a.c { display: block; background: var(--canvas); border: 1px solid var(--line); padding: 16px 18px; color: inherit; text-decoration: none; border-top: 3px solid var(--ink); }
+  a.c:hover { background: var(--layer-accent); } a.c b { display: block; margin-bottom: 4px; } a.c span { color: var(--muted); font-size: 13px; }
+  a.c small { color: var(--blue); }
+</style></head>
+<body><main>
+  <h1>Prototypes</h1>
+  <p class="lead">Experiments only. These are standalone pages with fake data: the real app in <code>frontend/</code> is untouched. Open any of them by double-clicking, no server needed. Pick one favourite per group and tell me which.</p>
+  <h2>A. Bill detail (opens from Accounts &rarr; bill history)</h2>
+  <div class="g">
+    <a class="c" href="bills/01-receipt-slip.html"><b>1 &middot; Receipt slip</b><span>Narrow monospaced slip, dashed lines, like the counter printer. Familiar to every shop.</span></a>
+    <a class="c" href="bills/02-formal-invoice.html"><b>2 &middot; Formal invoice</b><span>Document layout: header, details grid, ruled table, totals, a colour bar for the balance.</span></a>
+    <a class="c" href="bills/03-phone-cards.html"><b>3 &middot; Phone cards</b><span>One column, item cards, big total at the top, Print / Receive buttons always in reach.</span></a>
+    <a class="c" href="bills/04-summary-first.html"><b>4 &middot; Summary first</b><span>Dark side panel with total and paid bar, payment timeline, items folded away.</span></a>
+    <a class="c" href="bills/05-editorial.html"><b>5 &middot; Editorial</b><span>No boxes: large type, dotted leaders, one line saying what is still owed.</span></a>
+  </div>
+  <h2>B. Record payment (Accounts &rarr; receive / pay)</h2>
+  <div class="g">
+    <a class="c" href="payments/01-single-form.html"><b>1 &middot; Single form</b><span>One column: Receive / Pay switch, person, amount, method, one button.</span></a>
+    <a class="c" href="payments/02-three-steps.html"><b>2 &middot; Three steps</b><span>One question per screen: who, how much and against which bill, confirm.</span></a>
+    <a class="c" href="payments/03-bill-allocation.html"><b>3 &middot; Bill allocation</b><span>Type one amount; it is spread over the oldest open bills and the result is shown.</span></a>
+    <a class="c" href="payments/04-keypad.html"><b>4 &middot; Keypad</b><span>Big number and a touch keypad with quick amounts, built for the counter.</span></a>
+    <a class="c" href="payments/05-pick-from-list.html"><b>5 &middot; Pick from list</b><span>People list with balances on the left, a slip with a before/after balance on the right.</span></a>
+  </div>
+</main></body></html>

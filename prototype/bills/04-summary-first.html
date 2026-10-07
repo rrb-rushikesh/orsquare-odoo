@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bill 4 - Summary first</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { display: flex; justify-content: center; padding: 28px 16px 60px; }
+  /* answers "what is the state of this bill?" first; line items are one click away */
+  .grid { display: grid; grid-template-columns: 300px 1fr; width: 100%; max-width: 860px; border: 1px solid var(--line); background: var(--canvas); }
+  .side { background: var(--ink); color: #fff; padding: 26px 24px; display: flex; flex-direction: column; gap: 4px; }
+  .side small { color: #a8a8a8; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }
+  .side .no { font-size: 13px; color: #c6c6c6; margin-bottom: 18px; }
+  .side .total { font-size: 40px; font-weight: 300; letter-spacing: -.02em; }
+  .meter { height: 6px; background: #393939; margin: 14px 0 6px; }
+  .meter i { display: block; height: 100%; background: #ffffff; }
+  .legend { display: flex; justify-content: space-between; font-size: 12px; color: #c6c6c6; }
+  .due { margin-top: 22px; padding: 12px 14px; font-weight: 600; display: flex; justify-content: space-between; }
+  .due.rec { background: var(--rec-bg); color: var(--rec-fg); } .due.pay { background: var(--pay-bg); color: var(--pay-fg); } .due.ok { background: #393939; color: #c6c6c6; }
+  .main { padding: 22px 26px; }
+  h3 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+  .who { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 18px; }
+  .who b { font-size: 18px; font-weight: 500; } .who span { color: var(--muted); }
+  .tl { list-style: none; margin: 0 0 20px; padding: 0 0 0 16px; border-left: 2px solid var(--line); }
+  .tl li { position: relative; padding: 0 0 12px 8px; display: flex; justify-content: space-between; }
+  .tl li::before { content: ''; position: absolute; left: -22px; top: 5px; width: 10px; height: 10px; background: var(--canvas); border: 2px solid var(--ink); }
+  .tl li.todo::before { border-color: var(--subtle); border-style: dashed; } .tl li.todo { color: var(--muted); }
+  details { border-top: 1px solid var(--line); } summary { padding: 12px 0; cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; }
+  summary::after { content: '+'; color: var(--muted); } details[open] summary::after { content: '\2212'; }
+  .li { display: grid; grid-template-columns: 1fr 70px 80px 90px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .li span:nth-child(n+2) { text-align: right; }
+  .calc { display: flex; justify-content: space-between; padding: 6px 0; color: var(--ink-2); }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Bill 4 &middot; Summary first</b><div class="sw" data-switch></div></div>
+<div class="wrap"><div class="grid" id="bill"></div></div>
+<script src="../shared/data.js"></script>
+<script>
+mountBills((b, t) => {
+  const pct = Math.round((t.paid / t.total) * 100);
+  return `
+  <div class="side"><small>${b.kind === 'sale' ? 'Sales bill' : 'Purchase bill'}</small><div class="no">${b.no} &middot; ${b.date}</div>
+    <small>Bill total</small><div class="total num">${inr(t.total)}</div>
+    <div class="meter"><i style="width:${pct}%"></i></div>
+    <div class="legend"><span>${b.kind === 'sale' ? 'Received' : 'Paid'} ${inr(t.paid)}</span><span>${pct}%</span></div>
+    <div class="due ${t.due ? dueClass(b) : 'ok'}"><span>${t.due ? dueWord(b) : 'Settled'}</span><span class="num">${inr(t.due)}</span></div></div>
+  <div class="main">
+    <div class="who"><b>${b.party}</b><span>${b.phone || b.supplierInvoice || ''}</span></div>
+    <h3>Payment history</h3>
+    <ul class="tl">
+      <li><span>Bill created &middot; ${b.time}</span><span class="num">${inr(t.total)}</span></li>
+      ${b.payments.map((p) => `<li><span>${p.method} &middot; ${p.at}</span><span class="num">-${inr(p.amount)}</span></li>`).join('')}
+      ${t.due ? `<li class="todo"><span>Still to ${b.kind === 'sale' ? 'receive' : 'pay'}</span><span class="num">${inr(t.due)}</span></li>` : ''}
+    </ul>
+    <details><summary>${b.items.length} items</summary>
+      ${b.items.map((i) => `<div class="li"><span>${i.name}</span><span class="num">${i.qty}</span><span class="num">${inr(i.rate)}</span><span class="num">${inr(i.qty * i.rate)}</span></div>`).join('')}
+      <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
+        <div class="calc"><span>Subtotal</span><span class="num">${inr(t.subtotal)}</span></div>
+        ${b.discount ? `<div class="calc"><span>Discount</span><span class="num">-${inr(b.discount)}</span></div>` : ''}
+        <div class="calc"><span>${b.taxLabel}</span><span class="num">${inr(b.tax)}</span></div></div>
+    </details></div>`; });
+</script></body></html>

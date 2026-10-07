@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bill 2 - Formal invoice</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { padding: 28px 16px 60px; display: flex; justify-content: center; }
+  .doc { width: 100%; max-width: 780px; background: var(--canvas); border: 1px solid var(--line); border-top: 4px solid var(--ink); }
+  .head { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 24px 28px 18px; align-items: end; border-bottom: 1px solid var(--line); }
+  .kind { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .no { font-size: 30px; font-weight: 300; letter-spacing: -.01em; }
+  .shop { text-align: right; font-size: 12px; color: var(--muted); }
+  .shop b { display: block; color: var(--ink); font-size: 14px; }
+  .meta { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+  .meta div { padding: 14px 28px; border-right: 1px solid var(--line); }
+  .meta div:last-child { border-right: 0; }
+  .meta small { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .meta span { font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 12px 28px; background: var(--layer); border-bottom: 1px solid var(--line); }
+  td { padding: 12px 28px; border-bottom: 1px solid var(--line); }
+  th.r, td.r { text-align: right; }
+  td .u { color: var(--muted); font-size: 12px; }
+  .totals { display: flex; justify-content: flex-end; padding: 18px 28px; }
+  .totals dl { margin: 0; width: 280px; }
+  .totals .l { display: flex; justify-content: space-between; padding: 4px 0; color: var(--ink-2); }
+  .totals .g { border-top: 2px solid var(--ink); margin-top: 8px; padding-top: 10px; font-size: 20px; font-weight: 600; color: var(--ink); }
+  .foot { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px; font-weight: 600; }
+  .foot.rec { background: var(--rec-bg); color: var(--rec-fg); } .foot.pay { background: var(--pay-bg); color: var(--pay-fg); } .foot.ok { background: var(--layer); color: var(--muted); }
+  .foot span:last-child { font-size: 18px; }
+  .paid { padding: 0 28px 14px; color: var(--muted); font-size: 12px; }
+  @media (max-width: 640px) { .meta { grid-template-columns: 1fr 1fr; } .head, .meta div, th, td, .totals, .foot, .paid { padding-left: 16px; padding-right: 16px; } }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Bill 2 &middot; Formal invoice</b><div class="sw" data-switch></div></div>
+<div class="wrap"><div class="doc" id="bill"></div></div>
+<script src="../shared/data.js"></script>
+<script>
+mountBills((b, t) => `
+  <div class="head"><div><div class="kind">${b.kind === 'sale' ? 'Sales bill' : 'Purchase bill'}</div><div class="no">${b.no}</div></div>
+    <div class="shop"><b>${SHOP.name}</b>${SHOP.address}<br>GSTIN ${SHOP.gstin}</div></div>
+  <div class="meta">
+    <div><small>${b.kind === 'sale' ? 'Billed to' : 'Supplier'}</small><span>${b.party}</span></div>
+    <div><small>Date</small><span>${b.date}, ${b.time}</span></div>
+    <div><small>${b.supplierInvoice ? 'Supplier invoice' : 'Phone'}</small><span>${b.supplierInvoice || b.phone || '-'}</span></div>
+    <div><small>Entered by</small><span>${b.staff}</span></div>
+  </div>
+  <table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+    ${b.items.map((i) => `<tr><td>${i.name}<div class="u">${i.unit}</div></td><td class="r num">${i.qty}</td><td class="r num">${inr(i.rate)}</td><td class="r num">${inr(i.qty * i.rate)}</td></tr>`).join('')}
+  </tbody></table>
+  <div class="totals"><dl>
+    <div class="l"><span>Subtotal</span><span class="num">${inr(t.subtotal)}</span></div>
+    ${b.discount ? `<div class="l"><span>Discount</span><span class="num">-${inr(b.discount)}</span></div>` : ''}
+    <div class="l"><span>${b.taxLabel}</span><span class="num">${inr(b.tax)}</span></div>
+    <div class="l g"><span>Total</span><span class="num">${inr(t.total)}</span></div></dl></div>
+  <div class="paid">${b.payments.map((p) => `Received ${inr(p.amount)} by ${p.method}`.replace('Received', b.kind === 'sale' ? 'Received' : 'Paid')).join(' &middot; ')}</div>
+  <div class="foot ${t.due ? dueClass(b) : 'ok'}"><span>${t.due ? dueWord(b) + ' balance' : 'Settled'}</span><span class="num">${inr(t.due)}</span></div>`);
+</script></body></html>

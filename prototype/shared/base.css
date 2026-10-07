@@ -1,0 +1,28 @@
+/* Tokens copied from frontend/src/styles/tokens.css so the prototypes match the real palette. */
+:root {
+  --blue: #0f62fe; --blue-active: #002d9c;
+  --ink: #161616; --ink-2: #393939; --muted: #525252; --subtle: #8c8c8c; --disabled: #c6c6c6;
+  --canvas: #ffffff; --layer: #f4f4f4; --layer-2: #e0e0e0; --layer-accent: #edf5ff;
+  --line: #e0e0e0; --line-strong: #161616;
+  --rec: #2d6b3f; --rec-fg: #235c35; --rec-bg: #edf6f0;
+  --pay: #a03b3b; --pay-fg: #8a2e2e; --pay-bg: #faebeb;
+  --adv: #0f62fe;
+  --font: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--font); color: var(--ink); background: var(--layer); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+
+/* experiment chrome: not part of any design, only the picker on top of each page */
+.proto-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; background: var(--ink); color: #fff; font-size: 12px; }
+.proto-bar a { color: #c6c6c6; text-decoration: none; }
+.proto-bar a:hover { color: #fff; }
+.proto-bar b { font-weight: 600; }
+.proto-bar .sw { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.proto-bar .sw button { background: transparent; border: 1px solid #525252; color: #c6c6c6; padding: 4px 10px; cursor: pointer; border-radius: 0; }
+.proto-bar .sw button.on { background: #fff; color: var(--ink); border-color: #fff; }
+
+.rec-t { color: var(--rec-fg); } .pay-t { color: var(--pay-fg); } .adv-t { color: var(--adv); } .zero-t { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }

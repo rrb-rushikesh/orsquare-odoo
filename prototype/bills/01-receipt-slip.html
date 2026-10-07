@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bill 1 - Receipt slip</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  body { background: #d8d8d8; }
+  .wrap { display: flex; justify-content: center; padding: 28px 12px 60px; }
+  /* the slip: narrow, monospaced, the same thing the counter printer would give the customer */
+  .slip { width: 340px; background: #fffef9; padding: 22px 20px 30px; font-family: var(--mono); font-size: 12.5px; color: #1c1c1c;
+          box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.12);
+          --z: linear-gradient(135deg, #d8d8d8 8px, transparent 0) -8px 0/16px 16px repeat-x, linear-gradient(225deg, #d8d8d8 8px, transparent 0) -8px 0/16px 16px repeat-x; }
+  .slip::after { content: ''; display: block; height: 14px; margin: 30px -20px -30px; background: var(--z); }
+  .c { text-align: center; }
+  .shop { font-size: 16px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .dash { border: 0; border-top: 1px dashed #777; margin: 12px 0; }
+  .row { display: flex; justify-content: space-between; gap: 10px; }
+  .it { margin: 7px 0; }
+  .it .n { font-weight: 600; }
+  .it .q { color: #555; display: flex; justify-content: space-between; }
+  .big { font-size: 17px; font-weight: 700; }
+  .tag { display: inline-block; border: 1.5px solid currentColor; padding: 2px 8px; font-weight: 700; letter-spacing: .1em; transform: rotate(-3deg); }
+  .rec-t { color: #235c35; } .pay-t { color: #8a2e2e; } .zero-t { color: #333; }
+  .foot { margin-top: 14px; color: #666; font-size: 11px; }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Bill 1 &middot; Receipt slip</b><div class="sw" data-switch></div></div>
+<div class="wrap"><div class="slip" id="bill"></div></div>
+<script src="../shared/data.js"></script>
+<script>
+mountBills((b, t) => `
+  <div class="c"><div class="shop">${SHOP.name}</div><div>${SHOP.address}</div><div>GSTIN ${SHOP.gstin}</div></div>
+  <hr class="dash">
+  <div class="c"><b>${b.kind === 'sale' ? 'SALE BILL' : 'PURCHASE BILL'}</b></div>
+  <div class="row"><span>No. ${b.no}</span><span>${b.date}</span></div>
+  <div class="row"><span>${b.party}</span><span>${b.time}</span></div>
+  ${b.supplierInvoice ? `<div>Supplier inv. ${b.supplierInvoice}</div>` : ''}
+  <hr class="dash">
+  ${b.items.map((i) => `<div class="it"><div class="n">${i.name}</div><div class="q"><span>${i.qty} x ${inr(i.rate)}</span><span>${inr(i.qty * i.rate)}</span></div></div>`).join('')}
+  <hr class="dash">
+  <div class="row"><span>Subtotal</span><span>${inr(t.subtotal)}</span></div>
+  ${b.discount ? `<div class="row"><span>Discount</span><span>-${inr(b.discount)}</span></div>` : ''}
+  ${b.tax ? `<div class="row"><span>${b.taxLabel}</span><span>${inr(b.tax)}</span></div>` : ''}
+  <div class="row big" style="margin-top:6px"><span>TOTAL</span><span>${inr(t.total)}</span></div>
+  <hr class="dash">
+  ${b.payments.map((p) => `<div class="row"><span>${p.method} ${p.at}</span><span>${inr(p.amount)}</span></div>`).join('')}
+  <div class="row" style="margin-top:6px"><span><b>${t.due ? dueWord(b) : 'Settled'}</b></span><span class="${t.due ? dueClass(b) + '-t' : 'zero-t'}"><b>${t.due ? inr(t.due) : inr(0)}</b></span></div>
+  <div class="c" style="margin-top:16px">${t.due ? `<span class="tag ${dueClass(b)}-t">${t.due ? dueWord(b).toUpperCase() : ''}</span>` : '<span class="tag zero-t">PAID IN FULL</span>'}</div>
+  <div class="c foot">Thank you &middot; ${SHOP.phone}</div>`);
+</script></body></html>

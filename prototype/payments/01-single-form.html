@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment 1 - Single form</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { display: flex; justify-content: center; padding: 32px 12px 60px; }
+  /* the simplest possible form: one column, top to bottom, one button */
+  .form { width: 100%; max-width: 420px; background: var(--canvas); border: 1px solid var(--line); }
+  .form h2 { margin: 0; padding: 16px 20px; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--line); }
+  .body { padding: 20px; display: grid; gap: 18px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line-strong); }
+  .seg button { border: 0; background: var(--canvas); padding: 11px; cursor: pointer; font-weight: 500; }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .seg.dir button.on.rec { background: var(--rec); } .seg.dir button.on.pay { background: var(--pay); }
+  select, input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-bottom: 1px solid var(--ink); background: var(--layer); border-radius: 0; }
+  .owes { padding: 10px 12px; font-size: 13px; }
+  .owes.rec { background: var(--rec-bg); color: var(--rec-fg); } .owes.pay { background: var(--pay-bg); color: var(--pay-fg); } .owes.adv { background: var(--layer-accent); color: var(--adv); } .owes.zero { background: var(--layer); color: var(--muted); }
+  .amt { font-size: 26px; font-weight: 300; }
+  .chips { display: flex; gap: 6px; margin-top: 8px; }
+  .chips button { border: 1px solid var(--line); background: var(--canvas); padding: 5px 10px; cursor: pointer; font-size: 12px; }
+  .go { border: 0; padding: 15px; font-weight: 600; color: #fff; cursor: pointer; width: 100%; }
+  .go.rec { background: var(--rec); } .go.pay { background: var(--pay); } .go:disabled { background: var(--disabled); cursor: not-allowed; }
+  .done { padding: 12px; background: var(--rec-bg); color: var(--rec-fg); display: none; }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Payment 1 &middot; Single form</b></div>
+<div class="wrap"><div class="form">
+  <h2>Record payment</h2>
+  <div class="body">
+    <div class="seg dir" id="dir"><button data-d="in" class="on rec">Receive money</button><button data-d="out" class="pay">Pay money</button></div>
+    <div><label id="plabel">From customer</label><select id="party"></select></div>
+    <div class="owes" id="owes"></div>
+    <div><label>Amount</label><input class="amt num" id="amt" inputmode="decimal" placeholder="0"><div class="chips" id="chips"></div></div>
+    <div><label>Paid by</label><div class="seg" id="mode"><button class="on">Cash</button><button>UPI</button></div></div>
+    <div id="refbox" style="display:none"><label>UPI reference</label><input id="ref" placeholder="Transaction id"></div>
+    <button class="go rec" id="go" disabled>Receive</button>
+    <div class="done" id="done"></div>
+  </div></div></div>
+<script src="../shared/data.js"></script>
+<script>
+let dir = 'in', mode = 'Cash';
+const $ = (id) => document.getElementById(id);
+const list = () => PARTIES.filter((p) => (dir === 'in') === isReceive(p));
+const cur = () => PARTIES.find((p) => p.id === $('party').value);
+function draw() {
+  $('plabel').textContent = dir === 'in' ? 'From customer' : 'To supplier';
+  $('party').innerHTML = list().map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+  update();
+}
+function update() {
+  const p = cur(); const amt = Number($('amt').value) || 0;
+  const cls = p.balance > 0 ? (dir === 'in' ? 'rec' : 'pay') : p.balance < 0 ? 'adv' : 'zero';
+  $('owes').className = 'owes ' + cls;
+  $('owes').textContent = p.balance > 0 ? (dir === 'in' ? `${p.name} owes you ${inr(p.balance)}` : `You owe ${p.name} ${inr(p.balance)}`)
+    : p.balance < 0 ? `${p.name} has paid ${inr(-p.balance)} in advance` : 'Nothing is owed';
+  $('chips').innerHTML = p.balance > 0 ? `<button data-v="${p.balance}">Full ${inr(p.balance)}</button>` + (p.balance >= 1000 ? `<button data-v="${Math.round(p.balance / 2)}">Half</button>` : '') : '';
+  $('go').className = 'go ' + (dir === 'in' ? 'rec' : 'pay');
+  $('go').textContent = amt ? `${dir === 'in' ? 'Receive' : 'Pay'} ${inr(amt)} by ${mode}` : (dir === 'in' ? 'Receive' : 'Pay');
+  $('go').disabled = !amt;
+}
+$('dir').onclick = (e) => { const d = e.target.dataset.d; if (!d) return; dir = d; [...$('dir').children].forEach((b) => b.classList.toggle('on', b.dataset.d === d)); [...$('dir').children].forEach((b) => b.classList.toggle('rec', b.dataset.d === 'in')); $('amt').value = ''; draw(); };
+$('mode').onclick = (e) => { if (e.target.tagName !== 'BUTTON') return; mode = e.target.textContent; [...$('mode').children].forEach((b) => b.classList.toggle('on', b === e.target)); $('refbox').style.display = mode === 'UPI' ? 'block' : 'none'; update(); };
+$('party').onchange = () => { $('amt').value = ''; update(); };
+$('amt').oninput = update;
+$('chips').onclick = (e) => { if (e.target.dataset.v) { $('amt').value = e.target.dataset.v; update(); } };
+$('go').onclick = () => { $('done').style.display = 'block'; $('done').textContent = `Saved: ${inr(Number($('amt').value))} ${dir === 'in' ? 'received from' : 'paid to'} ${cur().name} (${mode}). Prototype only, nothing was stored.`; };
+draw();
+</script></body></html>

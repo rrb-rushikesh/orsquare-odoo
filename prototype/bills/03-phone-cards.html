@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bill 3 - Phone cards</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { display: flex; justify-content: center; padding: 24px 12px 60px; }
+  /* phone-width first: one column, big tap targets, total and actions always in reach */
+  .phone { width: 100%; max-width: 400px; background: var(--layer); border: 1px solid var(--line); position: relative; }
+  .top { background: var(--canvas); padding: 16px 16px 18px; border-bottom: 1px solid var(--line); }
+  .top .crumb { color: var(--blue); font-size: 13px; }
+  .top h1 { margin: 6px 0 0; font-size: 15px; font-weight: 500; color: var(--muted); }
+  .top .amt { font-size: 38px; font-weight: 300; letter-spacing: -.02em; margin: 2px 0 8px; }
+  .chip { display: inline-block; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+  .chip.rec { background: var(--rec-bg); color: var(--rec-fg); } .chip.pay { background: var(--pay-bg); color: var(--pay-fg); } .chip.ok { background: var(--layer-2); color: var(--ink-2); }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .sec { padding: 14px 16px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  .card { background: var(--canvas); margin: 0 12px 8px; padding: 12px 14px; display: flex; justify-content: space-between; gap: 12px; border-left: 3px solid var(--line-strong); }
+  .card .n { font-weight: 500; } .card .q { color: var(--muted); font-size: 13px; }
+  .card .t { font-weight: 600; white-space: nowrap; }
+  .sum { background: var(--canvas); margin: 8px 12px; padding: 4px 14px; }
+  .sum .l { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .sum .l:last-child { border: 0; font-weight: 600; font-size: 16px; }
+  .bar { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-top: 1px solid var(--line); margin-top: 12px; }
+  .bar button { border: 0; background: var(--canvas); padding: 15px; font-weight: 500; cursor: pointer; }
+  .bar button.main { background: var(--blue); color: #fff; }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Bill 3 &middot; Phone cards</b><div class="sw" data-switch></div></div>
+<div class="wrap"><div class="phone" id="bill"></div></div>
+<script src="../shared/data.js"></script>
+<script>
+mountBills((b, t) => `
+  <div class="top"><div class="crumb">&larr; Bill history</div>
+    <h1>${b.no} &middot; ${b.party}</h1>
+    <div class="amt num">${inr(t.total)}</div>
+    <span class="chip ${t.due ? dueClass(b) : 'ok'}">${t.due ? dueWord(b) + ' ' + inr(t.due) : 'Settled'}</span>
+    <div class="sub">${b.date}, ${b.time} &middot; ${b.items.length} items</div></div>
+  <div class="sec">Items</div>
+  ${b.items.map((i) => `<div class="card"><div><div class="n">${i.name}</div><div class="q num">${i.qty} &times; ${inr(i.rate)}</div></div><div class="t num">${inr(i.qty * i.rate)}</div></div>`).join('')}
+  <div class="sec">Totals</div>
+  <div class="sum">
+    <div class="l"><span>Subtotal</span><span class="num">${inr(t.subtotal)}</span></div>
+    ${b.discount ? `<div class="l"><span>Discount</span><span class="num">-${inr(b.discount)}</span></div>` : ''}
+    ${b.tax ? `<div class="l"><span>${b.taxLabel}</span><span class="num">${inr(b.tax)}</span></div>` : ''}
+    <div class="l"><span>Total</span><span class="num">${inr(t.total)}</span></div></div>
+  <div class="sec">${b.kind === 'sale' ? 'Received' : 'Paid'}</div>
+  ${b.payments.map((p) => `<div class="card" style="border-color:var(--line)"><div class="n">${p.method}<div class="q">${p.at}</div></div><div class="t num">${inr(p.amount)}</div></div>`).join('')}
+  <div class="bar"><button>Print</button><button class="main">${t.due ? (b.kind === 'sale' ? 'Receive' : 'Pay') + ' ' + inr(t.due) : 'Share'}</button></div>`);
+</script></body></html>

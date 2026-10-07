@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment 5 - Pick from list</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { display: flex; justify-content: center; padding: 28px 12px 60px; }
+  /* two panels: who owes what on the left, a slip on the right. The direction is decided by the person you click. */
+  .grid { display: grid; grid-template-columns: 300px 1fr; width: 100%; max-width: 820px; background: var(--canvas); border: 1px solid var(--line); min-height: 460px; }
+  .list { border-right: 1px solid var(--line); background: var(--layer); }
+  .list input { width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 14px 16px; background: var(--canvas); }
+  .grp { padding: 14px 16px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+  .grp.rec { color: var(--rec-fg); } .grp.pay { color: var(--pay-fg); }
+  .row { display: flex; justify-content: space-between; width: 100%; text-align: left; border: 0; background: transparent; padding: 11px 16px; cursor: pointer; border-left: 3px solid transparent; }
+  .row:hover { background: var(--layer-2); } .row.on { background: var(--canvas); border-left-color: var(--ink); }
+  .row .v { font-weight: 600; } .row .v.rec { color: var(--rec-fg); } .row .v.pay { color: var(--pay-fg); } .row .v.adv { color: var(--adv); }
+  .slip { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+  .slip.empty { align-items: center; justify-content: center; color: var(--muted); text-align: center; }
+  .head small { text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 600; } .head.rec small { color: var(--rec-fg); } .head.pay small { color: var(--pay-fg); }
+  .head h2 { margin: 4px 0 0; font-size: 24px; font-weight: 400; }
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; border: 1px solid var(--line); padding: 14px 16px; gap: 10px; }
+  .flow small { display: block; color: var(--muted); font-size: 11px; } .flow .arrow { color: var(--subtle); font-size: 20px; } .flow b { font-size: 20px; font-weight: 500; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input.amt { width: 100%; padding: 13px; border: 1px solid var(--line); border-bottom: 2px solid var(--ink); background: var(--layer); font-size: 26px; font-weight: 300; border-radius: 0; }
+  .seg { display: inline-grid; grid-auto-flow: column; border: 1px solid var(--ink); } .seg button { border: 0; padding: 9px 22px; background: var(--canvas); cursor: pointer; } .seg button.on { background: var(--ink); color: #fff; }
+  .go { border: 0; padding: 15px; font-weight: 600; color: #fff; cursor: pointer; } .go.rec { background: var(--rec); } .go.pay { background: var(--pay); } .go:disabled { background: var(--disabled); }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .list { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Payment 5 &middot; Pick from list</b></div>
+<div class="wrap"><div class="grid"><div class="list"><input id="q" placeholder="Search name or phone"><div id="people"></div></div><div class="slip empty" id="slip">Pick a person on the left.</div></div></div>
+<script src="../shared/data.js"></script>
+<script>
+let sel = null, mode = 'Cash', amt = '';
+const $ = (id) => document.getElementById(id);
+function people() {
+  const q = $('q').value.toLowerCase().trim();
+  const hit = (p) => !q || p.name.toLowerCase().includes(q) || p.phone.replace(/\s/g, '').includes(q);
+  const grp = (title, cls, arr) => arr.length ? `<div class="grp ${cls}">${title}</div>` + arr.map((p) => `<button class="row ${sel === p.id ? 'on' : ''}" data-id="${p.id}"><span>${p.name}</span><span class="v ${p.balance > 0 ? cls : p.balance < 0 ? 'adv' : ''}">${p.balance > 0 ? inr(p.balance) : p.balance < 0 ? 'Adv ' + inr(-p.balance) : '-'}</span></button>`).join('') : '';
+  $('people').innerHTML = grp('Receivable (customers)', 'rec', PARTIES.filter((p) => isReceive(p) && hit(p))) + grp('Payable (suppliers)', 'pay', PARTIES.filter((p) => !isReceive(p) && hit(p)));
+}
+function slip() {
+  const p = PARTIES.find((x) => x.id === sel); const el = $('slip');
+  if (!p) { el.className = 'slip empty'; el.textContent = 'Pick a person on the left.'; return; }
+  const rec = isReceive(p), n = Number(amt) || 0, cls = rec ? 'rec' : 'pay';
+  const after = p.balance - n; // negative becomes advance
+  el.className = 'slip';
+  el.innerHTML = `<div class="head ${cls}"><small>${rec ? 'Receive money' : 'Pay money'}</small><h2>${rec ? 'from' : 'to'} ${p.name}</h2></div>
+    <div><label>Amount</label><input class="amt num" id="amt" inputmode="decimal" placeholder="0" value="${amt}"></div>
+    <div class="flow"><div><small>Now</small><b class="num ${p.balance > 0 ? cls + '-t' : p.balance < 0 ? 'adv-t' : 'zero-t'}">${p.balance < 0 ? 'Adv ' + inr(-p.balance) : inr(p.balance)}</b></div><div class="arrow">&rarr;</div>
+      <div><small>After this payment</small><b class="num ${after > 0 ? cls + '-t' : after < 0 ? 'adv-t' : 'zero-t'}" id="after">${after < 0 ? 'Adv ' + inr(-after) : after === 0 ? 'Settled' : inr(after)}</b></div></div>
+    <div><label>Paid by</label><div class="seg" id="mode"><button class="${mode === 'Cash' ? 'on' : ''}">Cash</button><button class="${mode === 'UPI' ? 'on' : ''}">UPI</button></div></div>
+    <button class="go ${cls}" id="go" ${n ? '' : 'disabled'}>${n ? (rec ? 'Receive ' : 'Pay ') + inr(n) : 'Enter an amount'}</button>`;
+  $('amt').oninput = (e) => { amt = e.target.value; const keep = e.target.selectionStart; slip(); const a = $('amt'); a.focus(); a.setSelectionRange(keep, keep); };
+  $('mode').onclick = (e) => { if (e.target.tagName === 'BUTTON') { mode = e.target.textContent; slip(); } };
+  $('go').onclick = () => { $('go').textContent = 'Saved. Prototype only, nothing was stored.'; $('go').disabled = true; };
+}
+$('people').onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) { sel = b.dataset.id; amt = ''; people(); slip(); } };
+$('q').oninput = people;
+people();
+</script></body></html>

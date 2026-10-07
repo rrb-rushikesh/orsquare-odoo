@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment 2 - Three steps</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .wrap { display: flex; justify-content: center; padding: 32px 12px 60px; }
+  /* one question per screen: nothing to misread, ideal for a busy counter or a new cashier */
+  .card { width: 100%; max-width: 480px; background: var(--canvas); border: 1px solid var(--line); min-height: 520px; display: flex; flex-direction: column; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .steps div { padding: 12px 14px; font-size: 12px; color: var(--subtle); border-bottom: 3px solid var(--line); }
+  .steps div.on { color: var(--ink); border-color: var(--ink); font-weight: 600; } .steps div.past { color: var(--muted); border-color: var(--muted); }
+  .pane { padding: 22px 20px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  h2 { margin: 0 0 8px; font-size: 20px; font-weight: 400; }
+  .opt { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 14px 16px; border: 1px solid var(--line); background: var(--canvas); cursor: pointer; width: 100%; }
+  .opt:hover { background: var(--layer); } .opt.on { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); background: var(--layer); }
+  .opt small { display: block; color: var(--muted); font-size: 12px; }
+  .opt .v { font-weight: 600; } .opt .v.rec { color: var(--rec-fg); } .opt .v.pay { color: var(--pay-fg); } .opt .v.adv { color: var(--adv); }
+  .big { padding: 20px 16px; } .big.rec b { color: var(--rec-fg); } .big.pay b { color: var(--pay-fg); }
+  input { width: 100%; padding: 14px; border: 1px solid var(--line); border-bottom: 2px solid var(--ink); font-size: 28px; font-weight: 300; background: var(--layer); border-radius: 0; }
+  .nav { display: flex; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--line); }
+  .nav button { padding: 11px 22px; border: 1px solid var(--ink); background: var(--canvas); cursor: pointer; font-weight: 500; }
+  .nav button.next { background: var(--ink); color: #fff; } .nav button:disabled { opacity: .35; cursor: not-allowed; }
+  .sum { border: 1px solid var(--line); } .sum div { display: flex; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--line); } .sum div:last-child { border: 0; font-weight: 600; background: var(--layer); }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Payment 2 &middot; Three steps</b></div>
+<div class="wrap"><div class="card"><div class="steps" id="steps"></div><div class="pane" id="pane"></div><div class="nav"><button id="back">Back</button><button class="next" id="next">Next</button></div></div></div>
+<script src="../shared/data.js"></script>
+<script>
+const S = { step: 0, dir: null, party: null, bill: 'account', amount: '', mode: 'Cash' };
+const $ = (id) => document.getElementById(id);
+const P = () => PARTIES.find((p) => p.id === S.party);
+function ok() {
+  if (S.step === 0) return S.dir && S.party;
+  if (S.step === 1) return Number(S.amount) > 0;
+  return true;
+}
+function render() {
+  $('steps').innerHTML = ['1 Who', '2 How much', '3 Confirm'].map((t, i) => `<div class="${i === S.step ? 'on' : i < S.step ? 'past' : ''}">${t}</div>`).join('');
+  const pane = $('pane'); const p = P(); const word = S.dir === 'in' ? 'Receive' : 'Pay';
+  if (S.step === 0) {
+    pane.innerHTML = `<h2>What do you want to record?</h2>
+      <button class="opt big rec ${S.dir === 'in' ? 'on' : ''}" data-dir="in"><span><b>Receive money</b><small>A customer is paying you</small></span></button>
+      <button class="opt big pay ${S.dir === 'out' ? 'on' : ''}" data-dir="out"><span><b>Pay money</b><small>You are paying a supplier</small></span></button>
+      ${S.dir ? `<h2 style="margin-top:14px">${S.dir === 'in' ? 'Which customer?' : 'Which supplier?'}</h2>` + PARTIES.filter((x) => (S.dir === 'in') === isReceive(x)).map((x) => `<button class="opt ${S.party === x.id ? 'on' : ''}" data-party="${x.id}"><span>${x.name}<small>${x.phone}</small></span><span class="v ${x.balance > 0 ? (S.dir === 'in' ? 'rec' : 'pay') : x.balance < 0 ? 'adv' : ''}">${x.balance > 0 ? inr(x.balance) : x.balance < 0 ? 'Advance ' + inr(-x.balance) : 'Settled'}</span></button>`).join('') : ''}`;
+  } else if (S.step === 1) {
+    pane.innerHTML = `<h2>${word} ${S.dir === 'in' ? 'from' : 'to'} ${p.name}</h2>
+      <input id="amt" class="num" inputmode="decimal" placeholder="Amount" value="${S.amount}">
+      <div style="color:var(--muted);font-size:13px;margin-top:6px">Against</div>
+      <button class="opt ${S.bill === 'account' ? 'on' : ''}" data-bill="account"><span>On account<small>Not tied to one bill</small></span><span class="v">${p.balance > 0 ? inr(p.balance) : ''}</span></button>
+      ${p.bills.map((b) => `<button class="opt ${S.bill === b.no ? 'on' : ''}" data-bill="${b.no}" data-due="${b.due}"><span>${b.no}<small>${b.date}</small></span><span class="v ${S.dir === 'in' ? 'rec' : 'pay'}">${inr(b.due)}</span></button>`).join('')}`;
+  } else {
+    pane.innerHTML = `<h2>Paid by</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="opt ${S.mode === 'Cash' ? 'on' : ''}" data-mode="Cash">Cash</button><button class="opt ${S.mode === 'UPI' ? 'on' : ''}" data-mode="UPI">UPI</button></div>
+      <div class="sum" style="margin-top:14px"><div><span>${S.dir === 'in' ? 'From' : 'To'}</span><span>${p.name}</span></div><div><span>Against</span><span>${S.bill === 'account' ? 'On account' : S.bill}</span></div><div><span>Method</span><span>${S.mode}</span></div><div><span>${word}</span><span class="num">${inr(Number(S.amount))}</span></div></div>
+      <div id="saved" style="color:var(--rec-fg)"></div>`;
+  }
+  $('back').disabled = S.step === 0; $('next').disabled = !ok(); $('next').textContent = S.step === 2 ? 'Save payment' : 'Next';
+}
+$('pane').onclick = (e) => {
+  const t = e.target.closest('[data-dir],[data-party],[data-bill],[data-mode]'); if (!t) return;
+  if (t.dataset.dir) { S.dir = t.dataset.dir; S.party = null; }
+  if (t.dataset.party) S.party = t.dataset.party;
+  if (t.dataset.bill) { S.bill = t.dataset.bill; if (t.dataset.due) S.amount = t.dataset.due; }
+  if (t.dataset.mode) S.mode = t.dataset.mode;
+  render();
+};
+$('pane').oninput = (e) => { if (e.target.id === 'amt') { S.amount = e.target.value; $('next').disabled = !ok(); } };
+$('back').onclick = () => { S.step--; render(); };
+$('next').onclick = () => { if (S.step < 2) { S.step++; render(); } else { $('saved').textContent = 'Saved. Prototype only, nothing was stored.'; $('next').disabled = true; } };
+render();
+</script></body></html>

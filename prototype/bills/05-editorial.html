@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bill 5 - Editorial</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  body { background: #fbfaf7; }
+  .wrap { display: flex; justify-content: center; padding: 48px 20px 90px; }
+  /* no boxes, no table lines: only type, space and dotted leaders */
+  .page { width: 100%; max-width: 560px; font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif; color: #1d1d1b; }
+  .eyebrow { font-family: var(--font); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #8a8a85; }
+  h1 { font-weight: 400; font-size: 54px; line-height: 1; margin: 10px 0 6px; letter-spacing: -.02em; }
+  .who { font-size: 19px; font-style: italic; color: #55554f; margin-bottom: 40px; }
+  .line { display: flex; align-items: baseline; gap: 8px; margin: 13px 0; font-size: 17px; }
+  .line .dots { flex: 1; border-bottom: 1px dotted #b9b8b0; transform: translateY(-4px); }
+  .line small { font-family: var(--font); color: #8a8a85; font-size: 12px; }
+  .gap { height: 28px; }
+  .sumline { display: flex; justify-content: space-between; font-family: var(--font); font-size: 13px; color: #55554f; margin: 6px 0; }
+  .total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 22px; padding-top: 18px; border-top: 1px solid #1d1d1b; }
+  .total span:first-child { font-family: var(--font); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .total span:last-child { font-size: 44px; letter-spacing: -.02em; }
+  .state { margin-top: 34px; font-family: var(--font); font-size: 15px; }
+  .state b { font-weight: 600; } .state.rec b { color: var(--rec-fg); } .state.pay b { color: var(--pay-fg); }
+  .paidby { font-family: var(--font); font-size: 13px; color: #77776f; margin-top: 8px; }
+</style></head>
+<body>
+<div class="proto-bar"><a href="../index.html">&larr; All prototypes</a><b>Bill 5 &middot; Editorial</b><div class="sw" data-switch></div></div>
+<div class="wrap"><div class="page" id="bill"></div></div>
+<script src="../shared/data.js"></script>
+<script>
+mountBills((b, t) => `
+  <div class="eyebrow">${SHOP.name} &middot; ${b.kind === 'sale' ? 'Sales bill' : 'Purchase bill'} &middot; ${b.date}</div>
+  <h1>${b.no}</h1>
+  <div class="who">${b.kind === 'sale' ? 'for' : 'from'} ${b.party}</div>
+  ${b.items.map((i) => `<div class="line"><span>${i.name} <small>${i.qty} &times; ${inr(i.rate)}</small></span><span class="dots"></span><span class="num">${inr(i.qty * i.rate)}</span></div>`).join('')}
+  <div class="gap"></div>
+  <div class="sumline"><span>Subtotal</span><span class="num">${inr(t.subtotal)}</span></div>
+  ${b.discount ? `<div class="sumline"><span>Discount</span><span class="num">-${inr(b.discount)}</span></div>` : ''}
+  ${b.tax ? `<div class="sumline"><span>${b.taxLabel}</span><span class="num">${inr(b.tax)}</span></div>` : ''}
+  <div class="total"><span>Total</span><span class="num">${inr(t.total)}</span></div>
+  <div class="state ${t.due ? dueClass(b) : ''}">${t.due ? `<b>${dueWord(b)} ${inr(t.due)}</b> still open.` : '<b>Settled.</b> Nothing is owed.'}</div>
+  <div class="paidby">${b.payments.map((p) => `${inr(p.amount)} by ${p.method}`).join(', ')}</div>`);
+</script></body></html>
