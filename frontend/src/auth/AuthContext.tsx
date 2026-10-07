@@ -73,8 +73,26 @@ const ME_KEY = 'or2_me';
 function readCached(): { shop: string; me: Me } | null {
   try {
     const shop = localStorage.getItem(SHOP_KEY);
-    const me = localStorage.getItem(ME_KEY);
-    return shop && me ? { shop, me: JSON.parse(me) as Me } : null;
+    const raw = localStorage.getItem(ME_KEY);
+    if (!shop || !raw) return null;
+    const me = JSON.parse(raw) as Me;
+    if (!me || typeof me !== 'object') return null;
+    if (!me.flags) {
+      me.flags = { can_see_money: true, can_see_valuation: true, can_manage_returns: true };
+    }
+    if (!me.company) {
+      me.company = { id: 0, name: 'ORSquare Platform', currency: 'INR', tz: 'Asia/Kolkata', gstin: '', business_date: '' };
+    }
+    if (!Array.isArray(me.roles)) {
+      me.roles = [];
+    }
+    if (!Array.isArray(me.tabs)) {
+      me.tabs = [];
+    }
+    if (!me.features || typeof me.features !== 'object') {
+      me.features = {} as any;
+    }
+    return { shop, me };
   } catch {
     return null;
   }
@@ -91,16 +109,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const adopt = useCallback((m: Me, shop: string) => {
-    setMe(m);
+    const normalized: Me = {
+      ...m,
+      flags: m.flags || { can_see_money: true, can_see_valuation: true, can_manage_returns: true },
+      company: m.company || { id: 0, name: 'ORSquare Platform', currency: 'INR', tz: 'Asia/Kolkata', gstin: '', business_date: '' },
+      roles: Array.isArray(m.roles) ? m.roles : [],
+      tabs: Array.isArray(m.tabs) ? m.tabs : [],
+      features: m.features || ({} as any),
+    };
+    setMe(normalized);
     setReady(true);
     setShopCode(shop);
     setSessionError(null);
     try {
       localStorage.setItem(SHOP_KEY, shop);
-      localStorage.setItem(ME_KEY, JSON.stringify(m));
+      localStorage.setItem(ME_KEY, JSON.stringify(normalized));
     } catch { /* private mode */ }
-    if ((m as any).surface !== 'dev' && !m.roles?.includes('developer')) {
-      void startStore(shop, m);
+    if ((normalized as any).surface !== 'dev' && !normalized.roles?.includes('developer')) {
+      void startStore(shop, normalized);
     }
   }, []);
 
@@ -116,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     const hydrate = async () => {
       const cached = readCached();
-      if (cached?.me && cached?.shop) {
+      if (cached?.me && cached?.shop && (cached.me as any).surface !== 'dev' && !cached.me.roles?.includes('developer')) {
         void startStore(cached.shop, cached.me);
       }
       try {
@@ -205,9 +231,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isOwnerAccount: false, isMultiShop: false,
       surfaceOn: key => key === 'surface.ledger' ? tabs.has('reports') : key === 'surface.advanced_accounting' ? true : key === 'surface.stock',
       feature: key => ({ enabled: featureOn(key), owner_only: false }),
-      seesMoney: !!me?.flags.can_see_money,
-      seesValuation: !!me?.flags.can_see_valuation,
-      canManageReturns: !!me?.flags.can_manage_returns,
+      seesMoney: !!me?.flags?.can_see_money,
+      seesValuation: !!me?.flags?.can_see_valuation,
+      canManageReturns: !!me?.flags?.can_manage_returns,
       can: (perm) => tabs.has(perm),
       featureOn,
       sessionError, signIn, refreshUserProfile, signOut,
